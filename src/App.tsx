@@ -1844,9 +1844,6 @@ export default function App() {
                               onChange={(e) => setFormAccessLevelId(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium"
                             >
-                              <option value="1">Level 1 (Highest)</option>
-                              <option value="2">Level 2 (Standard)</option>
-                              <option value="3">Level 3 (Limited)</option>
                               <option value="4">Level 4</option>
                               <option value="5">Level 5</option>
                               <option value="6">Level 6</option>
@@ -2215,9 +2212,6 @@ export default function App() {
                               onChange={(e) => setFormAccessLevelId(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium"
                             >
-                              <option value="1">Level 1 (Highest)</option>
-                              <option value="2">Level 2 (Standard)</option>
-                              <option value="3">Level 3 (Limited)</option>
                               <option value="4">Level 4</option>
                               <option value="5">Level 5</option>
                               <option value="6">Level 6</option>
