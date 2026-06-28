@@ -1306,9 +1306,6 @@ export default function App() {
                                   <button
                                     onClick={async () => {
                                       if (confirm(`Are you sure you want to delete ${u.name}?`)) {
-                                        // Optimistically remove from state
-                                        setUserDirectoryState(prev => prev.filter(item => item.username !== u.username));
-
                                         try {
                                           const token = loginResult?.data?.token || "";
                                           const headers: Record<string, string> = {
@@ -1321,7 +1318,13 @@ export default function App() {
 
                                           let endpoint = "";
                                           let method = "DELETE";
-                                          const idParam = u._id || u.username;
+                                          // Use _id for DB delete (required by backend routes)
+                                          const idParam = u._id;
+
+                                          if (!idParam) {
+                                            alert(`Cannot delete ${u.name}: missing database ID. Please refresh the user list.`);
+                                            return;
+                                          }
 
                                           if (u.role === "student") {
                                             endpoint = `https://abms-lkw9.onrender.com/m/student/delete/${idParam}`;
@@ -1344,12 +1347,16 @@ export default function App() {
                                             if (!response.ok) {
                                               const errText = await response.text();
                                               console.warn(`Database delete returned non-ok status: ${response.status}`, errText);
+                                              alert(`Failed to delete ${u.name} from database (${response.status}). Please try again.`);
                                             } else {
                                               console.log("Successfully deleted from database.");
+                                              // Only remove from UI after confirmed DB deletion
+                                              setUserDirectoryState(prev => prev.filter(item => item._id !== u._id));
                                             }
                                           }
                                         } catch (err: any) {
                                           console.error("Failed to delete from database:", err);
+                                          alert(`Network error while deleting ${u.name}: ${err.message}`);
                                         }
                                       }
                                     }}
