@@ -119,7 +119,7 @@ export default function App() {
 
   // User directory CRUD states
   const [userDirectoryState, setUserDirectoryState] = useState(() => {
-    const saved = localStorage.getItem("abms_user_directory");
+    const saved = localStorage.getItem("abms_user_directory_fresh");
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -127,22 +127,11 @@ export default function App() {
         console.error("Failed to parse saved user directory:", e);
       }
     }
-    return [
-      { username: "REG-2026-1049", name: "Jackson Evaluation User", role: "student", status: "Active", phone: "0771234567" },
-      { username: "IUN27062027ST", name: "Jackson Evaluation User", role: "student", status: "Active", phone: "0771234567" },
-      { username: "INST_9921_NIC", name: "Instructor Evaluation User", role: "instructor", status: "Active", phone: "0771112223" },
-      { username: "ADMIN", name: "Admin User", role: "administrator", status: "Active", phone: "0773334445", access_level: "1" },
-      { username: "ADMIN_NIC_123", name: "Admin User", role: "administrator", status: "Active", phone: "0773334445", access_level: "2" },
-      { username: "ADMIN_LEVEL_3", name: "Admin User Level 3", role: "administrator", status: "Active", phone: "0775556667", access_level: "3" },
-      { username: "+94771234567", name: "Parent User", role: "parents", status: "Active", phone: "+94771234567" },
-      { username: "JACKSON", name: "Jenish J D", role: "instructor", status: "Active", phone: "0775556667" },
-      { username: "ALMAMATER", name: "Elena R Rostova", role: "student", status: "Active", phone: "0779998881" },
-      { username: "MVANCE", name: "Marcus V Vance", role: "administrator", status: "Active", phone: "0772223334", access_level: "1" }
-    ];
+    return [];
   });
 
   useEffect(() => {
-    localStorage.setItem("abms_user_directory", JSON.stringify(userDirectoryState));
+    localStorage.setItem("abms_user_directory_fresh", JSON.stringify(userDirectoryState));
   }, [userDirectoryState]);
 
   const [adminAccessLevel, setAdminAccessLevel] = useState("1");
