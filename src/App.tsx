@@ -50,8 +50,6 @@ const ROLE_CONFIGS: Record<
     borderColorClass: string;
     placeholder: string;
     credentialHint: string;
-    demoUser: string;
-    demoPass: string;
   }
 > = {
   administrator: {
@@ -62,9 +60,7 @@ const ROLE_CONFIGS: Record<
     bgBadgeClass: "bg-amber-100 text-amber-800",
     borderColorClass: "group-hover:border-amber-500/40 focus-within:ring-amber-500/20 focus-within:border-amber-500",
     placeholder: "NIC / Username",
-    credentialHint: "National Identity Card (NIC) number or admin username",
-    demoUser: "admin_nic_123",
-    demoPass: "adminPass123"
+    credentialHint: "National Identity Card (NIC) number or admin username"
   },
   student: {
     title: "Student Portal",
@@ -74,9 +70,7 @@ const ROLE_CONFIGS: Record<
     bgBadgeClass: "bg-cyan-100 text-cyan-800",
     borderColorClass: "group-hover:border-cyan-500/40 focus-within:ring-cyan-500/20 focus-within:border-cyan-500",
     placeholder: "Registration Number",
-    credentialHint: "Format: REG-2026-XXXX",
-    demoUser: "REG-2026-1049",
-    demoPass: "studentPass99"
+    credentialHint: "Format: REG-2026-XXXX"
   },
   instructor: {
     title: "Instructor Portal",
@@ -86,9 +80,7 @@ const ROLE_CONFIGS: Record<
     bgBadgeClass: "bg-emerald-100 text-emerald-800",
     borderColorClass: "group-hover:border-emerald-500/40 focus-within:ring-emerald-500/20 focus-within:border-emerald-500",
     placeholder: "NIC / Employee ID",
-    credentialHint: "Instructor NIC number or employee ID key",
-    demoUser: "inst_9921_nic",
-    demoPass: "instructorSecure88"
+    credentialHint: "Instructor NIC number or employee ID key"
   },
   parents: {
     title: "Parent Portal",
@@ -98,9 +90,7 @@ const ROLE_CONFIGS: Record<
     bgBadgeClass: "bg-violet-100 text-violet-800",
     borderColorClass: "group-hover:border-violet-500/40 focus-within:ring-violet-500/20 focus-within:border-violet-500",
     placeholder: "Phone Number",
-    credentialHint: "Registered parent mobile number",
-    demoUser: "+94771234567",
-    demoPass: "parentPass321"
+    credentialHint: "Registered parent mobile number"
   }
 };
 
@@ -319,12 +309,6 @@ export default function App() {
   const [formSex, setFormSex] = useState("Male");
   const [formDob, setFormDob] = useState("2000-01-01");
   const [formAccessLevelId, setFormAccessLevelId] = useState("1");
-
-  // Auto-fill credentials helper
-  const handleApplyDemo = () => {
-    setUsername(activeConfig.demoUser);
-    setPassword(activeConfig.demoPass);
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2681,38 +2665,6 @@ export default function App() {
                     </button>
                   </div>
                 </form>
-
-                {/* Demo Helper Drawer Banner */}
-                <div className="mt-6 pt-5 border-t border-slate-200/80 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-500">Sandbox Demo Helper</span>
-                    <button
-                      type="button"
-                      onClick={handleApplyDemo}
-                      className="text-[11px] font-bold text-cyan-600 hover:text-cyan-700 underline cursor-pointer"
-                    >
-                      Pre-fill credentials
-                    </button>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="space-y-0.5 text-left">
-                      <span className="text-[10px] font-mono block text-slate-400 font-bold">TEST ACCOUNT:</span>
-                      <span className="text-[11px] font-mono text-slate-600 select-all block sm:inline mr-2">
-                        Username: <b className="text-slate-800">{activeConfig.demoUser}</b>
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-600 select-all block sm:inline">
-                        Password: <b className="text-slate-800">{activeConfig.demoPass}</b>
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleApplyDemo}
-                      className="text-[10px] bg-white hover:bg-slate-50 text-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm cursor-pointer self-start sm:self-center shrink-0 font-medium"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
               </motion.div>
             ) : (
               /* Success State Display Card */
