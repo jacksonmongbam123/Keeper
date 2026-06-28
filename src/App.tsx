@@ -113,7 +113,7 @@ export default function App() {
   const activeConfig = ROLE_CONFIGS[selectedRole];
 
   // Dashboard states
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(() => selectedRole === "administrator" ? "users" : "overview");
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -396,6 +396,9 @@ export default function App() {
               }
             }
             setAdminAccessLevel(levelStr);
+            setActiveTab("users");
+          } else {
+            setActiveTab("overview");
           }
 
           setLoginResult({
@@ -425,7 +428,7 @@ export default function App() {
     setLoginResult(null);
     setUsername("");
     setPassword("");
-    setActiveTab("overview");
+    setActiveTab(selectedRole === "administrator" ? "users" : "overview");
   };
 
   if (loginResult?.success) {
@@ -460,10 +463,7 @@ export default function App() {
     ];
 
     const menuItems = selectedRole === "administrator" ? [
-      { id: "overview", label: "System Overview", icon: Home },
-      { id: "users", label: "User Directory", icon: Users },
-      { id: "logs", label: "Security Audits", icon: Terminal },
-      { id: "settings", label: "System Options", icon: Settings }
+      { id: "users", label: "User Directory", icon: Users }
     ] : selectedRole === "student" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "courses", label: "My Curriculum", icon: BookOpen },
@@ -1107,59 +1107,6 @@ export default function App() {
 
       // Administrator views
       if (selectedRole === "administrator") {
-        if (activeTab === "overview") {
-          return (
-            <div className="space-y-6">
-              {/* Stat grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: "Access Gateway Health", val: "100%", desc: "Service Fully Online", icon: Activity, color: "text-amber-600 bg-amber-50 border-amber-100" },
-                  { label: "Active Sessions", val: "14 standard", desc: "No critical warnings", icon: Users, color: "text-blue-600 bg-blue-50 border-blue-100" },
-                  { label: "Database Handshake", val: "Normal", desc: "Atlas Pool Integrity Ok", icon: Database, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-                  { label: "Core Security Rules", val: "Protected", desc: "Bypass mapped tightly", icon: Cpu, color: "text-violet-600 bg-violet-50 border-violet-100" }
-                ].map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">{item.label}</span>
-                        <div className={`p-1.5 rounded-lg border ${item.color}`}>
-                          <Icon className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
-                      <p className="text-2xl font-black text-slate-900 mt-2">{item.val}</p>
-                      <span className="text-[10px] text-slate-500 block mt-1">{item.desc}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Recent audits quick list */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-1">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Terminal className="w-3.5 h-3.5 text-amber-600" />
-                    Latest System Audit Streams
-                  </h3>
-                  <button onClick={() => { setActiveTab("logs"); setSearchQuery(""); }} className="text-[10px] text-amber-600 font-bold hover:underline cursor-pointer">View All Audits</button>
-                </div>
-                <div className="space-y-2">
-                  {systemLogs.slice(0, 3).map((log, idx) => (
-                    <div key={idx} className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl font-mono text-[10px] leading-relaxed flex flex-col sm:flex-row justify-between items-start gap-1">
-                      <div>
-                        <span className="text-slate-400 font-bold mr-1.5">[{log.timestamp}]</span>
-                        <span className="text-amber-700 font-bold mr-2 uppercase">{log.event}:</span>
-                        <span className="text-slate-700">{log.message}</span>
-                      </div>
-                      <span className="text-[9px] bg-slate-200/60 text-slate-500 px-1.5 rounded font-sans uppercase shrink-0 font-bold">Success</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        }
-
         if (activeTab === "users") {
           const filtered = userDirectory.filter(u => u.name.toLowerCase().includes(lowerQuery) || u.username.toLowerCase().includes(lowerQuery) || u.role.toLowerCase().includes(lowerQuery));
           return (
@@ -2218,53 +2165,6 @@ export default function App() {
             </div>
           );
         }
-
-        if (activeTab === "logs") {
-          return (
-            <div className="bg-slate-950 rounded-2xl p-4 font-mono text-[11px] text-slate-300 border border-slate-800 shadow-lg space-y-2 max-h-[480px] overflow-y-auto leading-relaxed">
-              <div className="border-b border-slate-800 pb-2 mb-2 flex justify-between items-center text-slate-500 text-[10px] font-bold">
-                <span>GATEWAY CONSOLE BUFFER (SYS_LOG)</span>
-                <span className="text-emerald-500 animate-pulse">● SECURE STREAM ACTIVE</span>
-              </div>
-              {systemLogs.map((log, idx) => (
-                <div key={idx} className="hover:bg-slate-900 p-1.5 rounded transition-colors">
-                  <span className="text-slate-500 font-bold mr-2">[{log.timestamp}]</span>
-                  <span className="text-amber-500 font-bold mr-2 uppercase">{log.event}:</span>
-                  <span className="text-slate-200">{log.message}</span>
-                </div>
-              ))}
-              <div className="hover:bg-slate-900 p-1.5 rounded transition-colors">
-                <span className="text-slate-500 font-bold mr-2">[{new Date().toLocaleTimeString()}]</span>
-                <span className="text-emerald-500 font-bold mr-2 uppercase">SYS_OK:</span>
-                <span className="text-slate-400">Ready for incoming sandbox API authentication requests</span>
-              </div>
-            </div>
-          );
-        }
-
-        if (activeTab === "settings") {
-          return (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm max-w-xl space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Global System Tuning</h3>
-              <div className="space-y-4 text-xs">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="rounded text-amber-500 focus:ring-amber-500/20 w-4 h-4 border-slate-300 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-slate-800 block">Universal Dev Sandbox Bypass</span>
-                    <span className="text-[10px] text-slate-500">Allow demo usernames to bypass standard remote hashing for quick evaluation testing.</span>
-                  </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="rounded text-amber-500 focus:ring-amber-500/20 w-4 h-4 border-slate-300 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-slate-800 block">Force Strict Content Security Headers</span>
-                    <span className="text-[10px] text-slate-500">Block scripts or requests originating from outside approved onrender sub-nodes.</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-          );
-        }
       }
 
       return null;
@@ -2539,6 +2439,7 @@ export default function App() {
                           setSelectedRole(role);
                           setUsername("");
                           setPassword("");
+                          setActiveTab(role === "administrator" ? "users" : "overview");
                         }}
                         className={`relative p-3 rounded-xl flex flex-col items-center justify-center gap-2 border text-center transition-all duration-300 cursor-pointer ${
                           isSelected
