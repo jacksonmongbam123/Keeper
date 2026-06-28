@@ -1847,6 +1847,9 @@ export default function App() {
                               <option value="1">Level 1 (Highest)</option>
                               <option value="2">Level 2 (Standard)</option>
                               <option value="3">Level 3 (Limited)</option>
+                              <option value="4">Level 4</option>
+                              <option value="5">Level 5</option>
+                              <option value="6">Level 6</option>
                             </select>
                           </div>
                         </div>
@@ -2215,6 +2218,9 @@ export default function App() {
                               <option value="1">Level 1 (Highest)</option>
                               <option value="2">Level 2 (Standard)</option>
                               <option value="3">Level 3 (Limited)</option>
+                              <option value="4">Level 4</option>
+                              <option value="5">Level 5</option>
+                              <option value="6">Level 6</option>
                             </select>
                           </div>
                         </div>
