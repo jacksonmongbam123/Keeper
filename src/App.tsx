@@ -134,6 +134,62 @@ export default function App() {
     localStorage.setItem("abms_user_directory_fresh", JSON.stringify(userDirectoryState));
   }, [userDirectoryState]);
 
+  // Session persistence - restore session from localStorage on mount
+  useEffect(() => {
+    const savedSession = localStorage.getItem("abms_session");
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed && parsed.success && parsed.data?.token) {
+          // Verify session with backend
+          fetch("https://abms-lkw9.onrender.com/login/verify", {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${parsed.data.token}`
+            }
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.status === 200 && data.user) {
+                setLoginResult({
+                  success: true,
+                  message: "Session restored",
+                  data: {
+                    token: parsed.data.token,
+                    user: data.user
+                  }
+                });
+                if (data.user.access_level_id) {
+                  setAdminAccessLevel(data.user.access_level_id);
+                }
+                if (data.user.user_type) {
+                  const roleMap: Record<string, RoleType> = {
+                    "admin": "administrator",
+                    "student": "student",
+                    "teacher": "instructor",
+                    "parent": "parents"
+                  };
+                  setSelectedRole(roleMap[data.user.user_type] || "student");
+                }
+              } else {
+                // Session invalid, clear localStorage
+                localStorage.removeItem("abms_session");
+              }
+            })
+            .catch(err => {
+              console.error("Session verification error:", err);
+              localStorage.removeItem("abms_session");
+            });
+        }
+      } catch (e) {
+        console.error("Failed to parse saved session:", e);
+        localStorage.removeItem("abms_session");
+      }
+    }
+  }, []);
+
   const [adminAccessLevel, setAdminAccessLevel] = useState("1");
 
   // Fetch real database users and merge them on successful administrator login or navigating to users tab
@@ -406,6 +462,12 @@ export default function App() {
             message: responseData.message || "Logged in successfully",
             data: responseData
           });
+          // Save session to localStorage for persistence
+          localStorage.setItem("abms_session", JSON.stringify({
+            success: true,
+            message: responseData.message || "Logged in successfully",
+            data: responseData
+          }));
         }
       } else {
         setLoginResult({
@@ -429,6 +491,7 @@ export default function App() {
     setUsername("");
     setPassword("");
     setActiveTab(selectedRole === "administrator" ? "users" : "overview");
+    localStorage.removeItem("abms_session");
   };
 
   if (loginResult?.success) {
@@ -437,6 +500,13 @@ export default function App() {
     const displayRegNo = userObj.reg_no || userObj.nic || username || "REG-2026-1049";
     const displayRole = userObj.role || userObj.user_type || selectedRole;
     const displayEmail = userObj.email || `${displayRole.toLowerCase()}@abms-portal.com`;
+    const displayPhone = userObj.phone || "";
+    const displaySex = userObj.sex || "";
+    const displayDob = userObj.dob ? new Date(userObj.dob).toLocaleDateString() : "";
+    const displayPassport = userObj.passport || "";
+    const displayNameWithSurname = userObj.first_name
+      ? `${userObj.first_name} ${userObj.middle_name ? userObj.middle_name + " " : ""}${userObj.last_name || ""}`.trim()
+      : displayName;
 
     const studentCourses = [
       { code: "CS-401", name: "Advanced Software Architecture", credit: 4, grade: "A", instructor: "Dr. Elena Rostova" },
@@ -2281,6 +2351,10 @@ export default function App() {
 
                       <div className="space-y-1.5 text-xs text-slate-600">
                         <div className="flex justify-between py-1 border-b border-slate-50">
+                          <span className="text-slate-400 font-medium">Full Name:</span>
+                          <span className="font-semibold text-slate-800 truncate max-w-[140px]">{displayNameWithSurname}</span>
+                        </div>
+                        <div className="flex justify-between py-1 border-b border-slate-50">
                           <span className="text-slate-400 font-medium">Role:</span>
                           <span className="font-semibold text-slate-800 capitalize bg-cyan-50 text-cyan-700 px-1.5 py-0.5 rounded text-[10px]">
                             {displayRole}
@@ -2290,6 +2364,30 @@ export default function App() {
                           <span className="text-slate-400 font-medium">Access Key:</span>
                           <span className="font-mono font-semibold text-slate-800 select-all">{displayRegNo}</span>
                         </div>
+                        {displayPhone && (
+                          <div className="flex justify-between py-1 border-b border-slate-50">
+                            <span className="text-slate-400 font-medium">Phone:</span>
+                            <span className="font-mono font-semibold text-slate-800">{displayPhone}</span>
+                          </div>
+                        )}
+                        {displayEmail && !displayEmail.includes("@abms-portal.com") && (
+                          <div className="flex justify-between py-1 border-b border-slate-50">
+                            <span className="text-slate-400 font-medium">Email:</span>
+                            <span className="font-semibold text-slate-800 truncate max-w-[140px]">{displayEmail}</span>
+                          </div>
+                        )}
+                        {displaySex && (
+                          <div className="flex justify-between py-1 border-b border-slate-50">
+                            <span className="text-slate-400 font-medium">Gender:</span>
+                            <span className="font-semibold text-slate-800">{displaySex}</span>
+                          </div>
+                        )}
+                        {displayDob && (
+                          <div className="flex justify-between py-1 border-b border-slate-50">
+                            <span className="text-slate-400 font-medium">Date of Birth:</span>
+                            <span className="font-semibold text-slate-800">{displayDob}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between py-1 border-b border-slate-50">
                           <span className="text-slate-400 font-medium">Status:</span>
                           <span className="font-semibold text-emerald-600 flex items-center gap-1">
