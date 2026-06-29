@@ -1324,6 +1324,9 @@ export default function App() {
                                           } else if (u.role === "parents" || u.role === "parent") {
                                             endpoint = `https://abms-lkw9.onrender.com/m/parent/delete/${idParam}`;
                                             method = "POST";
+                                          } else if (u.role === "administrator" || u.role === "admin") {
+                                            endpoint = `https://abms-lkw9.onrender.com/m/admin/delete/${idParam}`;
+                                            method = "POST";
                                           }
 
                                           if (endpoint) {
