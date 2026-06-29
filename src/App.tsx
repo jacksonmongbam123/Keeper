@@ -310,18 +310,7 @@ export default function App() {
           }
 
           if (fetchedUsers.length > 0) {
-            setUserDirectoryState(prev => {
-              const merged = [...prev];
-              fetchedUsers.forEach(fetched => {
-                const matchIdx = merged.findIndex(m => m.username.toLowerCase() === fetched.username.toLowerCase());
-                if (matchIdx !== -1) {
-                  merged[matchIdx] = { ...merged[matchIdx], ...fetched };
-                } else {
-                  merged.push(fetched);
-                }
-              });
-              return merged;
-            });
+            setUserDirectoryState(fetchedUsers);
           }
         } catch (err) {
           console.error("Error fetching all users:", err);
