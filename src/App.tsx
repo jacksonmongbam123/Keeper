@@ -130,6 +130,14 @@ export default function App() {
     return [];
   });
 
+  
+  // Clear demo data from localStorage on app load
+  useEffect(() => {
+    localStorage.removeItem('keeper_titles');
+    localStorage.removeItem('keeper_grades');
+    localStorage.removeItem('keeper_user_types');
+  }, []);
+
   useEffect(() => {
     localStorage.setItem("abms_user_directory_fresh", JSON.stringify(userDirectoryState));
   }, [userDirectoryState]);
