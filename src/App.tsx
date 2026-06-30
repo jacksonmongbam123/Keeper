@@ -340,6 +340,7 @@ export default function App() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassport, setFormPassport] = useState("None");
   const [formTitleId, setFormTitleId] = useState("Mr");
+  const [titlesList, setTitlesList] = useState<string[]>(["Mr", "Ms", "Mrs", "Dr", "Prof"]);
   const [formSex, setFormSex] = useState("Male");
   const [formDob, setFormDob] = useState("2000-01-01");
   const [formAccessLevelId, setFormAccessLevelId] = useState("1");
@@ -1693,12 +1694,9 @@ export default function App() {
                               onChange={(e) => setFormTitleId(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
                             >
-                              <option value="Mr">Mr</option>
-                              <option value="Mrs">Mrs</option>
-                              <option value="Miss">Miss</option>
-                              <option value="Ms">Ms</option>
-                              <option value="Dr">Dr</option>
-                              <option value="Rev">Rev</option>
+                              {titlesList.map(title => (
+                                <option key={title} value={title}>{title}</option>
+                              ))}
                             </select>
                           </div>
 
@@ -2061,12 +2059,9 @@ export default function App() {
                               onChange={(e) => setFormTitleId(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
                             >
-                              <option value="Mr">Mr</option>
-                              <option value="Mrs">Mrs</option>
-                              <option value="Miss">Miss</option>
-                              <option value="Ms">Ms</option>
-                              <option value="Dr">Dr</option>
-                              <option value="Rev">Rev</option>
+                              {titlesList.map(title => (
+                                <option key={title} value={title}>{title}</option>
+                              ))}
                             </select>
                           </div>
 
