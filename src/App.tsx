@@ -340,9 +340,9 @@ export default function App() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassport, setFormPassport] = useState("None");
   const [formTitleId, setFormTitleId] = useState("Mr");
-  const [titlesList, setTitlesList] = useState<string[]>(["Mr", "Ms", "Mrs", "Dr", "Prof"]);
-  const [gradesList, setGradesList] = useState<string[]>(["A", "B", "C", "D", "F"]);
-  const [userTypesList, setUserTypesList] = useState<string[]>(["student", "teacher", "parent", "administrator"]);
+  const [titlesList, setTitlesList] = useState<string[]>([]);
+  const [gradesList, setGradesList] = useState<string[]>([]);
+  const [userTypesList, setUserTypesList] = useState<string[]>([]);
   const [formSex, setFormSex] = useState("Male");
   const [formDob, setFormDob] = useState("2000-01-01");
   const [formAccessLevelId, setFormAccessLevelId] = useState("1");
