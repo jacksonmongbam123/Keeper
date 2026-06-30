@@ -559,7 +559,45 @@ export default function App() {
 
       if (selectedRole === "student") {
         if (activeTab === "overview") {
-          return (
+        
+  // Filter user directory by admin's organization
+  useEffect(() => {
+    if (adminOrganizationId && userDirectoryState.length > 0) {
+      const filtered = userDirectoryState.filter((user: any) => 
+        user.organization_id === adminOrganizationId
+      );
+      setFilteredUserDirectory(filtered);
+    } else {
+      setFilteredUserDirectory(userDirectoryState);
+    }
+  }, [userDirectoryState, adminOrganizationId]);
+
+  // Fetch logged-in admin's organization details
+  useEffect(() => {
+    const fetchAdminOrganization = async () => {
+      try {
+        // After login, admin data should be stored
+        const adminData = localStorage.getItem('keeper_admin_info');
+        if (adminData) {
+          const admin = JSON.parse(adminData);
+          const adminNIC = admin.nic || admin.phone;
+          if (adminNIC) {
+            const res = await fetch(`https://abms-lkw9.onrender.com/m/admin/by-nic/${adminNIC}`);
+            if (res.ok) {
+              const adminDetails = await res.json();
+              setAdminOrganizationId(adminDetails.organization_id);
+              setAdminAccessLevel(adminDetails.access_level_id);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not fetch admin organization:', err);
+      }
+    };
+    fetchAdminOrganization();
+  }, []);
+
+  return (
             <div className="space-y-6">
               {/* Alert banner */}
               <div className="bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 border border-cyan-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
