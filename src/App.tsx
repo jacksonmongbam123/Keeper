@@ -432,8 +432,8 @@ export default function App() {
             if (rawAccess !== undefined) {
               levelStr = String(rawAccess);
             } else {
-              // Match in local userDirectoryState
-              const matched = userDirectoryState.find(
+              // Match in filtered user directory
+              const matched = filteredUserDirectory.find(
                 u => u.username.toLowerCase() === username.trim().toLowerCase()
               );
               if (matched && matched.role === "administrator" && (matched as any).access_level) {
@@ -522,7 +522,7 @@ export default function App() {
       { id: 4, name: "Final Semester Comprehensive Viva", score: "N/A", date: "July 12, 2026", status: "Not Started" }
     ];
 
-    const userDirectory = userDirectoryState;
+    const userDirectory = filteredUserDirectory;
 
     const systemLogs = [
       { timestamp: "23:10:21", event: "AUTH_SUCCESS_BYPASS", message: "User ADMIN auto-authenticated on /login bypassing standard encryption checks" },
@@ -1679,7 +1679,8 @@ export default function App() {
                           title_id: formTitleId,
                           sex: formSex,
                           dob: formDob,
-                          access_level_id: formAccessLevelId
+                          access_level_id: formAccessLevelId,
+                          organization_id: adminOrganizationId
                         };
                         setUserDirectoryState(prev => [...prev, newUser]);
                         setTimeout(() => {
@@ -2022,7 +2023,8 @@ export default function App() {
                                 title_id: formTitleId,
                                 sex: formSex,
                                 dob: formDob,
-                                access_level_id: formAccessLevelId
+                                access_level_id: formAccessLevelId,
+                          organization_id: adminOrganizationId
                               } 
                             : u
                         ));
@@ -2048,7 +2050,8 @@ export default function App() {
                                 title_id: formTitleId,
                                 sex: formSex,
                                 dob: formDob,
-                                access_level_id: formAccessLevelId
+                                access_level_id: formAccessLevelId,
+                          organization_id: adminOrganizationId
                               } 
                             : u
                         ));
