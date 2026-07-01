@@ -470,6 +470,11 @@ export default function App() {
             message: responseData.message || "Logged in successfully",
             data: responseData
           }));
+          
+          // Save admin info for organization filtering
+          if (responseData.user && (responseData.user.role === "administrator" || responseData.user.role === "admin")) {
+            localStorage.setItem("keeper_admin_info", JSON.stringify(responseData.user));
+          }
         }
       } else {
         setLoginResult({
