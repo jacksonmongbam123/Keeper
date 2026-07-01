@@ -596,7 +596,7 @@ export default function App() {
 
       if (selectedRole === "student") {
         if (activeTab === "overview") {
-        
+          return (
             <div className="space-y-6">
               {/* Alert banner */}
               <div className="bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 border border-cyan-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
