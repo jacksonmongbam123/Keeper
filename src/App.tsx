@@ -202,8 +202,6 @@ export default function App() {
     }
   }, []);
 
-  const [adminAccessLevel, setAdminAccessLevel] = useState("1");
-
   // Fetch real database users and merge them on successful administrator login or navigating to users tab
   useEffect(() => {
     if (loginResult?.success && selectedRole === "administrator") {
