@@ -432,8 +432,8 @@ export default function App() {
             if (rawAccess !== undefined) {
               levelStr = String(rawAccess);
             } else {
-              // Match in filtered user directory
-              const matched = filteredUserDirectory.find(
+              // Match in user directory
+              const matched = userDirectoryState.find(
                 u => u.username.toLowerCase() === username.trim().toLowerCase()
               );
               if (matched && matched.role === "administrator" && (matched as any).access_level) {
