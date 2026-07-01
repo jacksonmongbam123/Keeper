@@ -425,6 +425,16 @@ export default function App() {
   }, [loginResult, selectedRole, activeTab]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [mappingType, setMappingType] = useState<"student" | "teacher" | "parent" | null>(null);
+  const [selectedUserForMapping, setSelectedUserForMapping] = useState<any>(null);
+  const [selectedClass, setSelectedClass] = useState("");
+  const [selectedSection, setSelectedSection] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [sectionsList, setSectionsList] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
   const [selectedUserToEdit, setSelectedUserToEdit] = useState<any>(null);
 
   const [formUsername, setFormUsername] = useState("");
@@ -594,6 +604,111 @@ export default function App() {
     localStorage.removeItem("abms_session");
   };
 
+  // Handler for opening mapping modal
+  const openMappingModal = (user: any, type: "student" | "teacher" | "parent") => {
+    setSelectedUserForMapping(user);
+    setMappingType(type);
+    setSelectedClass("");
+    setSelectedSection("");
+    setSelectedSubject("");
+    setSelectedStudents([]);
+    setIsMappingModalOpen(true);
+  };
+
+  // Handler for saving student class mapping
+  const handleSaveStudentMapping = async () => {
+    if (!selectedClass || !selectedSection) {
+      alert("Please select both class and section");
+      return;
+    }
+    try {
+      const res = await fetch("https://abms-lkw9.onrender.com/m/studentClassMapping/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_id: selectedUserForMapping._id,
+          organization_id: adminOrganizationId,
+          class_id: selectedClass,
+          section_id: selectedSection
+        })
+      });
+      if (res.ok) {
+        alert("Student assigned to class and section successfully!");
+        setIsMappingModalOpen(false);
+      } else {
+        const error = await res.json();
+        alert(error.message || "Failed to assign student");
+      }
+    } catch (err) {
+      console.error('Error assigning student:', err);
+      alert('Error connecting to backend');
+    }
+  };
+
+  // Handler for saving teacher class subject mapping
+  const handleSaveTeacherMapping = async () => {
+    if (!selectedClass || !selectedSection || !selectedSubject) {
+      alert("Please select class, section, and subject");
+      return;
+    }
+    try {
+      const res = await fetch("https://abms-lkw9.onrender.com/m/teacherClassSubjectMapping/assign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacher_id: selectedUserForMapping._id,
+          organization_id: adminOrganizationId,
+          class_id: selectedClass,
+          section_id: selectedSection,
+          subject_id: selectedSubject
+        })
+      });
+      if (res.ok) {
+        alert("Teacher assigned to class, section, and subject successfully!");
+        setIsMappingModalOpen(false);
+      } else {
+        const error = await res.json();
+        alert(error.message || "Failed to assign teacher");
+      }
+    } catch (err) {
+      console.error('Error assigning teacher:', err);
+      alert('Error connecting to backend');
+    }
+  };
+
+  // Handler for saving parent student mapping
+  const handleSaveParentMapping = async () => {
+    if (selectedStudents.length === 0) {
+      alert("Please select at least one student");
+      return;
+    }
+    try {
+      const promises = selectedStudents.map(studentId =>
+        fetch("https://abms-lkw9.onrender.com/m/parentStudentMapping/assign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            parent_id: selectedUserForMapping._id,
+            student_id: studentId,
+            organization_id: adminOrganizationId,
+            relationship: "guardian"
+          })
+        })
+      );
+      const results = await Promise.all(promises);
+      const allSuccess = results.every(r => r.ok);
+      if (allSuccess) {
+        alert(`Parent assigned to ${selectedStudents.length} student(s) successfully!`);
+        setIsMappingModalOpen(false);
+      } else {
+        alert("Some assignments failed");
+      }
+    } catch (err) {
+      console.error('Error assigning parent:', err);
+      alert('Error connecting to backend');
+    }
+  };
+
   // Filter user directory by admin's organization
   useEffect(() => {
     if (adminOrganizationId && userDirectoryState.length > 0) {
@@ -629,6 +744,35 @@ export default function App() {
       }
     };
     fetchAdminOrganization();
+  }, []);
+
+  // Fetch classes, sections, and subjects for mapping
+  useEffect(() => {
+    const fetchMappingData = async () => {
+      try {
+        const [classRes, sectionRes, subjectRes] = await Promise.all([
+          fetch("https://abms-lkw9.onrender.com/m/class/retrieve", { method: "POST" }),
+          fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", { method: "POST" }),
+          fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", { method: "POST" })
+        ]);
+
+        if (classRes.ok) {
+          const data = await classRes.json();
+          if (Array.isArray(data)) setClassesList(data);
+        }
+        if (sectionRes.ok) {
+          const data = await sectionRes.json();
+          if (Array.isArray(data)) setSectionsList(data);
+        }
+        if (subjectRes.ok) {
+          const data = await subjectRes.json();
+          if (Array.isArray(data)) setSubjectsList(data);
+        }
+      } catch (err) {
+        console.warn('Could not fetch mapping data:', err);
+      }
+    };
+    fetchMappingData();
   }, []);
 
   if (loginResult?.success) {
@@ -1756,6 +1900,10 @@ export default function App() {
                           access_level_id
                         };
                         setUserDirectoryState(prev => [...prev, newUser]);
+                        // Open mapping modal for class assignment
+                        setSelectedUserForMapping(newUser);
+                        setMappingType("student");
+                        setIsMappingModalOpen(true);
                         setIsAddModalOpen(false);
                       } catch (err: any) {
                         console.error("Database CRUD Error:", err);
