@@ -2524,6 +2524,122 @@ export default function App() {
                   </div>
                 </div>
               )}
+
+              {/* Mapping Configuration Modal */}
+              {isMappingModalOpen && selectedUserForMapping && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                    <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+                      <h2 className="text-xl font-bold text-slate-900">
+                        {mappingType === "student" && "Assign Class & Section"}
+                        {mappingType === "teacher" && "Assign Class, Section & Subject"}
+                        {mappingType === "parent" && "Assign Students"}
+                      </h2>
+                      <button onClick={() => setIsMappingModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">&times;</button>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                      <div className="bg-slate-50 p-3 rounded-lg">
+                        <p className="text-sm text-slate-600"><strong>User:</strong> {selectedUserForMapping.name}</p>
+                      </div>
+
+                      {(mappingType === "student" || mappingType === "teacher") && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Class</label>
+                            <select
+                              value={selectedClass}
+                              onChange={(e) => setSelectedClass(e.target.value)}
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            >
+                              <option value="">Select Class</option>
+                              {classesList.map((cls: any) => (
+                                <option key={cls._id} value={cls._id}>{cls.name || cls.class}</option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Section</label>
+                            <select
+                              value={selectedSection}
+                              onChange={(e) => setSelectedSection(e.target.value)}
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            >
+                              <option value="">Select Section</option>
+                              {sectionsList.map((sec: any) => (
+                                <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {mappingType === "teacher" && (
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Subject</label>
+                          <select
+                            value={selectedSubject}
+                            onChange={(e) => setSelectedSubject(e.target.value)}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="">Select Subject</option>
+                            {subjectsList.map((sub: any) => (
+                              <option key={sub._id} value={sub._id}>{sub.name || sub.subject}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {mappingType === "parent" && (
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Select Students</label>
+                          <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3">
+                            {filteredUserDirectory
+                              .filter((u: any) => u.role === "student" && u.organization_id === adminOrganizationId)
+                              .map((student: any) => (
+                                <label key={student._id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedStudents.includes(student._id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedStudents([...selectedStudents, student._id]);
+                                      } else {
+                                        setSelectedStudents(selectedStudents.filter(id => id !== student._id));
+                                      }
+                                    }}
+                                    className="rounded"
+                                  />
+                                  <span className="text-sm text-slate-700">{student.name}</span>
+                                </label>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-4">
+                        <button
+                          onClick={() => setIsMappingModalOpen(false)}
+                          className="flex-1 border border-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg hover:bg-slate-50 transition"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (mappingType === "student") handleSaveStudentMapping();
+                            else if (mappingType === "teacher") handleSaveTeacherMapping();
+                            else if (mappingType === "parent") handleSaveParentMapping();
+                          }}
+                          className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                        >
+                          Save Mapping
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         }
