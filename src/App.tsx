@@ -216,6 +216,99 @@ export default function App() {
         }
 
         try {
+          // Get admin's organization ID from response or localStorage
+          let orgId = loginResult?.data?.user?.organization_id;
+          if (!orgId) {
+            const adminData = localStorage.getItem('keeper_admin_info');
+            if (adminData) {
+              const admin = JSON.parse(adminData);
+              orgId = admin.organization_id;
+            }
+          }
+
+          // If we have org_id, fetch only users from that organization
+          if (orgId) {
+            const res = await fetch(`https://abms-lkw9.onrender.com/m/admin/organization/${orgId}/users`, {
+              method: "GET",
+              headers
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              let fetchedUsers: any[] = [];
+
+              // Add students
+              if (Array.isArray(data.students)) {
+                data.students.forEach((s: any) => {
+                  fetchedUsers.push({
+                    _id: s._id,
+                    username: s.reg_no || s.nic || s.username || "",
+                    name: s.name || `${s.first_name || ""} ${s.last_name || ""}`.trim() || "Student",
+                    role: "student",
+                    status: s.status || "Active",
+                    phone: s.phone || "",
+                    first_name: s.first_name || "",
+                    middle_name: s.middle_name || "",
+                    last_name: s.last_name || "",
+                    email: s.email || "",
+                    passport: s.passport || "",
+                    dob: s.dob || "",
+                    sex: s.sex || "",
+                    organization_id: orgId
+                  });
+                });
+              }
+
+              // Add teachers
+              if (Array.isArray(data.teachers)) {
+                data.teachers.forEach((t: any) => {
+                  fetchedUsers.push({
+                    _id: t._id,
+                    username: t.reg_no || t.nic || t.username || "",
+                    name: t.name || `${t.first_name || ""} ${t.last_name || ""}`.trim() || "Teacher",
+                    role: "instructor",
+                    status: t.status || "Active",
+                    phone: t.phone || "",
+                    first_name: t.first_name || "",
+                    middle_name: t.middle_name || "",
+                    last_name: t.last_name || "",
+                    email: t.email || "",
+                    passport: t.passport || "",
+                    dob: t.dob || "",
+                    sex: t.sex || "",
+                    organization_id: orgId
+                  });
+                });
+              }
+
+              // Add parents
+              if (Array.isArray(data.parents)) {
+                data.parents.forEach((p: any) => {
+                  fetchedUsers.push({
+                    _id: p._id,
+                    username: p.phone || p.username || "",
+                    name: p.name || `${p.first_name || ""} ${p.last_name || ""}`.trim() || "Parent",
+                    role: "parents",
+                    status: p.status || "Active",
+                    phone: p.phone || "",
+                    first_name: p.first_name || "",
+                    middle_name: p.middle_name || "",
+                    last_name: p.last_name || "",
+                    email: p.email || "",
+                    passport: p.passport || "",
+                    dob: p.dob || "",
+                    sex: p.sex || "",
+                    organization_id: orgId
+                  });
+                });
+              }
+
+              setUserDirectoryState(fetchedUsers);
+              return;
+            }
+          }
+
+          // Fallback to fetching all users (for backward compatibility)
           const [studentsRes, teachersRes, parentsRes, adminsRes] = await Promise.allSettled([
             fetch("https://abms-lkw9.onrender.com/m/student/retrieve", { method: "POST", headers }),
             fetch("https://abms-lkw9.onrender.com/m/teacher/retrieve", { method: "POST", headers }),
