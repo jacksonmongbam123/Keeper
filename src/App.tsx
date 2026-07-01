@@ -130,6 +130,10 @@ export default function App() {
     return [];
   });
 
+  const [filteredUserDirectory, setFilteredUserDirectory] = useState<any[]>([]);
+  const [adminOrganizationId, setAdminOrganizationId] = useState<string | null>(null);
+  const [adminAccessLevel, setAdminAccessLevel] = useState<string | null>(null);
+
   
   // Clear demo data from localStorage on app load
   useEffect(() => {
