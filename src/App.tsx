@@ -623,7 +623,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/student-class/add", {
+      const res = await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -652,7 +652,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacher-subject-class/add", {
+      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherSubjectClass/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -683,7 +683,7 @@ export default function App() {
     }
     try {
       const promises = selectedStudents.map(studentId =>
-        fetch("https://abms-lkw9.onrender.com/rel/parent-student/add", {
+        fetch("https://abms-lkw9.onrender.com/rel/parentStudent/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
