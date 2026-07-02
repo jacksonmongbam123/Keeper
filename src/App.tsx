@@ -153,7 +153,7 @@ export default function App() {
   const activeConfig = ROLE_CONFIGS[selectedRole];
 
   // Dashboard states
-  const [activeTab, setActiveTab] = useState(() => selectedRole === "administrator" ? "users" : "overview");
+  const [activeTab, setActiveTab] = useState("users");
   const [userTypeFilter, setUserTypeFilter] = useState<"all" | "student" | "instructor" | "parents">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
@@ -713,10 +713,8 @@ export default function App() {
   });
 
   const menuItems = selectedRole === "administrator" ? [
-    { id: "overview", label: "Overview", icon: Home },
     { id: "users", label: "User Directory", icon: Users },
-    { id: "institutions", label: "Institutions", icon: Building },
-    { id: "settings", label: "Settings", icon: Settings }
+    { id: "institutions", label: "Institutions", icon: Building }
   ] : selectedRole === "student" ? [
     { id: "overview", label: "Overview", icon: Home },
     { id: "courses", label: "Courses", icon: BookOpen },
@@ -738,56 +736,6 @@ export default function App() {
   ];
 
   const renderContent = () => {
-    // Overview
-    if (activeTab === "overview") {
-      return (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl p-5 text-white shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <Users className="w-5 h-5 opacity-80" />
-                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg">Total</span>
-              </div>
-              <p className="text-3xl font-bold">{userDirectory.length}</p>
-              <p className="text-xs opacity-80 mt-1">Total Users</p>
-            </div>
-            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <GraduationCap className="w-5 h-5 opacity-80" />
-                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg">Active</span>
-              </div>
-              <p className="text-3xl font-bold">{userDirectory.filter(u => u.role === "student").length}</p>
-              <p className="text-xs opacity-80 mt-1">Students</p>
-            </div>
-            <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-5 text-white shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <Presentation className="w-5 h-5 opacity-80" />
-                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg">Active</span>
-              </div>
-              <p className="text-3xl font-bold">{userDirectory.filter(u => u.role === "instructor").length}</p>
-              <p className="text-xs opacity-80 mt-1">Instructors</p>
-            </div>
-            <div className="bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-2xl p-5 text-white shadow-lg">
-              <div className="flex items-center justify-between mb-3">
-                <Users className="w-5 h-5 opacity-80" />
-                <span className="text-xs font-bold bg-white/20 px-2 py-1 rounded-lg">Active</span>
-              </div>
-              <p className="text-3xl font-bold">{userDirectory.filter(u => u.role === "parents").length}</p>
-              <p className="text-xs opacity-80 mt-1">Parents</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Welcome to ABMS Portal</h3>
-            <p className="text-sm text-slate-600">
-              Manage your institution's students, teachers, and parents from this unified dashboard.
-              Use the navigation menu to access different features.
-            </p>
-          </div>
-        </div>
-      );
-    }
-
     // Users Directory
     if (activeTab === "users") {
       return (
@@ -980,37 +928,6 @@ export default function App() {
                   <p className="text-sm text-slate-500">Select an institution to view details</p>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Settings Tab
-    if (activeTab === "settings") {
-      return (
-        <div className="space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Account Settings</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Email Notifications</p>
-                  <p className="text-xs text-slate-500">Receive alerts for important updates</p>
-                </div>
-                <button className="relative w-12 h-6 bg-cyan-500 rounded-full transition-colors">
-                  <span className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full shadow"></span>
-                </button>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Two-Factor Authentication</p>
-                  <p className="text-xs text-slate-500">Add an extra layer of security</p>
-                </div>
-                <button className="relative w-12 h-6 bg-slate-300 rounded-full transition-colors">
-                  <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow"></span>
-                </button>
-              </div>
             </div>
           </div>
         </div>
