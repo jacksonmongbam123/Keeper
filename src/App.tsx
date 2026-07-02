@@ -4,6 +4,7 @@ import {
   GraduationCap,
   Presentation,
   Users,
+  RefreshCw,
   ShieldCheck,
   Lock,
   User,
@@ -139,7 +140,81 @@ export default function App() {
   const [adminOrganizationId, setAdminOrganizationId] = useState<string | null>(null);
   const [adminAccessLevel, setAdminAccessLevel] = useState<string | null>(null);
 
-  
+  const [dfGrades, setDfGrades] = useState<any[]>([]);
+  const [dfSections, setDfSections] = useState<any[]>([]);
+  const [studentClassRelations, setStudentClassRelations] = useState<any[]>([]);
+  const [selectedDfGrade, setSelectedDfGrade] = useState<string>("");
+  const [selectedDfSection, setSelectedDfSection] = useState<string>("");
+  const [isLoadingRelations, setIsLoadingRelations] = useState<boolean>(false);
+
+  const fetchDfGradesAndSections = async () => {
+    try {
+      const [gradeRes, sectionRes] = await Promise.all([
+        fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }),
+        fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" })
+      ]);
+      if (gradeRes.ok) {
+        const data = await gradeRes.json();
+        const grades = Array.isArray(data)
+          ? data.filter(Boolean).map((g: any, i: number) => {
+              if (typeof g === 'string') {
+                return { _id: `grade_${i}`, grade: g, name: g };
+              }
+              return {
+                _id: g._id || g.id || `grade_${i}`,
+                grade: g.grade || g.name || `Grade ${i + 1}`,
+                name: g.name || g.grade || `Grade ${i + 1}`
+              };
+            })
+          : [];
+        setDfGrades(grades);
+      }
+      if (sectionRes.ok) {
+        const data = await sectionRes.json();
+        const sections = Array.isArray(data)
+          ? data.filter(Boolean).map((s: any, i: number) => {
+              if (typeof s === 'string') {
+                return { _id: `section_${i}`, section: s, name: s, code: s };
+              }
+              return {
+                _id: s._id || s.id || `section_${i}`,
+                section: s.section || s.name || s.code || `Section ${i + 1}`,
+                name: s.name || s.section || s.code || `Section ${i + 1}`,
+                code: s.code || s.section || s.name || `Section ${i + 1}`
+              };
+            })
+          : [];
+        setDfSections(sections);
+      }
+    } catch (err) {
+      console.warn("Error fetching df grade or section:", err);
+    }
+  };
+
+  const fetchStudentRelations = async () => {
+    setIsLoadingRelations(true);
+    try {
+      const res = await fetch("https://abms-lkw9.onrender.com/rel/studentClass/retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setStudentClassRelations(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+    } catch (err) {
+      console.warn("Error fetching student class relations:", err);
+    } finally {
+      setIsLoadingRelations(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDfGradesAndSections();
+    fetchStudentRelations();
+  }, []);
+
   // Clear demo data from localStorage on app load
   useEffect(() => {
     localStorage.removeItem('keeper_titles');
@@ -639,6 +714,7 @@ export default function App() {
       if (res.ok) {
         alert("Student assigned to class and section successfully!");
         setIsMappingModalOpen(false);
+        fetchStudentRelations();
       } else {
         const error = await res.json();
         alert(error.message || "Failed to assign student");
@@ -864,6 +940,7 @@ export default function App() {
 
     const menuItems = selectedRole === "administrator" ? [
       { id: "users", label: "User Directory", icon: Users },
+      { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
       { id: "institutions", label: "Institute Details", icon: Building }
     ] : selectedRole === "student" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
@@ -2849,6 +2926,190 @@ export default function App() {
                   <p className="text-xs text-slate-400">Organization details from m_organization collection not found</p>
                 </div>
               )}
+            </div>
+          </div>
+        );
+      }
+
+      // Students by Grade & Section Tab
+      if (activeTab === "students-by-grade") {
+        // Find matching relations based on selection
+        const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
+          if (!rel) return false;
+          const matchesGrade = !selectedDfGrade || rel.class_id === selectedDfGrade;
+          const matchesSection = !selectedDfSection || rel.section_id === selectedDfSection;
+          return matchesGrade && matchesSection;
+        });
+
+        const matchingStudentIds = new Set(matchingRelations.map(rel => rel?.student_id).filter(Boolean));
+
+        // Filter the student users from userDirectory
+        const filteredStudents = (Array.isArray(userDirectory) ? userDirectory : []).filter(u => {
+          if (!u) return false;
+          const roleLower = String(u.role || "").toLowerCase();
+          if (roleLower !== "student") return false;
+          if (!selectedDfGrade && !selectedDfSection) return true;
+          return matchingStudentIds.has(u._id) || matchingStudentIds.has(u.id);
+        });
+
+        // Helper to find mapped grade/section names for a student
+        const getStudentMappingText = (studentId: string) => {
+          const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
+          if (!rel) return "Unassigned";
+
+          const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+          const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id));
+          const sectionsList = Array.isArray(dfSections) ? dfSections : [];
+          const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
+
+          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : "Unknown Grade";
+          const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : "Unknown Section";
+
+          return `${gradeName} - ${sectionName}`;
+        };
+
+        return (
+          <div className="space-y-6 max-w-6xl">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-blue-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <GraduationCap className="h-6 w-6 text-cyan-600" />
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Students by Grade & Section</h2>
+                    <p className="text-xs text-slate-500 mt-1">Filter and view students mapped to academic classes and sections</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      setIsLoadingInstitution(true);
+                      await Promise.all([
+                        fetchDfGradesAndSections(),
+                        fetchStudentRelations()
+                      ]);
+                      setIsLoadingInstitution(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer animate-none"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRelations ? "animate-spin" : ""}`} />
+                    Refresh Data
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Filter Selector Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  {/* Grade Dropdown */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Select Grade (from df grade)</label>
+                    <select
+                      value={selectedDfGrade}
+                      onChange={(e) => setSelectedDfGrade(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    >
+                      <option value="">All Grades</option>
+                      {Array.isArray(dfGrades) && dfGrades.filter(Boolean).map((g) => (
+                        <option key={g._id || g.id} value={g._id || g.id}>
+                          {g.grade || g.name || "Unnamed Grade"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Section Dropdown */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Select Section (from df section)</label>
+                    <select
+                      value={selectedDfSection}
+                      onChange={(e) => setSelectedDfSection(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    >
+                      <option value="">All Sections</option>
+                      {Array.isArray(dfSections) && dfSections.filter(Boolean).map((s) => (
+                        <option key={s._id || s.id} value={s._id || s.id}>
+                          {s.section || s.name || s.code || "Unnamed Section"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Listing Status summary */}
+                <div className="flex justify-between items-center text-xs text-slate-500 px-1 border-b border-slate-100 pb-3">
+                  <span className="font-medium">
+                    Showing <strong className="text-cyan-600">{filteredStudents.length}</strong> student{filteredStudents.length === 1 ? "" : "s"}
+                  </span>
+                  <span className="text-[10px] bg-cyan-50 text-cyan-700 px-2.5 py-1 rounded-full border border-cyan-100 font-bold">
+                    System-wide Cohort Filtering
+                  </span>
+                </div>
+
+                {/* Display Grid */}
+                {filteredStudents.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredStudents.map((student) => {
+                      const mappingText = getStudentMappingText(student._id || student.id);
+                      return (
+                        <div key={student._id || student.id} className="bg-white border border-slate-200 hover:border-cyan-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-sm font-black shadow-sm">
+                                  {student.name?.charAt(0) || "S"}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-sm font-bold text-slate-900 truncate">{student.name}</h4>
+                                  <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">{student.username || "No Username"}</p>
+                                </div>
+                              </div>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                student.status === "Active" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-100 text-slate-600"
+                              }`}>
+                                {student.status || "Active"}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1 text-xs text-slate-600 pt-1">
+                              {student.email && (
+                                <p className="flex items-center gap-1.5 truncate">
+                                  <span className="text-slate-400">✉</span> {student.email}
+                                </p>
+                              )}
+                              {student.phone && (
+                                <p className="flex items-center gap-1.5">
+                                  <span className="text-slate-400">📞</span> {student.phone}
+                                </p>
+                              )}
+                              {(student.sex || student.dob) && (
+                                <p className="text-[10px] text-slate-400 mt-1 flex gap-2">
+                                  {student.sex && <span>Sex: <strong className="text-slate-600">{student.sex}</strong></span>}
+                                  {student.dob && <span>DOB: <strong className="text-slate-600">{new Date(student.dob).toLocaleDateString()}</strong></span>}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                            <span className="text-slate-400 font-medium">Mapped Class:</span>
+                            <span className="font-mono font-bold text-cyan-600 bg-cyan-50/50 px-2 py-0.5 rounded border border-cyan-100/50">
+                              {mappingText}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                    <GraduationCap className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-sm font-bold text-slate-800">No Mapped Students Found</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      There are no students currently mapped to the selected combination of grade and section, or there are no student class relations in the database yet.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );
