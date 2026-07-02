@@ -9,6 +9,7 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: parseInt(process.env.PORT || '4173'),
+    allowedHosts: ['keeper-lng8.onrender.com'],
   },
   server: {
     host: '0.0.0.0',
