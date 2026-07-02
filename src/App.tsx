@@ -257,6 +257,15 @@ export default function App() {
     }
   }, [adminOrganizationId]);
 
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setProfileOpen(false);
+    if (profileOpen) {
+      document.addEventListener("click", handleClickOutside);
+    }
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [profileOpen]);
+
   const fetchInstitutions = async () => {
     try {
       const res = await fetch(`${API_BASE}/m/organization/retrieve`, {
@@ -1149,18 +1158,35 @@ export default function App() {
                   <Bell className="w-5 h-5" />
                   <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
                 </button>
-                <div
-                  className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
-                  onClick={() => setProfileOpen(!profileOpen)}
-                >
-                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                    {loginResult?.data?.user?.first_name?.charAt(0) || loginResult?.data?.user?.name?.charAt(0) || "U"}
+                <div className="relative">
+                  <div
+                    className="flex items-center gap-3 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors"
+                    onClick={(e) => { e.stopPropagation(); setProfileOpen(!profileOpen); }}
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                      {loginResult?.data?.user?.first_name?.charAt(0) || loginResult?.data?.user?.name?.charAt(0) || "U"}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-slate-900">{loginResult?.data?.user?.first_name || loginResult?.data?.user?.name || "User"}</p>
+                      <p className="text-xs text-slate-500 capitalize">{selectedRole}</p>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-slate-900">{loginResult?.data?.user?.first_name || loginResult?.data?.user?.name || "User"}</p>
-                    <p className="text-xs text-slate-500 capitalize">{selectedRole}</p>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
+                  {profileOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-slate-200 shadow-lg z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <p className="text-sm font-semibold text-slate-900">{loginResult?.data?.user?.email || "user@example.com"}</p>
+                        <p className="text-xs text-slate-500 capitalize">{selectedRole}</p>
+                      </div>
+                      <button
+                        onClick={handleReset}
+                        className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </header>
