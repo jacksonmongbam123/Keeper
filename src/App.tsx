@@ -34,7 +34,8 @@ import {
   Clock,
   UserCog,
   Pencil,
-  UserPlus
+  UserPlus,
+  Link
 } from "lucide-react";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
@@ -1583,6 +1584,16 @@ export default function App() {
                                   >
                                     <Pencil className="w-3 h-3" />
                                     Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      openMappingModal(u, u.role === "instructor" ? "teacher" : u.role === "parents" ? "parent" : u.role as "student" | "teacher" | "parent");
+                                    }}
+                                    className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                    title={u.role === "student" ? "Assign class and section" : u.role === "instructor" ? "Assign class, section, and subject" : "Assign students"}
+                                  >
+                                    <Link className="w-3 h-3" />
+                                    Configure
                                   </button>
                                   <button
                                     onClick={async () => {
