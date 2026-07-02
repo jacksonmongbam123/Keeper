@@ -623,12 +623,11 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/m/studentClassMapping/assign", {
+      const res = await fetch("https://abms-lkw9.onrender.com/rel/student-class/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           student_id: selectedUserForMapping._id,
-          organization_id: adminOrganizationId,
           class_id: selectedClass,
           section_id: selectedSection
         })
@@ -653,12 +652,11 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/m/teacherClassSubjectMapping/assign", {
+      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacher-subject-class/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           teacher_id: selectedUserForMapping._id,
-          organization_id: adminOrganizationId,
           class_id: selectedClass,
           section_id: selectedSection,
           subject_id: selectedSubject
@@ -685,14 +683,12 @@ export default function App() {
     }
     try {
       const promises = selectedStudents.map(studentId =>
-        fetch("https://abms-lkw9.onrender.com/m/parentStudentMapping/assign", {
+        fetch("https://abms-lkw9.onrender.com/rel/parent-student/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             parent_id: selectedUserForMapping._id,
-            student_id: studentId,
-            organization_id: adminOrganizationId,
-            relationship: "guardian"
+            student_id: studentId
           })
         })
       );
