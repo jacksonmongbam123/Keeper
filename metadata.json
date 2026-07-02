@@ -1,0 +1,6 @@
+{
+  "name": "Keeper",
+  "description": "An interactive management dashboard for users, institutions, curricula, and courses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
