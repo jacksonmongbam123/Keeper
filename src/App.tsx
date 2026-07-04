@@ -2701,7 +2701,7 @@ export default function App() {
                           }
 
                           const res = await fetch(endpoint, {
-                            method: "POST",
+                            method: "PUT",
                             headers: headers,
                             body: JSON.stringify(payload)
                           });
