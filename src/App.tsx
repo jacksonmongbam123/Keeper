@@ -544,7 +544,7 @@ export default function App() {
   const [userTypesList, setUserTypesList] = useState<string[]>([]);
   const [formSex, setFormSex] = useState("Male");
   const [formDob, setFormDob] = useState("2000-01-01");
-  const [formAccessLevelId, setFormAccessLevelId] = useState("1");
+  const [formAccessLevelId, setFormAccessLevelId] = useState("4");
 
   // Role-specific form states
   const [formOccupation, setFormOccupation] = useState("");
@@ -557,11 +557,11 @@ export default function App() {
   // Sync default access levels with selected role to prevent posting "1" by default
   useEffect(() => {
     if (formRole === "student") {
-      setFormAccessLevelId("3");
-    } else if (formRole === "instructor") {
       setFormAccessLevelId("4");
+    } else if (formRole === "instructor" || formRole === "teacher") {
+      setFormAccessLevelId("5");
     } else if (formRole === "parents" || formRole === "parent") {
-      setFormAccessLevelId("2");
+      setFormAccessLevelId("6");
     }
   }, [formRole]);
 
@@ -581,11 +581,11 @@ export default function App() {
     setFormSex("Male");
     setFormDob("2000-01-01");
     if (formRole === "student") {
-      setFormAccessLevelId("3");
-    } else if (formRole === "instructor") {
       setFormAccessLevelId("4");
+    } else if (formRole === "instructor" || formRole === "teacher") {
+      setFormAccessLevelId("5");
     } else if (formRole === "parents" || formRole === "parent") {
-      setFormAccessLevelId("2");
+      setFormAccessLevelId("6");
     }
     setFormOccupation("");
     setFormMaritalStatus("Single");
@@ -1838,7 +1838,7 @@ export default function App() {
                         setFormTitleId("Mr");
                         setFormSex("Male");
                         setFormDob("2000-01-01");
-                        setFormAccessLevelId("1");
+                        setFormAccessLevelId("4");
                         setCrudError("");
                         setRegistrationStep(1);
                         setIsAddModalOpen(true);
@@ -2054,7 +2054,7 @@ export default function App() {
                         const sex = formSex || "Male";
                         const dob = formDob || "2000-01-01";
                         const title_id = formTitleId || "Mr";
-                        const access_level_id = formAccessLevelId || adminAccessLevel || "1";
+                        const access_level_id = formAccessLevelId || adminAccessLevel || "4";
 
                         let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
                         let payload: any = {};
@@ -2078,7 +2078,7 @@ export default function App() {
                             end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                             title_id: title_id,
                             user_type_id: "student",
-                            access_level_id: parseInt(access_level_id) || 3,
+                            access_level_id: parseInt(access_level_id) || 4,
                             is_active: true
                           };
                         } else if (formRole === "instructor") {
@@ -2100,7 +2100,7 @@ export default function App() {
                             end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                             title_id: title_id,
                             user_type_id: "teacher",
-                            access_level_id: parseInt(access_level_id) || 4,
+                            access_level_id: parseInt(access_level_id) || 5,
                             teacher_grade_id: "None",
                             marital_status_id: "None",
                             is_active: true
@@ -2121,7 +2121,7 @@ export default function App() {
                             dob: dob,
                             title_id: title_id,
                             user_type_id: "parent",
-                            access_level_id: parseInt(access_level_id) || 2,
+                            access_level_id: parseInt(access_level_id) || 6,
                             occupation_id: "None",
                             marital_status_id: "None",
                             is_active: true
@@ -2140,7 +2140,7 @@ export default function App() {
                             sex: sex,
                             dob: dob,
                             phone: formPhone,
-                            access_level_id: parseInt(access_level_id) || 1
+                            access_level_id: parseInt(access_level_id) || 4
                           };
                         }
 
@@ -2198,7 +2198,7 @@ export default function App() {
                             sex: sex,
                             dob: dob,
                             phone: formPhone,
-                            access_level_id: parseInt(access_level_id) || 1
+                            access_level_id: parseInt(access_level_id) || 4
                           };
 
                           try {
@@ -2378,12 +2378,9 @@ export default function App() {
                                 onChange={(e) => setFormAccessLevelId(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium text-sm"
                               >
-                                <option value="1">Level 1 (Guest / Visitor)</option>
-                                <option value="2">Level 2 (Parent Portal)</option>
-                                <option value="3">Level 3 (Academic Portal)</option>
-                                <option value="4">Level 4 (Teacher Portal)</option>
-                                <option value="5">Level 5 (Department Head)</option>
-                                <option value="6">Level 6 (Super Administrator)</option>
+                                <option value="4">Level 4</option>
+                                <option value="5">Level 5</option>
+                                <option value="6">Level 6</option>
                               </select>
                             </div>
                           </div>
@@ -3140,7 +3137,7 @@ export default function App() {
             const sex = formSex || "Male";
             const dob = formDob || "2000-01-01";
             const title_id = formTitleId || "Mr";
-            const access_level_id = formAccessLevelId || adminAccessLevel || "1";
+            const access_level_id = formAccessLevelId || adminAccessLevel || "4";
 
             let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
             let payload: any = {};
@@ -3164,7 +3161,7 @@ export default function App() {
                 end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                 title_id: title_id,
                 user_type_id: "student",
-                access_level_id: parseInt(access_level_id) || 3,
+                access_level_id: parseInt(access_level_id) || 4,
                 organization_id: adminOrganizationId,
                 is_active: true
               };
@@ -3187,7 +3184,7 @@ export default function App() {
                 end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                 title_id: title_id,
                 user_type_id: "teacher",
-                access_level_id: parseInt(access_level_id) || 4,
+                access_level_id: parseInt(access_level_id) || 5,
                 organization_id: adminOrganizationId,
                 teacher_grade_id: formQualification || "None",
                 specialization: formSpecialization || "None",
@@ -3210,7 +3207,7 @@ export default function App() {
                 dob: dob,
                 title_id: title_id,
                 user_type_id: "parent",
-                access_level_id: parseInt(access_level_id) || 2,
+                access_level_id: parseInt(access_level_id) || 6,
                 organization_id: adminOrganizationId,
                 occupation_id: formOccupation || "None",
                 marital_status_id: formMaritalStatus || "None",
@@ -3266,7 +3263,7 @@ export default function App() {
                 sex: sex,
                 dob: dob,
                 phone: formPhone,
-                access_level_id: parseInt(access_level_id) || 1,
+                access_level_id: parseInt(access_level_id) || 4,
                 organization_id: adminOrganizationId
               };
 
@@ -3500,9 +3497,9 @@ export default function App() {
                             onChange={(e) => setFormRole(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 font-semibold text-sm"
                           >
-                            <option value="student">Student Profile</option>
-                            <option value="instructor">Teacher Profile</option>
-                            <option value="parents">Parent Profile</option>
+                            <option value="student">Student</option>
+                            <option value="instructor">Teacher</option>
+                            <option value="parents">Parent</option>
                           </select>
                         </div>
 
@@ -3541,22 +3538,9 @@ export default function App() {
                             onChange={(e) => setFormAccessLevelId(e.target.value)}
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-bold text-cyan-600"
                           >
-                            {formRole === "student" && (
-                              <>
-                                <option value="3">Level 3 (Academic Portal - Student Default)</option>
-                                <option value="2">Level 2 (Parent Portal)</option>
-                                <option value="1">Level 1 (Guest / Visitor)</option>
-                              </>
-                            )}
-                            {(formRole === "instructor" || formRole === "teacher") && (
-                              <>
-                                <option value="4">Level 4 (Teacher Portal - Instructor Default)</option>
-                                <option value="5">Level 5 (Department Head)</option>
-                              </>
-                            )}
-                            {(formRole === "parents" || formRole === "parent") && (
-                              <option value="2">Level 2 (Parent Portal - Parent Default)</option>
-                            )}
+                            <option value="4">Level 4</option>
+                            <option value="5">Level 5</option>
+                            <option value="6">Level 6</option>
                           </select>
                           <p className="text-[10px] text-slate-400">Access levels are automatically filtered and pre-configured to prevent database schema mismatch errors.</p>
                         </div>
