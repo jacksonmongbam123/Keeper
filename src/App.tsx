@@ -936,7 +936,11 @@ export default function App() {
         const [gradeRes, sectionRes, subjectRes, titleRes, classSectionRes] = await Promise.all([
           fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", { method: "POST" }).catch(() => null),
+          fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/m/class_section/retrieve", {
             method: "POST",
@@ -3847,14 +3851,17 @@ export default function App() {
 
                             <div className="space-y-1.5">
                               <label className="text-xs font-bold text-slate-700">Specialization Subject <span className="text-red-500">*</span></label>
-                              <input
-                                type="text"
+                              <select
                                 value={formSpecialization}
                                 onChange={(e) => setFormSpecialization(e.target.value)}
-                                placeholder="e.g. Mathematics, Physics"
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
-                              />
+                              >
+                                <option value="">Select Specialization Subject</option>
+                                {subjectsList.map((sub: any) => (
+                                  <option key={sub._id} value={sub.subject || sub.name}>{sub.subject || sub.name}</option>
+                                ))}
+                              </select>
                             </div>
 
                             <div className="space-y-1.5">
