@@ -1,6 +1,6 @@
 {
-  "name": "Keeper",
-  "description": "An interactive management dashboard for users, institutions, curricula, and courses.",
+  "name": "Academic Board Management System",
+  "description": "A comprehensive portal for students, instructors, parents, and administrators to manage curriculum, assignments, grades, schedules, user directories, and institute details.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

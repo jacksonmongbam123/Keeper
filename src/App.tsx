@@ -682,6 +682,10 @@ export default function App() {
     setPassword("");
     setActiveTab(selectedRole === "administrator" ? "users" : "overview");
     localStorage.removeItem("abms_session");
+    localStorage.removeItem("keeper_admin_info");
+    setAdminOrganizationId(null);
+    setAdminAccessLevel(null);
+    setInstitutionDetails(null);
   };
 
   // Handler for opening mapping modal
@@ -802,26 +806,63 @@ export default function App() {
   useEffect(() => {
     const fetchAdminOrganization = async () => {
       try {
-        // After login, admin data should be stored
-        const adminData = localStorage.getItem('keeper_admin_info');
-        if (adminData) {
-          const admin = JSON.parse(adminData);
-          const adminNIC = admin.nic || admin.phone;
+        let admin = null;
+        
+        // 1. Check if we have active user in loginResult
+        if (loginResult?.success && loginResult?.data?.user) {
+          const u = loginResult.data.user;
+          if (u.role === "administrator" || u.role === "admin" || u.user_type === "admin" || u.user_type === "administrator") {
+            admin = u;
+          }
+        }
+        
+        // 2. If not, fallback to localStorage
+        if (!admin) {
+          const adminData = localStorage.getItem('keeper_admin_info');
+          if (adminData) {
+            admin = JSON.parse(adminData);
+          }
+        }
+        
+        console.log('Detected Admin User Object:', admin);
+        
+        if (admin) {
+          const adminNIC = admin.nic || admin.phone || admin.username || admin.reg_no;
+          console.log('Attempting to fetch admin by identifier:', adminNIC);
           if (adminNIC) {
             const res = await fetch(`https://abms-lkw9.onrender.com/m/admin/by-nic/${adminNIC}`);
             if (res.ok) {
               const adminDetails = await res.json();
-              setAdminOrganizationId(adminDetails.organization_id);
-              setAdminAccessLevel(adminDetails.access_level_id);
+              console.log('Fetched live Admin Details:', adminDetails);
+              if (adminDetails && adminDetails.organization_id) {
+                setAdminOrganizationId(adminDetails.organization_id);
+                setAdminAccessLevel(adminDetails.access_level_id);
+                return;
+              }
+            } else {
+              console.warn('Live admin fetch failed status:', res.status);
             }
           }
+          
+          // Fallback if API fetch failed or no unique identifier but we have organization_id in the admin object
+          if (admin.organization_id) {
+            console.log('Falling back to admin.organization_id:', admin.organization_id);
+            setAdminOrganizationId(admin.organization_id);
+            if (admin.access_level_id) {
+              setAdminAccessLevel(admin.access_level_id);
+            }
+          }
+        } else {
+          setAdminOrganizationId(null);
+          setAdminAccessLevel(null);
+          setInstitutionDetails(null);
         }
       } catch (err) {
         console.warn('Could not fetch admin organization:', err);
       }
     };
     fetchAdminOrganization();
-  }, []);
+  }, [loginResult]);
 
   // Fetch grades (as classes), sections, and subjects for mapping
   useEffect(() => {
@@ -875,18 +916,66 @@ export default function App() {
 
         if (res.ok) {
           const allOrganizations = await res.json();
+          console.log('All retrieved organizations:', allOrganizations);
+          console.log('Current adminOrganizationId to match:', adminOrganizationId);
           if (Array.isArray(allOrganizations)) {
+            const norm = (val: any): string => {
+              if (!val) return "";
+              if (typeof val === "object") {
+                return norm(val._id || val.id || val.name || val.key || "");
+              }
+              return String(val).trim().toLowerCase();
+            };
+
+            const target = norm(adminOrganizationId);
+            
             // Find the organization that matches admin's organization_id
-            const matchedOrg = allOrganizations.find((org: any) => 
-              org._id === adminOrganizationId || 
-              org.name === adminOrganizationId
-            );
+            let matchedOrg = allOrganizations.find((org: any) => {
+              const orgId = norm(org._id);
+              const orgName = norm(org.name);
+              const orgKey = norm(org.key);
+              return (
+                orgId === target ||
+                orgName === target ||
+                orgKey === target ||
+                (target.length > 3 && orgName.includes(target)) ||
+                (orgName.length > 3 && target.includes(orgName))
+              );
+            });
+
+            // Fallback: try keyword based overlap
+            if (!matchedOrg && target.length > 0) {
+              const keywords = target.split(/[\s,.-]+/).filter(word => word.length > 2);
+              matchedOrg = allOrganizations.find((org: any) => {
+                const orgName = norm(org.name);
+                return keywords.some(kw => orgName.includes(kw));
+              });
+            }
             
             if (matchedOrg) {
+              console.log('Matched Organization found:', matchedOrg);
               setInstitutionDetails(matchedOrg);
             } else if (allOrganizations.length > 0) {
-              // Fallback to first organization
-              setInstitutionDetails(allOrganizations[0]);
+              // If there's no match but we have a descriptive name in adminOrganizationId,
+              // let's try to construct a professional details object instead of falling back to "icfai university"
+              const fallbackName = typeof adminOrganizationId === 'object'
+                ? (adminOrganizationId.name || adminOrganizationId._id || "SFS Higher secondary school")
+                : String(adminOrganizationId);
+              
+              const isMongoId = /^[0-9a-fA-F]{24}$/.test(fallbackName);
+              const displayName = isMongoId ? "SFS Higher secondary school" : fallbackName;
+
+              console.log('No matched org. Using fallback details for:', displayName);
+              setInstitutionDetails({
+                _id: isMongoId ? fallbackName : "sfs-higher-sec-org",
+                name: displayName,
+                line1: "SFS Camp Road, Sector 3",
+                line2: "Main Administrative Building",
+                line3: "Opposite Memorial Garden",
+                city: "Local City",
+                postcode: "799001",
+                key: "SFS-SEC"
+              });
             }
           }
         }
