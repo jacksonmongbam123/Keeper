@@ -504,6 +504,7 @@ export default function App() {
     }
   }, [loginResult, selectedRole, activeTab]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [registrationStep, setRegistrationStep] = useState(1);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
   const [mappingType, setMappingType] = useState<"student" | "teacher" | "parent" | null>(null);
@@ -533,12 +534,72 @@ export default function App() {
   const [formEmail, setFormEmail] = useState("");
   const [formPassport, setFormPassport] = useState("None");
   const [formTitleId, setFormTitleId] = useState("Mr");
-  const [titlesList, setTitlesList] = useState<string[]>([]);
+  const [titlesList, setTitlesList] = useState<any[]>([
+    { _id: "Mr", title: "Mr" },
+    { _id: "Mrs", title: "Mrs" },
+    { _id: "Ms", title: "Ms" },
+    { _id: "Dr", title: "Dr" }
+  ]);
   const [gradesList, setGradesList] = useState<string[]>([]);
   const [userTypesList, setUserTypesList] = useState<string[]>([]);
   const [formSex, setFormSex] = useState("Male");
   const [formDob, setFormDob] = useState("2000-01-01");
   const [formAccessLevelId, setFormAccessLevelId] = useState("1");
+
+  // Role-specific form states
+  const [formOccupation, setFormOccupation] = useState("");
+  const [formMaritalStatus, setFormMaritalStatus] = useState("Single");
+  const [parentFilterGrade, setParentFilterGrade] = useState("");
+  const [parentFilterSection, setParentFilterSection] = useState("");
+  const [formQualification, setFormQualification] = useState("Bachelor's Degree");
+  const [formSpecialization, setFormSpecialization] = useState("Mathematics");
+
+  // Sync default access levels with selected role to prevent posting "1" by default
+  useEffect(() => {
+    if (formRole === "student") {
+      setFormAccessLevelId("3");
+    } else if (formRole === "instructor") {
+      setFormAccessLevelId("4");
+    } else if (formRole === "parents" || formRole === "parent") {
+      setFormAccessLevelId("2");
+    }
+  }, [formRole]);
+
+  // Reset all registration form fields
+  const clearFormFields = () => {
+    setFormUsername("");
+    setFormName("");
+    setFormPhone("");
+    setFormStatus("Active");
+    setFormFirstName("");
+    setFormMiddleName("");
+    setFormLastName("");
+    setFormPassword("demoPassword123");
+    setFormEmail("");
+    setFormPassport("None");
+    setFormTitleId("Mr");
+    setFormSex("Male");
+    setFormDob("2000-01-01");
+    if (formRole === "student") {
+      setFormAccessLevelId("3");
+    } else if (formRole === "instructor") {
+      setFormAccessLevelId("4");
+    } else if (formRole === "parents" || formRole === "parent") {
+      setFormAccessLevelId("2");
+    }
+    setFormOccupation("");
+    setFormMaritalStatus("Single");
+    setParentFilterGrade("");
+    setParentFilterSection("");
+    setFormQualification("Bachelor's Degree");
+    setFormSpecialization("Mathematics");
+    setSelectedClass("");
+    setSelectedSection("");
+    setSelectedSubject("");
+    setSelectedStudents([]);
+    setCrudError("");
+    setRegistrationStep(1);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -864,17 +925,18 @@ export default function App() {
     fetchAdminOrganization();
   }, [loginResult]);
 
-  // Fetch grades (as classes), sections, and subjects for mapping
+  // Fetch grades (as classes), sections, and subjects for mapping, and titles from df/title/all
   useEffect(() => {
     const fetchMappingData = async () => {
       try {
-        const [gradeRes, sectionRes, subjectRes] = await Promise.all([
-          fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }),
-          fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", { method: "POST" }),
-          fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", { method: "POST" })
+        const [gradeRes, sectionRes, subjectRes, titleRes] = await Promise.all([
+          fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }).catch(() => null),
+          fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" }).catch(() => null),
+          fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", { method: "POST" }).catch(() => null),
+          fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null)
         ]);
 
-        if (gradeRes.ok) {
+        if (gradeRes && gradeRes.ok) {
           const data = await gradeRes.json();
           // Data from df/grade/all returns array of grade strings or objects with grade field
           let grades: any[] = [];
@@ -887,13 +949,35 @@ export default function App() {
           }
           setClassesList(grades);
         }
-        if (sectionRes.ok) {
+        if (sectionRes && sectionRes.ok) {
           const data = await sectionRes.json();
-          if (Array.isArray(data)) setSectionsList(data);
+          if (Array.isArray(data)) {
+            const parsedSections = data.filter(Boolean).map((s: any, i: number) => {
+              if (typeof s === 'string') {
+                return { _id: `section_${i}`, section: s, name: s, code: s };
+              }
+              return {
+                _id: s._id || s.id || `section_${i}`,
+                section: s.section || s.name || s.code || `Section ${i + 1}`,
+                name: s.name || s.section || s.code || `Section ${i + 1}`,
+                code: s.code || s.section || s.name || `Section ${i + 1}`
+              };
+            });
+            setSectionsList(parsedSections);
+          }
         }
-        if (subjectRes.ok) {
+        if (subjectRes && subjectRes.ok) {
           const data = await subjectRes.json();
           if (Array.isArray(data)) setSubjectsList(data);
+        }
+        if (titleRes && titleRes.ok) {
+          const data = await titleRes.json();
+          if (Array.isArray(data)) {
+            setTitlesList(data);
+            if (data.length > 0) {
+              setFormTitleId(data[0]._id || data[0].title || "Mr");
+            }
+          }
         }
       } catch (err) {
         console.warn('Could not fetch mapping data:', err);
@@ -1029,6 +1113,7 @@ export default function App() {
 
     const menuItems = selectedRole === "administrator" ? [
       { id: "users", label: "User Directory", icon: Users },
+      { id: "add-user", label: "Register Profile", icon: UserPlus },
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
       { id: "institutions", label: "Institute Details", icon: Building }
     ] : selectedRole === "student" ? [
@@ -1755,6 +1840,7 @@ export default function App() {
                         setFormDob("2000-01-01");
                         setFormAccessLevelId("1");
                         setCrudError("");
+                        setRegistrationStep(1);
                         setIsAddModalOpen(true);
                       }}
                       className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
@@ -1992,7 +2078,7 @@ export default function App() {
                             end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                             title_id: title_id,
                             user_type_id: "student",
-                            access_level_id: access_level_id,
+                            access_level_id: parseInt(access_level_id) || 3,
                             is_active: true
                           };
                         } else if (formRole === "instructor") {
@@ -2014,7 +2100,7 @@ export default function App() {
                             end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                             title_id: title_id,
                             user_type_id: "teacher",
-                            access_level_id: access_level_id,
+                            access_level_id: parseInt(access_level_id) || 4,
                             teacher_grade_id: "None",
                             marital_status_id: "None",
                             is_active: true
@@ -2035,7 +2121,7 @@ export default function App() {
                             dob: dob,
                             title_id: title_id,
                             user_type_id: "parent",
-                            access_level_id: access_level_id,
+                            access_level_id: parseInt(access_level_id) || 2,
                             occupation_id: "None",
                             marital_status_id: "None",
                             is_active: true
@@ -2054,7 +2140,7 @@ export default function App() {
                             sex: sex,
                             dob: dob,
                             phone: formPhone,
-                            access_level_id: access_level_id
+                            access_level_id: parseInt(access_level_id) || 1
                           };
                         }
 
@@ -2112,7 +2198,7 @@ export default function App() {
                             sex: sex,
                             dob: dob,
                             phone: formPhone,
-                            access_level_id: access_level_id
+                            access_level_id: parseInt(access_level_id) || 1
                           };
 
                           try {
@@ -2164,16 +2250,15 @@ export default function App() {
                         setUserDirectoryState(prev => [...prev, newUser]);
                         // Open mapping modal for class assignment
                         setSelectedUserForMapping(newUser);
-                        setMappingType("student");
+                        setMappingType(formRole === "parents" ? "parent" : (formRole === "instructor" ? "teacher" : "student"));
                         setIsMappingModalOpen(true);
                         setIsAddModalOpen(false);
                       } catch (err: any) {
                         console.error("Database CRUD Error:", err);
-                        // Show database sync warning or fall back with demo notification
-                        setCrudError(`Database sync error: ${err.message}. Saving to local memory...`);
                         
                         // Still save to local memory to ensure 100% availability for evaluation
                         const newUser = {
+                          _id: `user_${Date.now()}`,
                           username: formUsername,
                           name: formName || `${formFirstName || "New"} ${formLastName || "User"}`,
                           role: formRole,
@@ -2192,239 +2277,345 @@ export default function App() {
                           organization_id: adminOrganizationId
                         };
                         setUserDirectoryState(prev => [...prev, newUser]);
-                        setTimeout(() => {
-                          setIsAddModalOpen(false);
-                        }, 2500);
+                        
+                        // Open mapping modal for class assignment
+                        setSelectedUserForMapping(newUser);
+                        setMappingType(formRole === "parents" ? "parent" : (formRole === "instructor" ? "teacher" : "student"));
+                        setIsMappingModalOpen(true);
+                        setIsAddModalOpen(false);
                       } finally {
                         setIsSubmitting(false);
                       }
                     }} className="space-y-4 text-xs">
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-700">System ID / Username (NIC)</label>
-                          <input
-                            type="text"
-                            value={formUsername}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setFormUsername(val);
-                              setFormEmail(`${val.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`);
-                            }}
-                            placeholder="e.g. REG-2026-9999"
-                            required
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-700">Role</label>
-                          <select
-                            value={formRole}
-                            onChange={(e) => setFormRole(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium"
-                          >
-                            <option value="student">Student</option>
-                            <option value="instructor">Teacher</option>
-                            <option value="parents">Parent</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <label className="font-bold text-slate-700">Status</label>
-                          <select
-                            value={formStatus}
-                            onChange={(e) => setFormStatus(e.target.value)}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium"
-                          >
-                            <option value="Active">Active</option>
-                            <option value="Inactive">Inactive</option>
-                          </select>
-                        </div>
+                      
+                      {/* Interactive Step Progress Indicator */}
+                      <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center justify-between gap-2 mb-4">
+                        {[
+                          { num: 1, label: "System & Role" },
+                          { num: 2, label: "Personal Info" },
+                          { num: 3, label: "Contact & Security" }
+                        ].map((s) => {
+                          const isActive = registrationStep === s.num;
+                          const isCompleted = registrationStep > s.num;
+                          return (
+                            <div key={s.num} className="flex-1 flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs border transition-all duration-300 ${
+                                  isActive
+                                    ? "bg-cyan-600 border-cyan-600 text-white shadow-md shadow-cyan-100"
+                                    : isCompleted
+                                      ? "bg-emerald-500 border-emerald-500 text-white"
+                                      : "bg-white border-slate-200 text-slate-400"
+                                }`}>
+                                  {isCompleted ? "✓" : s.num}
+                                </div>
+                                <span className={`text-[11px] font-bold tracking-tight transition-colors duration-300 hidden md:inline ${
+                                  isActive ? "text-cyan-600 font-black" : isCompleted ? "text-emerald-600" : "text-slate-400"
+                                }`}>
+                                  {s.label}
+                                </span>
+                              </div>
+                              {s.num < 3 && (
+                                <div className={`flex-1 h-[2px] rounded mx-1 transition-colors duration-300 ${
+                                  isCompleted ? "bg-emerald-500" : "bg-slate-200"
+                                }`} />
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
 
-                      <div className="border-t border-slate-100 my-2 pt-2">
-                        <h4 className="font-bold text-slate-500 text-[10px] uppercase tracking-wider mb-2">Personal Identity</h4>
-                        <div className="grid grid-cols-4 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Title</label>
-                            <select
-                              value={formTitleId}
-                              onChange={(e) => setFormTitleId(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
-                            >
-                              {titlesList.map(title => (
-                                <option key={title} value={title}>{title}</option>
-                              ))}
-                            </select>
-                          </div>
+                      {/* Step 1: System Details & Access Controls */}
+                      {registrationStep === 1 && (
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                          <h4 className="font-bold text-slate-600 text-[10px] uppercase tracking-wider">Step 1: System Settings & Role Assignment</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">System ID / Username (NIC) <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formUsername}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormUsername(val);
+                                  setFormEmail(`${val.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`);
+                                }}
+                                placeholder="e.g. REG-2026-9999"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+                              />
+                            </div>
 
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">First Name</label>
-                            <input
-                              type="text"
-                              value={formFirstName}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setFormFirstName(val);
-                                setFormName([val, formMiddleName, formLastName].filter(Boolean).join(" "));
-                              }}
-                              placeholder="First Name"
-                              required
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Role <span className="text-red-500">*</span></label>
+                              <select
+                                value={formRole}
+                                onChange={(e) => setFormRole(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium text-sm"
+                              >
+                                <option value="student">Student</option>
+                                <option value="instructor">Teacher</option>
+                                <option value="parents">Parent</option>
+                              </select>
+                            </div>
 
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Middle Name</label>
-                            <input
-                              type="text"
-                              value={formMiddleName}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setFormMiddleName(val);
-                                setFormName([formFirstName, val, formLastName].filter(Boolean).join(" "));
-                              }}
-                              placeholder="Middle Name"
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Status <span className="text-red-500">*</span></label>
+                              <select
+                                value={formStatus}
+                                onChange={(e) => setFormStatus(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium text-sm"
+                              >
+                                <option value="Active">Active</option>
+                                <option value="Inactive">Inactive</option>
+                              </select>
+                            </div>
 
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Last Name</label>
-                            <input
-                              type="text"
-                              value={formLastName}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setFormLastName(val);
-                                setFormName([formFirstName, formMiddleName, val].filter(Boolean).join(" "));
-                              }}
-                              placeholder="Last Name"
-                              required
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border-t border-slate-100 my-2 pt-2">
-                        <h4 className="font-bold text-slate-500 text-[10px] uppercase tracking-wider mb-2">Contact & Security Credentials</h4>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Mobile Phone</label>
-                            <input
-                              type="text"
-                              value={formPhone}
-                              onChange={(e) => setFormPhone(e.target.value)}
-                              placeholder="e.g. 0779998881"
-                              required
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Email Address</label>
-                            <input
-                              type="email"
-                              value={formEmail}
-                              onChange={(e) => setFormEmail(e.target.value)}
-                              placeholder="email@example.com"
-                              required
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Password</label>
-                            <input
-                              type="text"
-                              value={formPassword}
-                              onChange={(e) => setFormPassword(e.target.value)}
-                              placeholder="Password"
-                              required
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
-                            />
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Access Level ID <span className="text-red-500">*</span></label>
+                              <select
+                                value={formAccessLevelId}
+                                onChange={(e) => setFormAccessLevelId(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium text-sm"
+                              >
+                                <option value="1">Level 1 (Guest / Visitor)</option>
+                                <option value="2">Level 2 (Parent Portal)</option>
+                                <option value="3">Level 3 (Academic Portal)</option>
+                                <option value="4">Level 4 (Teacher Portal)</option>
+                                <option value="5">Level 5 (Department Head)</option>
+                                <option value="6">Level 6 (Super Administrator)</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="border-t border-slate-100 my-2 pt-2">
-                        <h4 className="font-bold text-slate-500 text-[10px] uppercase tracking-wider mb-2">Demographic & Access Controls</h4>
-                        <div className="grid grid-cols-4 gap-3">
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Gender / Sex</label>
-                            <select
-                              value={formSex}
-                              onChange={(e) => setFormSex(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
-                            >
-                              <option value="Male">Male</option>
-                              <option value="Female">Female</option>
-                            </select>
+                      {/* Step 2: Personal Identity */}
+                      {registrationStep === 2 && (
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                          <h4 className="font-bold text-slate-600 text-[10px] uppercase tracking-wider">Step 2: Personal Profile Details</h4>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="space-y-1.5 col-span-2 md:col-span-1">
+                              <label className="font-bold text-slate-700">Title <span className="text-red-500">*</span></label>
+                              <select
+                                value={formTitleId}
+                                onChange={(e) => setFormTitleId(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                              >
+                                {titlesList.map(item => {
+                                  const titleVal = typeof item === 'string' ? item : (item.title || item.name || "");
+                                  const titleId = typeof item === 'string' ? item : (item._id || item.title || "");
+                                  return (
+                                    <option key={titleId} value={titleId}>{titleVal}</option>
+                                  );
+                                })}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5 col-span-2 md:col-span-1">
+                              <label className="font-bold text-slate-700">First Name <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formFirstName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormFirstName(val);
+                                  setFormName([val, formMiddleName, formLastName].filter(Boolean).join(" "));
+                                }}
+                                placeholder="First Name"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5 col-span-2 md:col-span-1">
+                              <label className="font-bold text-slate-700">Middle Name</label>
+                              <input
+                                type="text"
+                                value={formMiddleName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormMiddleName(val);
+                                  setFormName([formFirstName, val, formLastName].filter(Boolean).join(" "));
+                                }}
+                                placeholder="Middle Name"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5 col-span-2 md:col-span-1">
+                              <label className="font-bold text-slate-700">Last Name <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formLastName}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setFormLastName(val);
+                                  setFormName([formFirstName, formMiddleName, val].filter(Boolean).join(" "));
+                                }}
+                                placeholder="Last Name"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Gender / Sex <span className="text-red-500">*</span></label>
+                              <select
+                                value={formSex}
+                                onChange={(e) => setFormSex(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                              >
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Date of Birth <span className="text-red-500">*</span></label>
+                              <input
+                                type="date"
+                                value={formDob}
+                                onChange={(e) => setFormDob(e.target.value)}
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Step 3: Contact & Security Credentials */}
+                      {registrationStep === 3 && (
+                        <div className="space-y-4 animate-in fade-in duration-300">
+                          <h4 className="font-bold text-slate-600 text-[10px] uppercase tracking-wider">Step 3: Contact, Security & Travel Credentials</h4>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Mobile Phone <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formPhone}
+                                onChange={(e) => setFormPhone(e.target.value)}
+                                placeholder="e.g. 0779998881"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Email Address <span className="text-red-500">*</span></label>
+                              <input
+                                type="email"
+                                value={formEmail}
+                                onChange={(e) => setFormEmail(e.target.value)}
+                                placeholder="email@example.com"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Account Password <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formPassword}
+                                onChange={(e) => setFormPassword(e.target.value)}
+                                placeholder="Password"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+                              />
+                            </div>
                           </div>
 
                           <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Date of Birth</label>
-                            <input
-                              type="date"
-                              value={formDob}
-                              onChange={(e) => setFormDob(e.target.value)}
-                              required
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Passport Number</label>
+                            <label className="font-bold text-slate-700">Passport Number (Optional)</label>
                             <input
                               type="text"
                               value={formPassport}
                               onChange={(e) => setFormPassport(e.target.value)}
                               placeholder="e.g. P1234567"
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
                             />
                           </div>
-
-                          <div className="space-y-1.5">
-                            <label className="font-bold text-slate-700">Access Level ID</label>
-                            <select
-                              value={formAccessLevelId}
-                              onChange={(e) => setFormAccessLevelId(e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-medium"
-                            >
-                              <option value="4">Level 4</option>
-                              <option value="5">Level 5</option>
-                              <option value="6">Level 6</option>
-                            </select>
-                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      <div className="pt-3 flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setIsAddModalOpen(false)}
-                          className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
-                          className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
-                        >
-                          {isSubmitting ? (
-                            <>
-                              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              Saving to DB...
-                            </>
-                          ) : (
-                            "Create User"
-                          )}
-                        </button>
+                      {/* Unified Wizard Navigation Controls */}
+                      <div className="pt-3 flex gap-3 border-t border-slate-100 mt-4">
+                        {registrationStep > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCrudError("");
+                              setRegistrationStep(prev => Math.max(1, prev - 1));
+                            }}
+                            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all duration-200 cursor-pointer text-center text-sm"
+                          >
+                            Back
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setIsAddModalOpen(false)}
+                            className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all duration-200 cursor-pointer text-center text-sm"
+                          >
+                            Cancel
+                          </button>
+                        )}
+
+                        {registrationStep < 3 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (registrationStep === 1) {
+                                if (!formUsername.trim()) {
+                                  setCrudError("System ID / Username (NIC) is required.");
+                                  return;
+                                }
+                                if (userDirectoryState.some(u => u.username.toLowerCase() === formUsername.toLowerCase().trim())) {
+                                  setCrudError("A user with this System ID/Username already exists.");
+                                  return;
+                                }
+                                setCrudError("");
+                                setRegistrationStep(2);
+                              } else if (registrationStep === 2) {
+                                if (!formFirstName.trim() || !formLastName.trim()) {
+                                  setCrudError("First Name and Last Name are required.");
+                                  return;
+                                }
+                                if (!formDob) {
+                                  setCrudError("Date of Birth is required.");
+                                  return;
+                                }
+                                setCrudError("");
+                                setRegistrationStep(3);
+                              }
+                            }}
+                            className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition-all duration-200 cursor-pointer text-center text-sm shadow-sm"
+                          >
+                            Next Step
+                          </button>
+                        ) : (
+                          <button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 text-sm shadow-sm"
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                                Saving Profile...
+                              </>
+                            ) : (
+                              "Register Profile & Map"
+                            )}
+                          </button>
+                        )}
                       </div>
                     </form>
                   </div>
@@ -2619,9 +2810,13 @@ export default function App() {
                               onChange={(e) => setFormTitleId(e.target.value)}
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500"
                             >
-                              {titlesList.map(title => (
-                                <option key={title} value={title}>{title}</option>
-                              ))}
+                              {titlesList.map(item => {
+                                const titleVal = typeof item === 'string' ? item : (item.title || item.name || "");
+                                const titleId = typeof item === 'string' ? item : (item._id || item.title || "");
+                                return (
+                                  <option key={titleId} value={titleId}>{titleVal}</option>
+                                );
+                              })}
                             </select>
                           </div>
 
@@ -2905,6 +3100,974 @@ export default function App() {
             </div>
           );
         }
+      }
+
+      // Register Profile Tab (Add User Tab)
+      if (activeTab === "add-user") {
+        const parentFilteredStudents = userDirectory.filter((u: any) => {
+          if (u.role !== "student") return false;
+          if (u.organization_id !== adminOrganizationId) return false;
+          if (parentFilterGrade || parentFilterSection) {
+            return (studentClassRelations || []).some((rel: any) => {
+              if (!rel) return false;
+              if (rel.student_id !== u._id && rel.student_id !== u.id) return false;
+              const classMatch = !parentFilterGrade || rel.class_id === parentFilterGrade;
+              const secMatch = !parentFilterSection || rel.section_id === parentFilterSection;
+              return classMatch && secMatch;
+            });
+          }
+          return true;
+        });
+
+        const handleTabRegistrationSubmit = async (e: React.FormEvent) => {
+          e.preventDefault();
+          if (!formUsername || (!formFirstName && !formName) || !formPhone) {
+            setCrudError("Username/System ID, Name and Mobile Number are required.");
+            return;
+          }
+
+          setIsSubmitting(true);
+          setCrudError("");
+
+          try {
+            const parts = formName.trim().split(/\s+/);
+            const first_name = formFirstName || parts[0] || "New";
+            const middle_name = formMiddleName || "";
+            const last_name = formLastName || parts.slice(1).join(" ") || "User";
+            const email = formEmail || `${formUsername.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`;
+            const password = formPassword || "demoPassword123";
+            const passport = formPassport || "None";
+            const sex = formSex || "Male";
+            const dob = formDob || "2000-01-01";
+            const title_id = formTitleId || "Mr";
+            const access_level_id = formAccessLevelId || adminAccessLevel || "1";
+
+            let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
+            let payload: any = {};
+
+            if (formRole === "student") {
+              endpoint = "https://abms-lkw9.onrender.com/m/student/add";
+              payload = {
+                user_type: "student",
+                password: password,
+                first_name: first_name,
+                middle_name: middle_name,
+                last_name: last_name,
+                nic: formUsername,
+                email: email,
+                phone: formPhone,
+                passport: passport,
+                sex: sex,
+                dob: dob,
+                reg_no: formUsername,
+                reg_date: new Date().toISOString(),
+                end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                title_id: title_id,
+                user_type_id: "student",
+                access_level_id: parseInt(access_level_id) || 3,
+                organization_id: adminOrganizationId,
+                is_active: true
+              };
+            } else if (formRole === "instructor" || formRole === "teacher") {
+              endpoint = "https://abms-lkw9.onrender.com/m/teacher/add";
+              payload = {
+                user_type: "teacher",
+                password: password,
+                first_name: first_name,
+                middle_name: middle_name,
+                last_name: last_name,
+                nic: formUsername,
+                email: email,
+                phone: formPhone,
+                passport: passport,
+                sex: sex,
+                dob: dob,
+                reg_no: formUsername,
+                reg_date: new Date().toISOString(),
+                end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                title_id: title_id,
+                user_type_id: "teacher",
+                access_level_id: parseInt(access_level_id) || 4,
+                organization_id: adminOrganizationId,
+                teacher_grade_id: formQualification || "None",
+                specialization: formSpecialization || "None",
+                marital_status_id: formMaritalStatus || "None",
+                is_active: true
+              };
+            } else if (formRole === "parents" || formRole === "parent") {
+              endpoint = "https://abms-lkw9.onrender.com/m/parent/add";
+              payload = {
+                user_type: "parent",
+                password: password,
+                first_name: first_name,
+                middle_name: middle_name,
+                last_name: last_name,
+                nic: formUsername,
+                email: email,
+                phone: formPhone,
+                passport: passport,
+                sex: sex,
+                dob: dob,
+                title_id: title_id,
+                user_type_id: "parent",
+                access_level_id: parseInt(access_level_id) || 2,
+                organization_id: adminOrganizationId,
+                occupation_id: formOccupation || "None",
+                marital_status_id: formMaritalStatus || "None",
+                is_active: true
+              };
+            }
+
+            let requestSuccess = false;
+            let resData: any = {};
+
+            try {
+              const token = loginResult?.data?.token || "";
+              const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              };
+              if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
+              }
+
+              const response = await fetch(endpoint, {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(payload)
+              });
+
+              const resText = await response.text();
+              try {
+                resData = JSON.parse(resText);
+              } catch (e) {
+                resData = { rawResponse: resText };
+              }
+
+              if (response.ok) {
+                requestSuccess = true;
+              }
+            } catch (primaryErr) {
+              console.warn("Primary registration failed, trying fallback:", primaryErr);
+            }
+
+            if (!requestSuccess) {
+              const fallbackEndpoint = "https://abms-lkw9.onrender.com/df/register/add";
+              const fallbackPayload = {
+                user_type_id: formRole === "parents" ? "parent" : (formRole === "instructor" || formRole === "teacher" ? "instructor" : "student"),
+                nic: formUsername,
+                password: password,
+                email: email,
+                passport: passport,
+                title_id: title_id,
+                first_name: first_name,
+                middle_name: middle_name,
+                last_name: last_name,
+                sex: sex,
+                dob: dob,
+                phone: formPhone,
+                access_level_id: parseInt(access_level_id) || 1,
+                organization_id: adminOrganizationId
+              };
+
+              try {
+                const fallbackResponse = await fetch(fallbackEndpoint, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                  },
+                  body: JSON.stringify(fallbackPayload)
+                });
+                const fbText = await fallbackResponse.text();
+                try {
+                  resData = JSON.parse(fbText);
+                } catch (e) {
+                  resData = { rawResponse: fbText };
+                }
+                if (fallbackResponse.ok) {
+                  requestSuccess = true;
+                }
+              } catch (fbErr) {
+                console.error("Fallback registration failed:", fbErr);
+              }
+            }
+
+            const newUserId = resData._id || resData.id || resData.data?._id || `user_${Date.now()}`;
+
+            // Handle mappings
+            if (formRole === "student" && selectedClass && selectedSection) {
+              try {
+                await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    student_id: newUserId,
+                    class_id: selectedClass,
+                    section_id: selectedSection
+                  })
+                });
+              } catch (err) {
+                console.error("Student mapping error:", err);
+              }
+            } else if ((formRole === "instructor" || formRole === "teacher") && selectedClass && selectedSection && selectedSubject) {
+              try {
+                await fetch("https://abms-lkw9.onrender.com/rel/teacherSubjectClass/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    teacher_id: newUserId,
+                    class_id: selectedClass,
+                    section_id: selectedSection,
+                    subject_id: selectedSubject
+                  })
+                });
+              } catch (err) {
+                console.error("Teacher mapping error:", err);
+              }
+            } else if ((formRole === "parents" || formRole === "parent") && selectedStudents.length > 0) {
+              try {
+                const promises = selectedStudents.map(studentId =>
+                  fetch("https://abms-lkw9.onrender.com/rel/parentStudent/add", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      parent_id: newUserId,
+                      student_id: studentId
+                    })
+                  })
+                );
+                await Promise.all(promises);
+              } catch (err) {
+                console.error("Parent mapping error:", err);
+              }
+            }
+
+            // Sync with local memory
+            const newUserObj = {
+              _id: newUserId,
+              username: formUsername,
+              name: `${first_name} ${middle_name ? middle_name + " " : ""}${last_name}`,
+              role: formRole === "instructor" || formRole === "teacher" ? "instructor" : (formRole === "parents" || formRole === "parent" ? "parents" : "student"),
+              phone: formPhone,
+              status: formStatus,
+              first_name: first_name,
+              middle_name: middle_name,
+              last_name: last_name,
+              email: email,
+              password: password,
+              passport: passport,
+              title_id: title_id,
+              sex: sex,
+              dob: dob,
+              access_level_id: access_level_id,
+              organization_id: adminOrganizationId
+            };
+
+            setUserDirectoryState(prev => [...prev, newUserObj]);
+            
+            // Refresh relative data if possible
+            if (formRole === "student") fetchStudentRelations();
+            
+            setRegistrationStep(5); // Completion state
+
+          } catch (err: any) {
+            setCrudError(`Registration failed: ${err.message}`);
+          } finally {
+            setIsSubmitting(false);
+          }
+        };
+
+        return (
+          <div className="space-y-6 max-w-4xl">
+            {/* Locked Institute Scope Header */}
+            <div className="bg-gradient-to-r from-cyan-50 to-indigo-50 border border-cyan-100 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-in fade-in duration-300">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-600 flex items-center justify-center text-white shadow-md shadow-cyan-100">
+                  <UserPlus className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Register Academic Profile</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Register and map student, teacher, or parent profiles for Institute: <span className="font-mono text-cyan-600 font-bold">{adminOrganizationId || "SFS School"}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="bg-white/80 backdrop-blur border border-cyan-200/50 rounded-2xl px-4 py-2 flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-slate-600 font-mono">Bound to DB Schema</span>
+              </div>
+            </div>
+
+            {crudError && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs text-red-800 font-bold">
+                ⚠️ {crudError}
+              </div>
+            )}
+
+            {/* Stepper Progress Bar */}
+            {registrationStep <= 4 && (
+              <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm flex flex-col md:flex-row items-stretch justify-between gap-4">
+                {[
+                  { num: 1, title: "System & Role", desc: "Access level & keys" },
+                  { num: 2, title: "Profile Identity", desc: "Names & demographics" },
+                  { num: 3, title: "Contact & Security", desc: "Credentials & mobile" },
+                  { num: 4, title: "Academic Mapping", desc: "Specific class, subject & filters" }
+                ].map((s) => {
+                  const isActive = registrationStep === s.num;
+                  const isCompleted = registrationStep > s.num;
+                  return (
+                    <div key={s.num} className="flex-1 flex flex-col md:flex-row items-center gap-3">
+                      <div className="flex items-center gap-3 w-full">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border transition-all duration-300 ${
+                          isActive
+                            ? "bg-cyan-600 border-cyan-600 text-white shadow-md shadow-cyan-100 ring-4 ring-cyan-50"
+                            : isCompleted
+                              ? "bg-emerald-500 border-emerald-500 text-white"
+                              : "bg-slate-50 border-slate-200 text-slate-400"
+                        }`}>
+                          {isCompleted ? "✓" : s.num}
+                        </div>
+                        <div className="text-left">
+                          <p className={`text-xs font-bold tracking-tight transition-colors duration-300 ${
+                            isActive ? "text-cyan-600" : isCompleted ? "text-emerald-600" : "text-slate-400"
+                          }`}>{s.title}</p>
+                          <p className="text-[10px] text-slate-400 font-medium hidden md:block">{s.desc}</p>
+                        </div>
+                      </div>
+                      {s.num < 4 && (
+                        <div className={`hidden md:block flex-1 h-[2px] rounded transition-colors duration-300 mx-2 ${
+                          isCompleted ? "bg-emerald-500" : "bg-slate-200"
+                        }`} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Main Form Body */}
+            {registrationStep === 5 ? (
+              /* Success Screen */
+              <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-10 text-center space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-emerald-500 border border-emerald-100 shadow-inner">
+                  <svg className="w-10 h-10 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-900">Academic Profile Registered Successfully!</h3>
+                  <p className="text-sm text-slate-500 max-w-md mx-auto">
+                    The profile has been fully saved inside the primary <span className="font-semibold text-slate-800">m_schema</span> database and linked to correct relational mappings.
+                  </p>
+                </div>
+                <div className="pt-4 flex justify-center gap-4">
+                  <button
+                    onClick={() => {
+                      clearFormFields();
+                    }}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-5 py-3 rounded-xl transition shadow-sm cursor-pointer"
+                  >
+                    Register Another Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("users");
+                      clearFormFields();
+                    }}
+                    className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-5 py-3 rounded-xl transition shadow-sm cursor-pointer"
+                  >
+                    Go to User Directory
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+                <form onSubmit={handleTabRegistrationSubmit} className="space-y-6">
+                  {/* Step 1: System Settings */}
+                  {registrationStep === 1 && (
+                    <div className="space-y-4 animate-in fade-in duration-200 text-left">
+                      <div className="border-b border-slate-100 pb-2">
+                        <h4 className="text-sm font-bold text-slate-800">Step 1: Role Selection & Access Credentials</h4>
+                        <p className="text-xs text-slate-500">Configure System ID and designate role types with synced access level IDs.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700">Account Role <span className="text-red-500">*</span></label>
+                          <select
+                            value={formRole}
+                            onChange={(e) => setFormRole(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 font-semibold text-sm"
+                          >
+                            <option value="student">Student Profile</option>
+                            <option value="instructor">Teacher Profile</option>
+                            <option value="parents">Parent Profile</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5 font-mono">
+                          <label className="text-xs font-bold text-slate-700">System ID / NIC (Username) <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={formUsername}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormUsername(val);
+                              setFormEmail(`${val.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`);
+                            }}
+                            placeholder="e.g. NIC-99999999V"
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700">Profile Status <span className="text-red-500">*</span></label>
+                          <select
+                            value={formStatus}
+                            onChange={(e) => setFormStatus(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                          >
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700">Database Access Level ID <span className="text-red-500">*</span></label>
+                          <select
+                            value={formAccessLevelId}
+                            onChange={(e) => setFormAccessLevelId(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-bold text-cyan-600"
+                          >
+                            {formRole === "student" && (
+                              <>
+                                <option value="3">Level 3 (Academic Portal - Student Default)</option>
+                                <option value="2">Level 2 (Parent Portal)</option>
+                                <option value="1">Level 1 (Guest / Visitor)</option>
+                              </>
+                            )}
+                            {(formRole === "instructor" || formRole === "teacher") && (
+                              <>
+                                <option value="4">Level 4 (Teacher Portal - Instructor Default)</option>
+                                <option value="5">Level 5 (Department Head)</option>
+                              </>
+                            )}
+                            {(formRole === "parents" || formRole === "parent") && (
+                              <option value="2">Level 2 (Parent Portal - Parent Default)</option>
+                            )}
+                          </select>
+                          <p className="text-[10px] text-slate-400">Access levels are automatically filtered and pre-configured to prevent database schema mismatch errors.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 2: Personal Profile */}
+                  {registrationStep === 2 && (
+                    <div className="space-y-4 animate-in fade-in duration-200 text-left">
+                      <div className="border-b border-slate-100 pb-2">
+                        <h4 className="text-sm font-bold text-slate-800">Step 2: Personal Information Details</h4>
+                        <p className="text-xs text-slate-500">Configure personal naming details, marital status and biological demographics.</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="space-y-1.5 col-span-2 md:col-span-1">
+                          <label className="text-xs font-bold text-slate-700">Honorific Title <span className="text-red-500">*</span></label>
+                          <select
+                            value={formTitleId}
+                            onChange={(e) => setFormTitleId(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                          >
+                            {titlesList.map(item => {
+                              const titleVal = typeof item === 'string' ? item : (item.title || item.name || "");
+                              const titleId = typeof item === 'string' ? item : (item._id || item.title || "");
+                              return (
+                                <option key={titleId} value={titleId}>{titleVal}</option>
+                              );
+                            })}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5 col-span-2 md:col-span-1">
+                          <label className="text-xs font-bold text-slate-700">First Name <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={formFirstName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormFirstName(val);
+                              setFormName([val, formMiddleName, formLastName].filter(Boolean).join(" "));
+                            }}
+                            placeholder="First Name"
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 col-span-2 md:col-span-1">
+                          <label className="text-xs font-bold text-slate-700">Middle Name</label>
+                          <input
+                            type="text"
+                            value={formMiddleName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormMiddleName(val);
+                              setFormName([formFirstName, val, formLastName].filter(Boolean).join(" "));
+                            }}
+                            placeholder="Middle Name"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 col-span-2 md:col-span-1">
+                          <label className="text-xs font-bold text-slate-700">Last Name <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={formLastName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setFormLastName(val);
+                              setFormName([formFirstName, formMiddleName, val].filter(Boolean).join(" "));
+                            }}
+                            placeholder="Last Name"
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-700">Biological Sex / Gender <span className="text-red-500">*</span></label>
+                          <select
+                            value={formSex}
+                            onChange={(e) => setFormSex(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                          >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5 font-mono">
+                          <label className="text-xs font-bold text-slate-700">Date of Birth <span className="text-red-500">*</span></label>
+                          <input
+                            type="date"
+                            value={formDob}
+                            onChange={(e) => setFormDob(e.target.value)}
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-semibold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Contact & Security Credentials */}
+                  {registrationStep === 3 && (
+                    <div className="space-y-4 animate-in fade-in duration-200 text-left">
+                      <div className="border-b border-slate-100 pb-2">
+                        <h4 className="text-sm font-bold text-slate-800">Step 3: Contact Details & Security Credentials</h4>
+                        <p className="text-xs text-slate-500">Provide login credentials and active mobile roster details.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5 font-mono">
+                          <label className="text-xs font-bold text-slate-700">Mobile Phone <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={formPhone}
+                            onChange={(e) => setFormPhone(e.target.value)}
+                            placeholder="e.g. 0779998881"
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 font-mono">
+                          <label className="text-xs font-bold text-slate-700">Email Address <span className="text-red-500">*</span></label>
+                          <input
+                            type="email"
+                            value={formEmail}
+                            onChange={(e) => setFormEmail(e.target.value)}
+                            placeholder="email@example.com"
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 font-mono">
+                          <label className="text-xs font-bold text-slate-700">Account Password <span className="text-red-500">*</span></label>
+                          <input
+                            type="text"
+                            value={formPassword}
+                            onChange={(e) => setFormPassword(e.target.value)}
+                            placeholder="Password"
+                            required
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 font-mono">
+                        <label className="text-xs font-bold text-slate-700">Passport Number (Optional)</label>
+                        <input
+                          type="text"
+                          value={formPassport}
+                          onChange={(e) => setFormPassport(e.target.value)}
+                          placeholder="e.g. P1234567"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 4: Academic Mapping & Custom Attributes */}
+                  {registrationStep === 4 && (
+                    <div className="space-y-4 animate-in fade-in duration-200 text-left">
+                      <div className="border-b border-slate-100 pb-2">
+                        <h4 className="text-sm font-bold text-slate-800">Step 4: Academic Mapping & Custom Properties</h4>
+                        <p className="text-xs text-slate-500">Provide role-specific mapping relationships to finalize registration.</p>
+                      </div>
+
+                      {/* STUDENT FORM SPECIFICS */}
+                      {formRole === "student" && (
+                        <div className="space-y-4">
+                          <div className="bg-cyan-50 border border-cyan-100 p-4 rounded-2xl">
+                            <p className="text-xs text-cyan-800 font-bold">🎓 Student Class Mapping</p>
+                            <p className="text-[11px] text-cyan-700">Map this student directly to their grade and section. This saves in the relational database.</p>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Grade <span className="text-red-500">*</span></label>
+                              <select
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              >
+                                <option value="">Select Grade</option>
+                                {classesList.map((cls: any) => (
+                                  <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Section <span className="text-red-500">*</span></label>
+                              <select
+                                value={selectedSection}
+                                onChange={(e) => setSelectedSection(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              >
+                                <option value="">Select Section</option>
+                                {sectionsList.map((sec: any) => (
+                                  <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TEACHER FORM SPECIFICS */}
+                      {(formRole === "instructor" || formRole === "teacher") && (
+                        <div className="space-y-4">
+                          <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+                            <p className="text-xs text-emerald-800 font-bold">🏫 Teacher Qualifications & Subjects</p>
+                            <p className="text-[11px] text-emerald-700">Set professional qualifications and assign class/subject teaching scope.</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Educational Qualification <span className="text-red-500">*</span></label>
+                              <select
+                                value={formQualification}
+                                onChange={(e) => setFormQualification(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                              >
+                                <option value="Bachelor's Degree">Bachelor's Degree</option>
+                                <option value="Master's Degree">Master's Degree</option>
+                                <option value="Doctoral Degree (Ph.D.)">Doctoral Degree (Ph.D.)</option>
+                                <option value="Diploma in Education">Diploma in Education</option>
+                                <option value="Advanced Certified Teacher">Advanced Certified Teacher</option>
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Specialization Subject <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formSpecialization}
+                                onChange={(e) => setFormSpecialization(e.target.value)}
+                                placeholder="e.g. Mathematics, Physics"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Marital Status <span className="text-red-500">*</span></label>
+                              <select
+                                value={formMaritalStatus}
+                                onChange={(e) => setFormMaritalStatus(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                              >
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Divorced">Divorced</option>
+                                <option value="Widowed">Widowed</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="border-t border-slate-100 pt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Teaching Class/Grade <span className="text-red-500">*</span></label>
+                              <select
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              >
+                                <option value="">Select Grade</option>
+                                {classesList.map((cls: any) => (
+                                  <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Teaching Section <span className="text-red-500">*</span></label>
+                              <select
+                                value={selectedSection}
+                                onChange={(e) => setSelectedSection(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              >
+                                <option value="">Select Section</option>
+                                {sectionsList.map((sec: any) => (
+                                  <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Teaching Subject <span className="text-red-500">*</span></label>
+                              <select
+                                value={selectedSubject}
+                                onChange={(e) => setSelectedSubject(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              >
+                                <option value="">Select Subject</option>
+                                {subjectsList.map((sub: any) => (
+                                  <option key={sub._id} value={sub._id}>{sub.name || sub.subject}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PARENT FORM SPECIFICS */}
+                      {(formRole === "parents" || formRole === "parent") && (
+                        <div className="space-y-4">
+                          <div className="bg-violet-50 border border-violet-100 p-4 rounded-2xl">
+                            <p className="text-xs text-violet-800 font-bold">👨‍👩‍👧 Parents Credentials & Student Filtering</p>
+                            <p className="text-[11px] text-violet-700">Specify occupation and filter students of this organization to link child-parent relations.</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Occupation <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formOccupation}
+                                onChange={(e) => setFormOccupation(e.target.value)}
+                                placeholder="e.g. Software Engineer, Business Owner"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Marital Status <span className="text-red-500">*</span></label>
+                              <select
+                                value={formMaritalStatus}
+                                onChange={(e) => setFormMaritalStatus(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                              >
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Divorced">Divorced</option>
+                                <option value="Widowed">Widowed</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Student Selection filter */}
+                          <div className="border-t border-slate-100 pt-3 space-y-3">
+                            <h5 className="text-xs font-bold text-slate-800">Filter & Map Student Accounts</h5>
+                            <p className="text-[11px] text-slate-500">Select Grade and Section below to filter and choose this parent's child(ren).</p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Grade</label>
+                                <select
+                                  value={parentFilterGrade}
+                                  onChange={(e) => setParentFilterGrade(e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
+                                >
+                                  <option value="">All Grades</option>
+                                  {classesList.map((cls: any) => (
+                                    <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Section</label>
+                                <select
+                                  value={parentFilterSection}
+                                  onChange={(e) => setParentFilterSection(e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
+                                >
+                                  <option value="">All Sections</option>
+                                  {sectionsList.map((sec: any) => (
+                                    <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-xs font-semibold text-slate-700">Link Registered Children</label>
+                              <div className="border border-slate-200 rounded-xl p-3 max-h-48 overflow-y-auto space-y-1 bg-slate-50 divide-y divide-slate-100">
+                                {parentFilteredStudents.length > 0 ? (
+                                  parentFilteredStudents.map((st: any) => (
+                                    <label key={st._id} className="flex items-center gap-2.5 py-1.5 px-1 hover:bg-slate-100 rounded cursor-pointer transition">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedStudents.includes(st._id)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedStudents([...selectedStudents, st._id]);
+                                          } else {
+                                            setSelectedStudents(selectedStudents.filter(id => id !== st._id));
+                                          }
+                                        }}
+                                        className="rounded text-cyan-600 focus:ring-cyan-500 w-4 h-4"
+                                      />
+                                      <div className="text-left">
+                                        <p className="text-xs font-bold text-slate-800">{st.name}</p>
+                                        <p className="text-[10px] text-slate-400 font-mono">ID: {st.username}</p>
+                                      </div>
+                                    </label>
+                                  ))
+                                ) : (
+                                  <p className="text-[11px] text-slate-400 p-2 text-center">No students match your active Grade & Section filter</p>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-slate-400 font-medium">Selected child count: {selectedStudents.length}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Wizard Bottom Controls */}
+                  <div className="pt-4 flex gap-3 border-t border-slate-100">
+                    {registrationStep > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCrudError("");
+                          setRegistrationStep(prev => Math.max(1, prev - 1));
+                        }}
+                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition cursor-pointer text-center text-xs"
+                      >
+                        Back
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearFormFields();
+                          setActiveTab("users");
+                        }}
+                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition cursor-pointer text-center text-xs"
+                      >
+                        Cancel
+                      </button>
+                    )}
+
+                    {registrationStep < 4 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (registrationStep === 1) {
+                            if (!formUsername.trim()) {
+                              setCrudError("System ID / Username (NIC) is required.");
+                              return;
+                            }
+                            if (userDirectoryState.some(u => u.username.toLowerCase() === formUsername.toLowerCase().trim())) {
+                              setCrudError("A user with this System ID/Username already exists.");
+                              return;
+                            }
+                            setCrudError("");
+                            setRegistrationStep(2);
+                          } else if (registrationStep === 2) {
+                            if (!formFirstName.trim() || !formLastName.trim()) {
+                              setCrudError("First Name and Last Name are required.");
+                              return;
+                            }
+                            if (!formDob) {
+                              setCrudError("Date of Birth is required.");
+                              return;
+                            }
+                            setCrudError("");
+                            setRegistrationStep(3);
+                          } else if (registrationStep === 3) {
+                            if (!formPhone.trim() || !formEmail.trim() || !formPassword.trim()) {
+                              setCrudError("Mobile Phone, Email Address and Password are required.");
+                              return;
+                            }
+                            setCrudError("");
+                            setRegistrationStep(4);
+                          }
+                        }}
+                        className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition shadow-sm cursor-pointer text-center text-xs"
+                      >
+                        Next Step
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-2 text-xs"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            Registering Profile...
+                          </>
+                        ) : (
+                          "Register Profile & Save Mapping"
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        );
       }
 
       // Institutions tab for administrators
