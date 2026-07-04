@@ -942,7 +942,7 @@ export default function App() {
             body: JSON.stringify({})
           }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/m/class_section/retrieve", {
+          fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({})
