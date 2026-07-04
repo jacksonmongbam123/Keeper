@@ -519,6 +519,7 @@ export default function App() {
   const [selectedUserToEdit, setSelectedUserToEdit] = useState<any>(null);
 
   const [formUsername, setFormUsername] = useState("");
+  const [formRegNo, setFormRegNo] = useState("");
   const [formName, setFormName] = useState("");
   const [formRole, setFormRole] = useState("student");
   const [formPhone, setFormPhone] = useState("");
@@ -568,6 +569,7 @@ export default function App() {
   // Reset all registration form fields
   const clearFormFields = () => {
     setFormUsername("");
+    setFormRegNo("");
     setFormName("");
     setFormPhone("");
     setFormStatus("Active");
@@ -766,6 +768,7 @@ export default function App() {
       alert("Please select both class and section");
       return;
     }
+
     try {
       const res = await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
         method: "POST",
@@ -1825,6 +1828,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         setFormUsername("");
+                        setFormRegNo("");
                         setFormName("");
                         setFormRole("student");
                         setFormPhone("");
@@ -1900,6 +1904,7 @@ export default function App() {
                                     onClick={() => {
                                       setSelectedUserToEdit(u);
                                       setFormUsername(u.username);
+                                      setFormRegNo(u.reg_no || "");
                                       setFormName(u.name);
                                       setFormRole(u.role);
                                       setFormPhone(u.phone);
@@ -2053,7 +2058,9 @@ export default function App() {
                         const passport = formPassport || "None";
                         const sex = formSex || "Male";
                         const dob = formDob || "2000-01-01";
-                        const title_id = formTitleId || "Mr";
+                        const selectedTitleObj = titlesList.find(t => (typeof t === 'string' ? t : t._id) === formTitleId);
+                        const title_val = selectedTitleObj ? (typeof selectedTitleObj === 'string' ? selectedTitleObj : (selectedTitleObj.title || selectedTitleObj.name || "Mr")) : (formTitleId || "Mr");
+                        const title_id = title_val;
                         const access_level_id = formAccessLevelId || adminAccessLevel || "4";
 
                         let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
@@ -2073,10 +2080,11 @@ export default function App() {
                             passport: passport,
                             sex: sex,
                             dob: dob,
-                            reg_no: formUsername,
+                            reg_no: formRegNo || formUsername,
                             reg_date: new Date().toISOString(),
                             end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                             title_id: title_id,
+                            title: title_val,
                             user_type_id: "student",
                             access_level_id: parseInt(access_level_id) || 4,
                             is_active: true
@@ -2099,6 +2107,7 @@ export default function App() {
                             reg_date: new Date().toISOString(),
                             end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                             title_id: title_id,
+                            title: title_val,
                             user_type_id: "teacher",
                             access_level_id: parseInt(access_level_id) || 5,
                             teacher_grade_id: "None",
@@ -2120,6 +2129,7 @@ export default function App() {
                             sex: sex,
                             dob: dob,
                             title_id: title_id,
+                            title: title_val,
                             user_type_id: "parent",
                             access_level_id: parseInt(access_level_id) || 6,
                             occupation_id: "None",
@@ -2134,6 +2144,7 @@ export default function App() {
                             email: email,
                             passport: passport,
                             title_id: title_id,
+                            title: title_val,
                             first_name: first_name,
                             middle_name: middle_name,
                             last_name: last_name,
@@ -2192,6 +2203,8 @@ export default function App() {
                             email: email,
                             passport: passport,
                             title_id: title_id,
+                            title: title_val,
+                            reg_no: formRole === "student" ? (formRegNo || formUsername) : undefined,
                             first_name: first_name,
                             middle_name: middle_name,
                             last_name: last_name,
@@ -2529,7 +2542,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="space-y-1.5">
+                           <div className="space-y-1.5">
                             <label className="font-bold text-slate-700">Passport Number (Optional)</label>
                             <input
                               type="text"
@@ -2539,6 +2552,20 @@ export default function App() {
                               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
                             />
                           </div>
+
+                          {formRole === "student" && (
+                            <div className="space-y-1.5 mt-3">
+                              <label className="font-bold text-slate-700">Registration Number <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formRegNo}
+                                onChange={(e) => setFormRegNo(e.target.value)}
+                                placeholder="e.g. REG-2026-1049"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono text-sm"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -2669,6 +2696,9 @@ export default function App() {
                         }
 
                         if (endpoint) {
+                          const selectedTitleObj = titlesList.find(t => (typeof t === 'string' ? t : t._id) === formTitleId);
+                          const title_val = selectedTitleObj ? (typeof selectedTitleObj === 'string' ? selectedTitleObj : (selectedTitleObj.title || selectedTitleObj.name || "Mr")) : (formTitleId || "Mr");
+
                           const payload: any = {
                             first_name: formFirstName,
                             middle_name: formMiddleName,
@@ -2676,7 +2706,8 @@ export default function App() {
                             password: formPassword,
                             email: formEmail,
                             passport: formPassport,
-                            title_id: formTitleId,
+                            title_id: title_val,
+                            title: title_val,
                             sex: formSex,
                             dob: formDob,
                             phone: formPhone,
@@ -2684,7 +2715,7 @@ export default function App() {
                           };
 
                           if (formRole === "student") {
-                            payload.reg_no = formUsername;
+                            payload.reg_no = formRegNo || formUsername;
                           } else if (formRole === "instructor" || formRole === "teacher") {
                             payload.nic = formUsername;
                           } else if (formRole === "parents" || formRole === "parent") {
@@ -2959,6 +2990,25 @@ export default function App() {
                         </div>
                       </div>
 
+                      {formRole === "student" && (
+                        <div className="border-t border-slate-100 my-2 pt-2 text-xs">
+                          <h4 className="font-bold text-slate-500 text-[10px] uppercase tracking-wider mb-2">Student Information</h4>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                              <label className="font-bold text-slate-700">Registration Number <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formRegNo}
+                                onChange={(e) => setFormRegNo(e.target.value)}
+                                placeholder="e.g. REG-2026-1049"
+                                required
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 font-mono"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="pt-3 flex gap-3">
                         <button
                           type="button"
@@ -3108,7 +3158,10 @@ export default function App() {
             return (studentClassRelations || []).some((rel: any) => {
               if (!rel) return false;
               if (rel.student_id !== u._id && rel.student_id !== u.id) return false;
-              const classMatch = !parentFilterGrade || rel.class_id === parentFilterGrade;
+              const classMatch = !parentFilterGrade || 
+                                 rel.class_id === parentFilterGrade || 
+                                 (classesList.find(c => c._id === parentFilterGrade)?.grade === rel.class_id) || 
+                                 (classesList.find(c => c._id === parentFilterGrade)?.name === rel.class_id);
               const secMatch = !parentFilterSection || rel.section_id === parentFilterSection;
               return classMatch && secMatch;
             });
@@ -3136,7 +3189,9 @@ export default function App() {
             const passport = formPassport || "None";
             const sex = formSex || "Male";
             const dob = formDob || "2000-01-01";
-            const title_id = formTitleId || "Mr";
+            const selectedTitleObj = titlesList.find(t => (typeof t === 'string' ? t : t._id) === formTitleId);
+            const title_val = selectedTitleObj ? (typeof selectedTitleObj === 'string' ? selectedTitleObj : (selectedTitleObj.title || selectedTitleObj.name || "Mr")) : (formTitleId || "Mr");
+            const title_id = title_val;
             const access_level_id = formAccessLevelId || adminAccessLevel || "4";
 
             let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
@@ -3156,10 +3211,11 @@ export default function App() {
                 passport: passport,
                 sex: sex,
                 dob: dob,
-                reg_no: formUsername,
+                reg_no: formRegNo || formUsername,
                 reg_date: new Date().toISOString(),
                 end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                 title_id: title_id,
+                title: title_val,
                 user_type_id: "student",
                 access_level_id: parseInt(access_level_id) || 4,
                 organization_id: adminOrganizationId,
@@ -3183,6 +3239,7 @@ export default function App() {
                 reg_date: new Date().toISOString(),
                 end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                 title_id: title_id,
+                title: title_val,
                 user_type_id: "teacher",
                 access_level_id: parseInt(access_level_id) || 5,
                 organization_id: adminOrganizationId,
@@ -3206,6 +3263,7 @@ export default function App() {
                 sex: sex,
                 dob: dob,
                 title_id: title_id,
+                title: title_val,
                 user_type_id: "parent",
                 access_level_id: parseInt(access_level_id) || 6,
                 organization_id: adminOrganizationId,
@@ -3257,6 +3315,8 @@ export default function App() {
                 email: email,
                 passport: passport,
                 title_id: title_id,
+                title: title_val,
+                reg_no: formRole === "student" ? (formRegNo || formUsername) : undefined,
                 first_name: first_name,
                 middle_name: middle_name,
                 last_name: last_name,
@@ -3721,10 +3781,10 @@ export default function App() {
                       {formRole === "student" && (
                         <div className="space-y-4">
                           <div className="bg-cyan-50 border border-cyan-100 p-4 rounded-2xl">
-                            <p className="text-xs text-cyan-800 font-bold">🎓 Student Class Mapping</p>
-                            <p className="text-[11px] text-cyan-700">Map this student directly to their grade and section. This saves in the relational database.</p>
+                            <p className="text-xs text-cyan-800 font-bold">🎓 Student Class Mapping & Registration</p>
+                            <p className="text-[11px] text-cyan-700">Map this student directly to their grade and section, and define their student registration number.</p>
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1.5">
                               <label className="text-xs font-bold text-slate-700">Grade <span className="text-red-500">*</span></label>
                               <select
@@ -3753,6 +3813,18 @@ export default function App() {
                                   <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
                                 ))}
                               </select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Registration Number <span className="text-red-500">*</span></label>
+                              <input
+                                type="text"
+                                value={formRegNo}
+                                onChange={(e) => setFormRegNo(e.target.value)}
+                                placeholder="e.g. REG-2026-1049"
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              />
                             </div>
                           </div>
                         </div>
@@ -4172,7 +4244,10 @@ export default function App() {
         // Find matching relations based on selection
         const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
           if (!rel) return false;
-          const matchesGrade = !selectedDfGrade || rel.class_id === selectedDfGrade;
+          const selectedGradeObj = (dfGrades || []).find(g => g && (g._id === selectedDfGrade || g.id === selectedDfGrade));
+          const matchesGrade = !selectedDfGrade || 
+                               rel.class_id === selectedDfGrade || 
+                               (selectedGradeObj && (rel.class_id === selectedGradeObj.grade || rel.class_id === selectedGradeObj.name));
           const matchesSection = !selectedDfSection || rel.section_id === selectedDfSection;
           return matchesGrade && matchesSection;
         });
@@ -4194,11 +4269,11 @@ export default function App() {
           if (!rel) return "Unassigned";
 
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
-          const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id));
+          const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id || g.name === rel.class_id));
           const sectionsList = Array.isArray(dfSections) ? dfSections : [];
           const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
 
-          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : "Unknown Grade";
+          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown Grade");
           const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : "Unknown Section";
 
           return `${gradeName} - ${sectionName}`;
