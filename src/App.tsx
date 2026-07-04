@@ -516,6 +516,7 @@ export default function App() {
   const [classesList, setClassesList] = useState<any[]>([]);
   const [sectionsList, setSectionsList] = useState<any[]>([]);
   const [subjectsList, setSubjectsList] = useState<any[]>([]);
+  const [classSectionsList, setClassSectionsList] = useState<any[]>([]);
   const [selectedUserToEdit, setSelectedUserToEdit] = useState<any>(null);
 
   const [formUsername, setFormUsername] = useState("");
@@ -764,8 +765,8 @@ export default function App() {
 
   // Handler for saving student class mapping
   const handleSaveStudentMapping = async () => {
-    if (!selectedClass || !selectedSection) {
-      alert("Please select both class and section");
+    if (!selectedClass) {
+      alert("Please select a class section");
       return;
     }
 
@@ -780,7 +781,7 @@ export default function App() {
         })
       });
       if (res.ok) {
-        alert("Student assigned to class and section successfully!");
+        alert("Student assigned to class section successfully!");
         setIsMappingModalOpen(false);
         fetchStudentRelations();
       } else {
@@ -795,8 +796,8 @@ export default function App() {
 
   // Handler for saving teacher class subject mapping
   const handleSaveTeacherMapping = async () => {
-    if (!selectedClass || !selectedSection || !selectedSubject) {
-      alert("Please select class, section, and subject");
+    if (!selectedClass || !selectedSubject) {
+      alert("Please select class section and subject");
       return;
     }
     try {
@@ -811,7 +812,7 @@ export default function App() {
         })
       });
       if (res.ok) {
-        alert("Teacher assigned to class, section, and subject successfully!");
+        alert("Teacher assigned to class section and subject successfully!");
         setIsMappingModalOpen(false);
       } else {
         const error = await res.json();
@@ -932,11 +933,16 @@ export default function App() {
   useEffect(() => {
     const fetchMappingData = async () => {
       try {
-        const [gradeRes, sectionRes, subjectRes, titleRes] = await Promise.all([
+        const [gradeRes, sectionRes, subjectRes, titleRes, classSectionRes] = await Promise.all([
           fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", { method: "POST" }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null)
+          fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null),
+          fetch("https://abms-lkw9.onrender.com/m/class_section/retrieve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          }).catch(() => null)
         ]);
 
         if (gradeRes && gradeRes.ok) {
@@ -972,6 +978,10 @@ export default function App() {
         if (subjectRes && subjectRes.ok) {
           const data = await subjectRes.json();
           if (Array.isArray(data)) setSubjectsList(data);
+        }
+        if (classSectionRes && classSectionRes.ok) {
+          const data = await classSectionRes.json();
+          if (Array.isArray(data)) setClassSectionsList(data.filter(Boolean));
         }
         if (titleRes && titleRes.ok) {
           const data = await titleRes.json();
@@ -3048,35 +3058,24 @@ export default function App() {
                       </div>
 
                       {(mappingType === "student" || mappingType === "teacher") && (
-                        <>
-                          <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Grade</label>
-                            <select
-                              value={selectedClass}
-                              onChange={(e) => setSelectedClass(e.target.value)}
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                            >
-                              <option value="">Select Grade</option>
-                              {classesList.map((cls: any) => (
-                                <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Section</label>
-                            <select
-                              value={selectedSection}
-                              onChange={(e) => setSelectedSection(e.target.value)}
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                            >
-                              <option value="">Select Section</option>
-                              {sectionsList.map((sec: any) => (
-                                <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Class Section</label>
+                          <select
+                            value={selectedClass}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSelectedClass(val);
+                              const matched = classSectionsList.find(cs => cs._id === val);
+                              setSelectedSection(matched ? (matched.__section || "") : "");
+                            }}
+                            className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                          >
+                            <option value="">Select Class Section</option>
+                            {classSectionsList.map((cs: any) => (
+                              <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
+                            ))}
+                          </select>
+                        </div>
                       )}
 
                       {mappingType === "teacher" && (
@@ -3154,15 +3153,17 @@ export default function App() {
         const parentFilteredStudents = userDirectory.filter((u: any) => {
           if (u.role !== "student") return false;
           if (u.organization_id !== adminOrganizationId) return false;
-          if (parentFilterGrade || parentFilterSection) {
+          if (parentFilterGrade) {
             return (studentClassRelations || []).some((rel: any) => {
               if (!rel) return false;
               if (rel.student_id !== u._id && rel.student_id !== u.id) return false;
-              const classMatch = !parentFilterGrade || 
-                                 rel.class_id === parentFilterGrade || 
+              
+              const matchedCs = classSectionsList.find(cs => cs._id === parentFilterGrade);
+              const classMatch = rel.class_id === parentFilterGrade || 
+                                 (matchedCs && (rel.class_id === matchedCs.grade || rel.class_id === matchedCs.name)) ||
                                  (classesList.find(c => c._id === parentFilterGrade)?.grade === rel.class_id) || 
                                  (classesList.find(c => c._id === parentFilterGrade)?.name === rel.class_id);
-              const secMatch = !parentFilterSection || rel.section_id === parentFilterSection;
+              const secMatch = !parentFilterSection || rel.section_id === parentFilterSection || (matchedCs && rel.section_id === matchedCs.__section);
               return classMatch && secMatch;
             });
           }
@@ -3785,32 +3786,22 @@ export default function App() {
                             <p className="text-[11px] text-cyan-700">Map this student directly to their grade and section, and define their student registration number.</p>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Grade <span className="text-red-500">*</span></label>
+                            <div className="space-y-1.5 col-span-2">
+                              <label className="text-xs font-bold text-slate-700">Class Section <span className="text-red-500">*</span></label>
                               <select
                                 value={selectedClass}
-                                onChange={(e) => setSelectedClass(e.target.value)}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSelectedClass(val);
+                                  const matched = classSectionsList.find(cs => cs._id === val);
+                                  setSelectedSection(matched ? (matched.__section || "") : "");
+                                }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
-                                <option value="">Select Grade</option>
-                                {classesList.map((cls: any) => (
-                                  <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Section <span className="text-red-500">*</span></label>
-                              <select
-                                value={selectedSection}
-                                onChange={(e) => setSelectedSection(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
-                                required
-                              >
-                                <option value="">Select Section</option>
-                                {sectionsList.map((sec: any) => (
-                                  <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                                <option value="">Select Class Section</option>
+                                {classSectionsList.map((cs: any) => (
+                                  <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
                                 ))}
                               </select>
                             </div>
@@ -3882,32 +3873,22 @@ export default function App() {
                           </div>
 
                           <div className="border-t border-slate-100 pt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Teaching Class/Grade <span className="text-red-500">*</span></label>
+                            <div className="space-y-1.5 col-span-2">
+                              <label className="text-xs font-bold text-slate-700">Teaching Class Section <span className="text-red-500">*</span></label>
                               <select
                                 value={selectedClass}
-                                onChange={(e) => setSelectedClass(e.target.value)}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setSelectedClass(val);
+                                  const matched = classSectionsList.find(cs => cs._id === val);
+                                  setSelectedSection(matched ? (matched.__section || "") : "");
+                                }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
-                                <option value="">Select Grade</option>
-                                {classesList.map((cls: any) => (
-                                  <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Teaching Section <span className="text-red-500">*</span></label>
-                              <select
-                                value={selectedSection}
-                                onChange={(e) => setSelectedSection(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
-                                required
-                              >
-                                <option value="">Select Section</option>
-                                {sectionsList.map((sec: any) => (
-                                  <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                                <option value="">Select Class Section</option>
+                                {classSectionsList.map((cs: any) => (
+                                  <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
                                 ))}
                               </select>
                             </div>
@@ -3969,33 +3950,24 @@ export default function App() {
                           {/* Student Selection filter */}
                           <div className="border-t border-slate-100 pt-3 space-y-3">
                             <h5 className="text-xs font-bold text-slate-800">Filter & Map Student Accounts</h5>
-                            <p className="text-[11px] text-slate-500">Select Grade and Section below to filter and choose this parent's child(ren).</p>
+                            <p className="text-[11px] text-slate-500">Select Class Section below to filter and choose this parent's child(ren).</p>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4">
                               <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Grade</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Class Section</label>
                                 <select
                                   value={parentFilterGrade}
-                                  onChange={(e) => setParentFilterGrade(e.target.value)}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setParentFilterGrade(val);
+                                    const matched = classSectionsList.find(cs => cs._id === val);
+                                    setParentFilterSection(matched ? (matched.__section || "") : "");
+                                  }}
                                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
                                 >
-                                  <option value="">All Grades</option>
-                                  {classesList.map((cls: any) => (
-                                    <option key={cls._id} value={cls._id}>{cls.name || cls.grade}</option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Section</label>
-                                <select
-                                  value={parentFilterSection}
-                                  onChange={(e) => setParentFilterSection(e.target.value)}
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
-                                >
-                                  <option value="">All Sections</option>
-                                  {sectionsList.map((sec: any) => (
-                                    <option key={sec._id} value={sec._id}>{sec.name || sec.section}</option>
+                                  <option value="">All Class Sections</option>
+                                  {classSectionsList.map((cs: any) => (
+                                    <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
                                   ))}
                                 </select>
                               </div>
@@ -4268,13 +4240,18 @@ export default function App() {
           const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
           if (!rel) return "Unassigned";
 
+          const csObj = classSectionsList.find(cs => cs._id === rel.class_id);
+          if (csObj) {
+            return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+          }
+
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
           const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id || g.name === rel.class_id));
           const sectionsList = Array.isArray(dfSections) ? dfSections : [];
           const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
 
           const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown Grade");
-          const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : "Unknown Section";
+          const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : (rel.section_id || "Unknown Section");
 
           return `${gradeName} - ${sectionName}`;
         };
