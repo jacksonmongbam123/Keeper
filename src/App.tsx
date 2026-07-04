@@ -1836,42 +1836,6 @@ export default function App() {
                       Level {adminAccessLevel} (Full CRUD Authorized)
                     </span>
                   </div>
-
-                  {/* Add User Button (visible if access level 1, 2, or 3) */}
-                  {["1", "2", "3"].includes(adminAccessLevel) ? (
-                    <button
-                      onClick={() => {
-                        setFormUsername("");
-                        setFormRegNo("");
-                        setFormName("");
-                        setFormRole("student");
-                        setFormPhone("");
-                        setFormStatus("Active");
-                        setFormFirstName("");
-                        setFormMiddleName("");
-                        setFormLastName("");
-                        setFormPassword("demoPassword123");
-                        setFormEmail("");
-                        setFormPassport("None");
-                        setFormTitleId("Mr");
-                        setFormSex("Male");
-                        setFormDob("2000-01-01");
-                        setFormAccessLevelId("4");
-                        setCrudError("");
-                        setRegistrationStep(1);
-                        setIsAddModalOpen(true);
-                      }}
-                      className="bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                      Add User
-                    </button>
-                  ) : (
-                    <div className="text-[10px] bg-amber-50 text-amber-700 border border-amber-100 px-3 py-2 rounded-xl flex items-center gap-1.5 font-medium">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Add/Edit require Verified Level 1/2/3 Admin
-                    </div>
-                  )}
                 </div>
               </div>
 
