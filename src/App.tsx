@@ -165,7 +165,7 @@ export default function App() {
   const activeConfig = ROLE_CONFIGS[selectedRole];
 
   // Dashboard states
-  const [activeTab, setActiveTab] = useState(() => selectedRole === "administrator" ? "users" : "overview");
+  const [activeTab, setActiveTab] = useState("overview");
   const [userTypeFilter, setUserTypeFilter] = useState<"all" | "student" | "instructor" | "parents">("all");
   const [institutionDetails, setInstitutionDetails] = useState<any>(null);
   const [isLoadingInstitution, setIsLoadingInstitution] = useState(false);
@@ -1803,7 +1803,7 @@ export default function App() {
               }
             }
             setAdminAccessLevel(levelStr);
-            setActiveTab("users");
+            setActiveTab("overview");
           } else {
             setActiveTab("overview");
           }
@@ -1846,7 +1846,7 @@ export default function App() {
     setLoginResult(null);
     setUsername("");
     setPassword("");
-    setActiveTab(selectedRole === "administrator" ? "users" : "overview");
+    setActiveTab("overview");
     localStorage.removeItem("abms_session");
     localStorage.removeItem("keeper_admin_info");
     setAdminOrganizationId(null);
@@ -2241,6 +2241,7 @@ export default function App() {
     ];
 
     const menuItems = selectedRole === "administrator" ? [
+      { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "users", label: "User Directory", icon: Users },
       { id: "add-user", label: "Register Profile", icon: UserPlus },
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
@@ -2891,6 +2892,186 @@ export default function App() {
 
       // Administrator views
       if (selectedRole === "administrator") {
+        if (activeTab === "overview") {
+          const studentCount = userDirectory.filter(u => u.role === "student").length;
+          const teacherCount = userDirectory.filter(u => u.role === "instructor").length;
+          const parentCount = userDirectory.filter(u => u.role === "parents").length;
+          const totalUsers = userDirectory.length;
+          const activeClassesCount = (classSectionsList || []).length;
+
+          return (
+            <div className="space-y-6">
+              {/* Institutional Welcome banner */}
+              <div className="bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg border border-indigo-200/20 relative overflow-hidden">
+                <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute left-1/3 bottom-0 w-48 h-48 bg-cyan-400/10 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black tracking-wider uppercase">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-300 animate-pulse" />
+                      Administrative Control Center
+                    </div>
+                    <h2 className="text-2xl font-black tracking-tight font-sans">
+                      {adminOrganizationId || "SFS School"} Overview
+                    </h2>
+                    <p className="text-xs text-cyan-100 max-w-xl font-medium">
+                      You are in control of the academic directory, registration portals, and data mapping grids. Monitor overall metrics and take quick administrative action below.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      onClick={() => setActiveTab("add-user")}
+                      className="px-4 py-2 bg-white text-indigo-700 hover:bg-cyan-50 text-xs font-bold rounded-xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-1.5 font-sans"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Register Profile
+                    </button>
+                    <button
+                      onClick={() => setIsStudentBulkModalOpen(true)}
+                      className="px-4 py-2 bg-indigo-500/30 hover:bg-indigo-500/40 text-white text-xs font-bold rounded-xl border border-white/10 backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-1.5 font-sans"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Bulk Import Students
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats bento grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                {[
+                  { label: "Overall Students", val: studentCount, desc: "Enrolled active profiles", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50 border-cyan-100/70", tab: "users", filter: "student" },
+                  { label: "Faculty Teachers", val: teacherCount, desc: "Assigned course instructors", icon: Users, color: "text-emerald-600 bg-emerald-50 border-emerald-100/70", tab: "users", filter: "instructor" },
+                  { label: "Registered Parents", val: parentCount, desc: "Linked family units", icon: Users, color: "text-violet-600 bg-violet-50 border-violet-100/70", tab: "users", filter: "parents" },
+                  { label: "Class Sections", val: activeClassesCount, desc: "Active grades & batches", icon: ClipboardList, color: "text-amber-600 bg-amber-50 border-amber-100/70", tab: "students-by-grade", filter: null },
+                  { label: "Total Directory Users", val: totalUsers, desc: "Full accounts roster", icon: Sparkles, color: "text-slate-600 bg-slate-50 border-slate-200/80", tab: "users", filter: "all" }
+                ].map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        setActiveTab(item.tab);
+                        if (item.filter) {
+                          setUserTypeFilter(item.filter as any);
+                        }
+                      }}
+                      className="bg-white border border-slate-200 hover:border-slate-300 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-250 cursor-pointer group flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block font-sans">{item.label}</span>
+                          <div className={`p-2 rounded-2xl border transition-all duration-300 group-hover:scale-110 ${item.color}`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                        </div>
+                        <p className="text-3xl font-black text-slate-900 mt-3 font-mono tracking-tight">{item.val}</p>
+                      </div>
+                      <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500 font-medium block">{item.desc}</span>
+                        <span className="text-[10px] text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                          View →
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Bottom panels: Quick Actions & Live Logs */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Visual User Distribution & Shortcuts */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm lg:col-span-5 flex flex-col justify-between space-y-4">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
+                      <Activity className="w-3.5 h-3.5 text-cyan-500" />
+                      Roster Distribution & Metrics
+                    </h3>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Visual break-down of system-wide registration volumes
+                    </p>
+                  </div>
+
+                  {/* Manual visual bars representing the users */}
+                  <div className="space-y-4 py-2">
+                    {[
+                      { label: "Students", count: studentCount, pct: totalUsers ? (studentCount / totalUsers) * 100 : 0, color: "bg-cyan-500" },
+                      { label: "Teachers", count: teacherCount, pct: totalUsers ? (teacherCount / totalUsers) * 100 : 0, color: "bg-emerald-500" },
+                      { label: "Parents", count: parentCount, pct: totalUsers ? (parentCount / totalUsers) * 100 : 0, color: "bg-violet-500" }
+                    ].map((row, i) => (
+                      <div key={i} className="space-y-1">
+                        <div className="flex justify-between text-xs font-bold text-slate-700">
+                          <span>{row.label}</span>
+                          <span className="font-mono text-slate-500">{row.count} ({Math.round(row.pct)}%)</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full ${row.color} rounded-full transition-all duration-500`} 
+                            style={{ width: `${row.pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4 space-y-2">
+                    <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">Operational Status</span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs font-bold text-slate-800">Database Pool Fully Operational</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium">
+                      Live connection synchronized with active MongoDB & Render endpoint clusters.
+                    </p>
+                  </div>
+                </div>
+
+                {/* System Activity Log Feed */}
+                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm lg:col-span-7 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
+                      <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                      Live System Activity Feed
+                    </h3>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Real-time gateway routing and bypass logging
+                    </p>
+                  </div>
+
+                  <div className="space-y-2.5 py-4 overflow-y-auto max-h-[220px]">
+                    {systemLogs.map((log, idx) => (
+                      <div key={idx} className="flex gap-3 text-xs p-2.5 rounded-xl bg-slate-50 border border-slate-100/80 hover:bg-slate-100/50 transition-all font-mono">
+                        <span className="text-slate-400 font-bold shrink-0">{log.timestamp}</span>
+                        <div className="space-y-0.5">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider uppercase bg-slate-200/80 text-slate-700 border border-slate-300/30">
+                            {log.event}
+                          </span>
+                          <p className="text-slate-600 text-[11px] leading-relaxed mt-1 font-sans font-medium">{log.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Showing latest administrative traces</span>
+                    <button 
+                      onClick={() => {
+                        console.log("System log snapshot traces:", systemLogs);
+                      }} 
+                      className="text-indigo-600 hover:underline font-bold cursor-pointer font-mono"
+                    >
+                      Log snapshot printed to console
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          );
+        }
+
         if (activeTab === "users") {
           const filteredByType = userDirectory.filter(u => {
             if (userTypeFilter === "all") return true;
@@ -7234,196 +7415,10 @@ export default function App() {
                 </div>
               </div>
             )}
-
-            {/* Centered Modal Overlay for Excel Student Bulk Uploading */}
-            {isStudentBulkModalOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full overflow-hidden animate-in fade-in zoom-in duration-200">
-                  {/* Modal Header */}
-                  <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50/50 to-indigo-50/50 flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                        <Upload className="w-4 h-4 text-cyan-500" />
-                        Excel Bulk Students Importer
-                      </h3>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
-                        Upload your student spreadsheet to map, validate, and bulk register academic student profiles with Class Sections
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => !isStudentBulkUploading && setIsStudentBulkModalOpen(false)}
-                      className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer disabled:opacity-50"
-                      disabled={isStudentBulkUploading}
-                    >
-                      &times;
-                    </button>
-                  </div>
-
-                  <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                    {/* Drag & Drop Upload Area */}
-                    {!isStudentBulkUploading && studentBulkParsedRows.length === 0 && (
-                      <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/5 p-8 rounded-2xl text-center transition-all relative">
-                        <input
-                          type="file"
-                          accept=".xlsx, .xls, .csv"
-                          onChange={handleStudentBulkFileChange}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                        <h4 className="text-xs font-bold text-slate-800">Drag & Drop Excel Student File Here</h4>
-                        <p className="text-[10px] text-slate-400 mt-1">Accepts standard .xlsx and .xls student rosters</p>
-                        <button
-                          type="button"
-                          className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold font-mono"
-                        >
-                          Browse Files
-                        </button>
-                      </div>
-                    )}
-
-                    {studentBulkFileError && (
-                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium font-mono">
-                        ⚠️ {studentBulkFileError}
-                      </div>
-                    )}
-
-                    {/* Parse Stats and Grid Table */}
-                    {studentBulkParsedRows.length > 0 && (
-                      <div className="space-y-4">
-                        {/* Summary Stats */}
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-2xl text-center">
-                            <span className="block text-[10px] text-slate-400 uppercase font-black tracking-wider">Total Parsed</span>
-                            <span className="text-lg font-black text-slate-800 font-mono">{studentBulkParsedRows.length}</span>
-                          </div>
-                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl text-center">
-                            <span className="block text-[10px] text-emerald-500 uppercase font-black tracking-wider">Ready to Register</span>
-                            <span className="text-lg font-black text-emerald-700 font-mono">
-                              {studentBulkParsedRows.filter(r => r.isValid).length}
-                            </span>
-                          </div>
-                          <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl text-center">
-                            <span className="block text-[10px] text-rose-500 uppercase font-black tracking-wider">Errors Found</span>
-                            <span className="text-lg font-black text-rose-700 font-mono">
-                              {studentBulkParsedRows.filter(r => !r.isValid).length}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* List Preview Table */}
-                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                          <div className="overflow-x-auto max-h-[300px] overflow-y-auto font-sans">
-                            <table className="w-full text-left text-xs divide-y divide-slate-100">
-                              <thead className="bg-slate-50 sticky top-0 z-10 text-[10px] uppercase font-black text-slate-400 font-mono">
-                                <tr>
-                                  <th className="p-3 pl-4">Row</th>
-                                  <th className="p-3">System ID & Reg No</th>
-                                  <th className="p-3">Title & Full Name</th>
-                                  <th className="p-3">Phone & Email</th>
-                                  <th className="p-3">Resolved Class Section</th>
-                                  <th className="p-3 pr-4 text-center">Status</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                {studentBulkParsedRows.map((row) => (
-                                  <tr key={row.rowNumber} className={`hover:bg-slate-50/50 ${!row.isValid ? "bg-rose-50/10" : ""}`}>
-                                    <td className="p-3 pl-4 font-mono font-bold text-slate-400">
-                                      #{row.rowNumber}
-                                    </td>
-                                    <td className="p-3 text-left">
-                                      <div className="font-mono font-bold text-slate-700">ID: {row.rawUsername || <span className="text-rose-400 italic">None</span>}</div>
-                                      <div className="text-[10px] font-mono text-slate-500 font-bold">Reg No: {row.rawRegNo}</div>
-                                    </td>
-                                    <td className="p-3 font-medium text-slate-800 text-left">
-                                      <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-600 font-bold px-1 py-0.5 rounded font-mono mr-1">{row.rawTitle}</span>
-                                      {row.rawFirstName} {row.rawMiddleName ? row.rawMiddleName + " " : ""}{row.rawLastName}
-                                      <div className="text-[9px] text-slate-400 font-semibold mt-0.5">{row.rawSex} (DOB: {row.rawDob})</div>
-                                    </td>
-                                    <td className="p-3 text-left">
-                                      <div className="text-slate-700 font-medium">{row.rawPhone}</div>
-                                      <div className="text-[9px] text-slate-400 font-mono">{row.rawEmail}</div>
-                                    </td>
-                                    <td className="p-3 text-left">
-                                      <div className="font-semibold text-slate-700">{row.resolvedClassText}</div>
-                                      <div className="text-[9px] text-slate-400 font-semibold">Source: "{row.rawClassSection}"</div>
-                                    </td>
-                                    <td className="p-3 pr-4 text-center">
-                                      {row.isValid ? (
-                                        <span className="inline-flex items-center bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-full text-[10px] font-mono border border-emerald-100">
-                                          ✓ Valid
-                                        </span>
-                                      ) : (
-                                        <div className="text-left min-w-[150px] space-y-1">
-                                          <span className="inline-flex items-center bg-rose-50 text-rose-700 font-black px-2 py-0.5 rounded text-[9px] border border-rose-100 font-mono">
-                                            ⚠️ Blocked
-                                          </span>
-                                          {row.errors.map((err: string, i: number) => (
-                                            <p key={i} className="text-[8px] leading-tight text-rose-500 font-medium font-mono">
-                                              • {err}
-                                            </p>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Progress feedback bar during uploads */}
-                    {isStudentBulkUploading && (
-                      <div className="space-y-3 bg-slate-900 text-slate-200 p-4 rounded-2xl border border-slate-800 shadow-inner">
-                        <div className="flex items-center justify-between text-xs font-mono font-bold">
-                          <span>Registering: {studentBulkSuccessCount + studentBulkErrorCount} / {studentBulkParsedRows.filter(r => r.isValid).length}</span>
-                          <span className="text-cyan-400 animate-pulse">Running Database Transactions...</span>
-                        </div>
-                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden font-sans">
-                          <div
-                            className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 transition-all duration-300"
-                            style={{
-                              width: `${(studentBulkParsedRows.filter(r => r.isValid).length > 0) ? ((studentBulkSuccessCount + studentBulkErrorCount) / studentBulkParsedRows.filter(r => r.isValid).length) * 100 : 0}%`
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Modal Footer */}
-                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 font-sans">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStudentBulkParsedRows([]);
-                        setIsStudentBulkModalOpen(false);
-                      }}
-                      className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition disabled:opacity-50 active:scale-95 cursor-pointer font-mono"
-                      disabled={isStudentBulkUploading}
-                    >
-                      {studentBulkParsedRows.length > 0 && !isStudentBulkUploading ? "Reset Sheet" : "Close"}
-                    </button>
-                    {studentBulkParsedRows.length > 0 && !isStudentBulkUploading && (
-                      <button
-                        type="button"
-                        onClick={handleConfirmStudentBulkUpload}
-                        disabled={studentBulkParsedRows.filter(r => r.isValid).length === 0}
-                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer flex items-center gap-1.5 font-mono"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Confirm Register ({studentBulkParsedRows.filter(r => r.isValid).length} Students)</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         );
       }
+
 
       return null;
     };
@@ -7614,6 +7609,194 @@ export default function App() {
               {renderDashboardContent()}
             </div>
           </main>
+
+          {/* Centered Modal Overlay for Excel Student Bulk Uploading */}
+          {isStudentBulkModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                {/* Modal Header */}
+                <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50/50 to-indigo-50/50 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-cyan-500" />
+                      Excel Bulk Students Importer
+                    </h3>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Upload your student spreadsheet to map, validate, and bulk register academic student profiles with Class Sections
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => !isStudentBulkUploading && setIsStudentBulkModalOpen(false)}
+                    className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer disabled:opacity-50"
+                    disabled={isStudentBulkUploading}
+                  >
+                    &times;
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                  {/* Drag & Drop Upload Area */}
+                  {!isStudentBulkUploading && studentBulkParsedRows.length === 0 && (
+                    <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/5 p-8 rounded-2xl text-center transition-all relative">
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv"
+                        onChange={handleStudentBulkFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                      <h4 className="text-xs font-bold text-slate-800">Drag & Drop Excel Student File Here</h4>
+                      <p className="text-[10px] text-slate-400 mt-1">Accepts standard .xlsx and .xls student rosters</p>
+                      <button
+                        type="button"
+                        className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold font-mono"
+                      >
+                        Browse Files
+                      </button>
+                    </div>
+                  )}
+
+                  {studentBulkFileError && (
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium font-mono">
+                      ⚠️ {studentBulkFileError}
+                    </div>
+                  )}
+
+                  {/* Parse Stats and Grid Table */}
+                  {studentBulkParsedRows.length > 0 && (
+                    <div className="space-y-4">
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-2xl text-center">
+                          <span className="block text-[10px] text-slate-400 uppercase font-black tracking-wider">Total Parsed</span>
+                          <span className="text-lg font-black text-slate-800 font-mono">{studentBulkParsedRows.length}</span>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl text-center">
+                          <span className="block text-[10px] text-emerald-500 uppercase font-black tracking-wider">Ready to Register</span>
+                          <span className="text-lg font-black text-emerald-700 font-mono">
+                            {studentBulkParsedRows.filter(r => r.isValid).length}
+                          </span>
+                        </div>
+                        <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl text-center">
+                          <span className="block text-[10px] text-rose-500 uppercase font-black tracking-wider">Errors Found</span>
+                          <span className="text-lg font-black text-rose-700 font-mono">
+                            {studentBulkParsedRows.filter(r => !r.isValid).length}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* List Preview Table */}
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto max-h-[300px] overflow-y-auto font-sans">
+                          <table className="w-full text-left text-xs divide-y divide-slate-100">
+                            <thead className="bg-slate-50 sticky top-0 z-10 text-[10px] uppercase font-black text-slate-400 font-mono">
+                              <tr>
+                                <th className="p-3 pl-4">Row</th>
+                                <th className="p-3">System ID & Reg No</th>
+                                <th className="p-3">Title & Full Name</th>
+                                <th className="p-3">Phone & Email</th>
+                                <th className="p-3">Resolved Class Section</th>
+                                <th className="p-3 pr-4 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {studentBulkParsedRows.map((row) => (
+                                <tr key={row.rowNumber} className={`hover:bg-slate-50/50 ${!row.isValid ? "bg-rose-50/10" : ""}`}>
+                                  <td className="p-3 pl-4 font-mono font-bold text-slate-400">
+                                    #{row.rowNumber}
+                                  </td>
+                                  <td className="p-3 text-left">
+                                    <div className="font-mono font-bold text-slate-700">ID: {row.rawUsername || <span className="text-rose-400 italic">None</span>}</div>
+                                    <div className="text-[10px] font-mono text-slate-500 font-bold">Reg No: {row.rawRegNo}</div>
+                                  </td>
+                                  <td className="p-3 font-medium text-slate-800 text-left">
+                                    <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-600 font-bold px-1 py-0.5 rounded font-mono mr-1">{row.rawTitle}</span>
+                                    {row.rawFirstName} {row.rawMiddleName ? row.rawMiddleName + " " : ""}{row.rawLastName}
+                                    <div className="text-[9px] text-slate-400 font-semibold mt-0.5">{row.rawSex} (DOB: {row.rawDob})</div>
+                                  </td>
+                                  <td className="p-3 text-left">
+                                    <div className="text-slate-700 font-medium">{row.rawPhone}</div>
+                                    <div className="text-[9px] text-slate-400 font-mono">{row.rawEmail}</div>
+                                  </td>
+                                  <td className="p-3 text-left">
+                                    <div className="font-semibold text-slate-700">{row.resolvedClassText}</div>
+                                    <div className="text-[9px] text-slate-400 font-semibold">Source: "{row.rawClassSection}"</div>
+                                  </td>
+                                  <td className="p-3 pr-4 text-center">
+                                    {row.isValid ? (
+                                      <span className="inline-flex items-center bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-full text-[10px] font-mono border border-emerald-100">
+                                        ✓ Valid
+                                      </span>
+                                    ) : (
+                                      <div className="text-left min-w-[150px] space-y-1">
+                                        <span className="inline-flex items-center bg-rose-50 text-rose-700 font-black px-2 py-0.5 rounded text-[9px] border border-rose-100 font-mono">
+                                          ⚠️ Blocked
+                                        </span>
+                                        {row.errors.map((err: string, i: number) => (
+                                          <p key={i} className="text-[8px] leading-tight text-rose-500 font-medium font-mono">
+                                            • {err}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Progress feedback bar during uploads */}
+                  {isStudentBulkUploading && (
+                    <div className="space-y-3 bg-slate-900 text-slate-200 p-4 rounded-2xl border border-slate-800 shadow-inner">
+                      <div className="flex items-center justify-between text-xs font-mono font-bold">
+                        <span>Registering: {studentBulkSuccessCount + studentBulkErrorCount} / {studentBulkParsedRows.filter(r => r.isValid).length}</span>
+                        <span className="text-cyan-400 animate-pulse">Running Database Transactions...</span>
+                      </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden font-sans">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 transition-all duration-300"
+                          style={{
+                            width: `${(studentBulkParsedRows.filter(r => r.isValid).length > 0) ? ((studentBulkSuccessCount + studentBulkErrorCount) / studentBulkParsedRows.filter(r => r.isValid).length) * 100 : 0}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 font-sans">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStudentBulkParsedRows([]);
+                      setIsStudentBulkModalOpen(false);
+                    }}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition disabled:opacity-50 active:scale-95 cursor-pointer font-mono"
+                    disabled={isStudentBulkUploading}
+                  >
+                    {studentBulkParsedRows.length > 0 && !isStudentBulkUploading ? "Reset Sheet" : "Close"}
+                  </button>
+                  {studentBulkParsedRows.length > 0 && !isStudentBulkUploading && (
+                    <button
+                      type="button"
+                      onClick={handleConfirmStudentBulkUpload}
+                      disabled={studentBulkParsedRows.filter(r => r.isValid).length === 0}
+                      className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer flex items-center gap-1.5 font-mono"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Confirm Register ({studentBulkParsedRows.filter(r => r.isValid).length} Students)</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     );
@@ -7725,7 +7908,7 @@ export default function App() {
                           setSelectedRole(role);
                           setUsername("");
                           setPassword("");
-                          setActiveTab(role === "administrator" ? "users" : "overview");
+                          setActiveTab("overview");
                         }}
                         className={`relative p-3 rounded-xl flex flex-col items-center justify-center gap-2 border text-center transition-all duration-300 cursor-pointer ${
                           isSelected
