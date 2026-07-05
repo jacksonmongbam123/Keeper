@@ -148,6 +148,52 @@ export default function App() {
   const [selectedDfSection, setSelectedDfSection] = useState<string>("");
   const [isLoadingRelations, setIsLoadingRelations] = useState<boolean>(false);
 
+  // --- Grade & Section Fee Viewer States ---
+  const [allFeeRecords, setAllFeeRecords] = useState<any[]>([]);
+  const [isLoadingFees, setIsLoadingFees] = useState<boolean>(false);
+  const [feesFetchError, setFeesFetchError] = useState<string>("");
+  const [feeViewerYear, setFeeViewerYear] = useState<string>("2026");
+  const [feeViewerStatusFilter, setFeeViewerStatusFilter] = useState<string>("All");
+
+  // Inline Fee Update Modal States
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [modalStudent, setModalStudent] = useState<any>(null);
+  const [modalTerm, setModalTerm] = useState<number>(1);
+  const [modalYear, setModalYear] = useState<number>(2026);
+  const [modalStatus, setModalStatus] = useState<string>("paid");
+  const [modalIsNew, setModalIsNew] = useState<boolean>(false);
+  const [modalSubmitting, setModalSubmitting] = useState<boolean>(false);
+  const [modalError, setModalError] = useState<string>("");
+  const [modalSuccess, setModalSuccess] = useState<string>("");
+
+  const fetchFeeRecords = async () => {
+    setIsLoadingFees(true);
+    setFeesFetchError("");
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      if (!token) return;
+      const res = await fetch("https://abms-lkw9.onrender.com/class/fee/all", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAllFeeRecords(Array.isArray(data) ? data.filter(Boolean) : []);
+      } else {
+        const text = await res.text();
+        console.warn("Failed to fetch fee records:", text);
+        setFeesFetchError(`Failed to load: ${res.statusText}`);
+      }
+    } catch (err: any) {
+      console.warn("Error fetching fee records:", err);
+      setFeesFetchError(err.message || "Network error fetching fee records");
+    } finally {
+      setIsLoadingFees(false);
+    }
+  };
+
   const fetchDfGradesAndSections = async () => {
     try {
       const [gradeRes, sectionRes] = await Promise.all([
@@ -282,6 +328,13 @@ export default function App() {
       }
     }
   }, []);
+
+  // Fetch fee records when switching to the fee viewer tab or on success admin login
+  useEffect(() => {
+    if (loginResult?.success && selectedRole === "administrator" && activeTab === "grade-section-fees") {
+      fetchFeeRecords();
+    }
+  }, [activeTab, loginResult, selectedRole]);
 
   // Fetch real database users and merge them on successful administrator login or navigating to users tab
   useEffect(() => {
@@ -1144,6 +1197,7 @@ export default function App() {
       { id: "users", label: "User Directory", icon: Users },
       { id: "add-user", label: "Register Profile", icon: UserPlus },
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
+      { id: "grade-section-fees", label: "Grade & Section Fee Viewer", icon: CreditCard },
       { id: "institutions", label: "Institute Details", icon: Building },
       { id: "fees", label: "Fees Management", icon: CreditCard }
     ] : selectedRole === "student" ? [
@@ -4765,6 +4819,545 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
+        );
+      }
+
+      // Grade & Section Fee Viewer Tab for administrators
+      if (activeTab === "grade-section-fees") {
+        // Find matching relations based on selection
+        const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
+          if (!rel) return false;
+          const selectedGradeObj = (dfGrades || []).find(g => g && (g._id === selectedDfGrade || g.id === selectedDfGrade));
+          const matchesGrade = !selectedDfGrade || 
+                               rel.class_id === selectedDfGrade || 
+                               (selectedGradeObj && (rel.class_id === selectedGradeObj.grade || rel.class_id === selectedGradeObj.name));
+          const matchesSection = !selectedDfSection || rel.section_id === selectedDfSection;
+          return matchesGrade && matchesSection;
+        });
+
+        const matchingStudentIds = new Set(matchingRelations.map(rel => rel?.student_id).filter(Boolean));
+
+        // Filter the student users from userDirectory
+        const baseStudents = (Array.isArray(userDirectory) ? userDirectory : []).filter(u => {
+          if (!u) return false;
+          const roleLower = String(u.role || "").toLowerCase();
+          if (roleLower !== "student") return false;
+          if (!selectedDfGrade && !selectedDfSection) return true;
+          return matchingStudentIds.has(u._id) || matchingStudentIds.has(u.id);
+        });
+
+        // Search filtering
+        const filteredStudents = baseStudents.filter((student: any) => {
+          const query = searchQuery.toLowerCase();
+          return (
+            (student.name && student.name.toLowerCase().includes(query)) ||
+            (student.username && student.username.toLowerCase().includes(query)) ||
+            (student._id && student._id.includes(query)) ||
+            (student.id && student.id.includes(query))
+          );
+        });
+
+        // Helper to find mapped class text
+        const getStudentMappingText = (studentId: string) => {
+          const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
+          if (!rel) return "Unassigned";
+
+          const csObj = typeof classSectionsList !== 'undefined' && Array.isArray(classSectionsList)
+            ? classSectionsList.find((cs: any) => cs._id === rel.class_id)
+            : undefined;
+
+          if (csObj) {
+            return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+          }
+
+          const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+          const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id || g.name === rel.class_id));
+          const sectionsList = Array.isArray(dfSections) ? dfSections : [];
+          const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
+
+          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown Grade");
+          const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : (rel.section_id || "Unknown Section");
+
+          return `${gradeName} - ${sectionName}`;
+        };
+
+        // Get status badge styles
+        const getStatusStyles = (status: string) => {
+          switch (status) {
+            case "paid":
+              return "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100";
+            case "unpaid":
+              return "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100";
+            case "pending":
+              return "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100";
+            default:
+              return "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100";
+          }
+        };
+
+        // Quick update action
+        const openStatusUpdate = (student: any, term: number, currentRecord: any) => {
+          setModalStudent(student);
+          setModalTerm(term);
+          setModalYear(Number(feeViewerYear));
+          if (currentRecord) {
+            setModalStatus(currentRecord.fee_status || currentRecord.feeStatus || "unpaid");
+            setModalIsNew(false);
+          } else {
+            setModalStatus("unpaid");
+            setModalIsNew(true);
+          }
+          setModalError("");
+          setModalSuccess("");
+          setIsUpdateModalOpen(true);
+        };
+
+        const handleModalSubmit = async (e: React.FormEvent) => {
+          e.preventDefault();
+          setModalSubmitting(true);
+          setModalError("");
+          setModalSuccess("");
+
+          try {
+            const endpoint = modalIsNew 
+              ? "https://abms-lkw9.onrender.com/class/fee/add"
+              : "https://abms-lkw9.onrender.com/class/fee/updateStatus";
+
+            const payload = {
+              studentID: modalStudent._id || modalStudent.id,
+              student_id: modalStudent._id || modalStudent.id,
+              term: Number(modalTerm),
+              year: Number(modalYear),
+              feeStatus: modalStatus,
+              fee_status: modalStatus
+            };
+
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${loginResult?.data?.token}`
+              },
+              body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+              const text = await response.text();
+              throw new Error(text || `Request failed with status ${response.status}`);
+            }
+
+            setModalSuccess("Fee record successfully updated on backend!");
+            // Refresh local list
+            await fetchFeeRecords();
+            setTimeout(() => {
+              setIsUpdateModalOpen(false);
+            }, 1000);
+          } catch (err: any) {
+            setModalError(err.message || "Failed to update fee record.");
+          } finally {
+            setModalSubmitting(false);
+          }
+        };
+
+        // Helper to find term status
+        const getTermStatusObj = (studentFees: any[], termNum: number) => {
+          const record = studentFees.find(r => Number(r.term) === termNum);
+          if (!record) return { status: "no_record", record: null };
+          const status = String(record.fee_status || record.feeStatus || "unpaid").toLowerCase();
+          return { status, record };
+        };
+
+        // Compute cohort statistics
+        let totalCohortCount = filteredStudents.length;
+        let paidCohortCount = 0;
+        let unpaidCohortCount = 0;
+        let pendingCohortCount = 0;
+
+        filteredStudents.forEach(s => {
+          const sId = s._id || s.id;
+          const sFees = allFeeRecords.filter(r => 
+            (r.student_id === sId || r.studentID === sId) && 
+            String(r.year) === feeViewerYear
+          );
+          
+          for (let t = 1; t <= 4; t++) {
+            const rec = sFees.find(r => Number(r.term) === t);
+            if (rec) {
+              const st = String(rec.fee_status || rec.feeStatus || "unpaid").toLowerCase();
+              if (st === "paid") paidCohortCount++;
+              else if (st === "pending") pendingCohortCount++;
+              else unpaidCohortCount++;
+            } else {
+              unpaidCohortCount++; // default no record is considered unpaid for total potential dues
+            }
+          }
+        });
+
+        const totalPotentialSlots = totalCohortCount * 4;
+        const collectionRate = totalPotentialSlots > 0 
+          ? Math.round((paidCohortCount / totalPotentialSlots) * 100) 
+          : 100;
+
+        // Apply final status filtering if not "All"
+        const finalDisplayedStudents = filteredStudents.filter(student => {
+          if (feeViewerStatusFilter === "All") return true;
+          const sId = student._id || student.id;
+          const sFees = allFeeRecords.filter(r => 
+            (r.student_id === sId || r.studentID === sId) && 
+            String(r.year) === feeViewerYear
+          );
+
+          if (feeViewerStatusFilter === "Paid") {
+            return sFees.some(r => String(r.fee_status || r.feeStatus || "").toLowerCase() === "paid");
+          }
+          if (feeViewerStatusFilter === "Unpaid") {
+            // Count outstanding (either explicitly unpaid or lacking records completely)
+            return sFees.some(r => String(r.fee_status || r.feeStatus || "").toLowerCase() === "unpaid") || sFees.length < 4;
+          }
+          if (feeViewerStatusFilter === "Pending") {
+            return sFees.some(r => String(r.fee_status || r.feeStatus || "").toLowerCase() === "pending");
+          }
+          return true;
+        });
+
+        return (
+          <div className="space-y-6 max-w-7xl">
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-indigo-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-6 w-6 text-indigo-600" />
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Grade & Section Fee Viewer</h2>
+                    <p className="text-xs text-slate-500 mt-1">Select class & section to search, monitor payments and update terms</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <button
+                    onClick={async () => {
+                      setIsLoadingFees(true);
+                      await Promise.all([
+                        fetchDfGradesAndSections(),
+                        fetchStudentRelations(),
+                        fetchFeeRecords()
+                      ]);
+                      setIsLoadingFees(false);
+                    }}
+                    disabled={isLoadingFees}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-sm shadow-indigo-600/10 active:scale-[0.98]"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingFees ? "animate-spin" : ""}`} />
+                    Sync live DB Fees
+                  </button>
+                </div>
+              </div>
+
+              {/* Filters Panel */}
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {/* Grade Dropdown */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Academic Grade</label>
+                    <select
+                      value={selectedDfGrade}
+                      onChange={(e) => setSelectedDfGrade(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    >
+                      <option value="">All Grades</option>
+                      {Array.isArray(dfGrades) && dfGrades.filter(Boolean).map((g) => (
+                        <option key={g._id || g.id} value={g._id || g.id}>
+                          {g.grade || g.name || "Unnamed Grade"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Section Dropdown */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Class Section</label>
+                    <select
+                      value={selectedDfSection}
+                      onChange={(e) => setSelectedDfSection(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    >
+                      <option value="">All Sections</option>
+                      {Array.isArray(dfSections) && dfSections.filter(Boolean).map((s) => (
+                        <option key={s._id || s.id} value={s._id || s.id}>
+                          {s.section || s.name || s.code || "Unnamed Section"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Year Input */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Calendar Year</label>
+                    <input
+                      type="number"
+                      value={feeViewerYear}
+                      onChange={(e) => setFeeViewerYear(e.target.value)}
+                      placeholder="2026"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    />
+                  </div>
+
+                  {/* Status Dropdown */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Overall Status</label>
+                    <select
+                      value={feeViewerStatusFilter}
+                      onChange={(e) => setFeeViewerStatusFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    >
+                      <option value="All">All Statuses</option>
+                      <option value="Paid">Has Paid Term</option>
+                      <option value="Unpaid">Has Unpaid/Missing</option>
+                      <option value="Pending">Has Pending Term</option>
+                    </select>
+                  </div>
+
+                  {/* Search bar */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Search Student</label>
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search name, ID, NIC..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Statistics Overview Grid */}
+              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                  <span className="text-[9px] uppercase font-bold text-slate-400">Filtered Pupils</span>
+                  <div className="text-xl font-black text-slate-900 mt-1">{totalCohortCount}</div>
+                </div>
+                <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                  <span className="text-[9px] uppercase font-bold text-emerald-500">Paid Slots</span>
+                  <div className="text-xl font-black text-emerald-600 mt-1">{paidCohortCount} <span className="text-[10px] font-normal text-slate-400">/ {totalPotentialSlots}</span></div>
+                </div>
+                <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                  <span className="text-[9px] uppercase font-bold text-amber-500">Pending Slots</span>
+                  <div className="text-xl font-black text-amber-600 mt-1">{pendingCohortCount}</div>
+                </div>
+                <div className="p-3 bg-white border border-slate-200 rounded-xl">
+                  <span className="text-[9px] uppercase font-bold text-indigo-500">Collection Rate</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xl font-black text-indigo-600">{collectionRate}%</span>
+                    <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden max-w-[80px]">
+                      <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${collectionRate}%` }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Error messages if any */}
+              {feesFetchError && (
+                <div className="m-6 p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+                  <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                  <span>{feesFetchError}</span>
+                </div>
+              )}
+
+              {/* Live Table */}
+              <div className="overflow-x-auto">
+                {finalDisplayedStudents.length > 0 ? (
+                  <table className="w-full border-collapse text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-mono uppercase text-slate-400">
+                        <th className="p-4 pl-6 font-bold">Student Name & ID</th>
+                        <th className="p-4 font-bold">Grade & Section</th>
+                        <th className="p-4 font-bold">Term 1</th>
+                        <th className="p-4 font-bold">Term 2</th>
+                        <th className="p-4 font-bold">Term 3</th>
+                        <th className="p-4 font-bold">Term 4</th>
+                        <th className="p-4 pr-6 text-right font-bold">Roster Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {finalDisplayedStudents.map((student) => {
+                        const sId = student._id || student.id;
+                        const sFees = allFeeRecords.filter(r => 
+                          (r.student_id === sId || r.studentID === sId) && 
+                          String(r.year) === feeViewerYear
+                        );
+
+                        const mappingText = getStudentMappingText(sId);
+
+                        return (
+                          <tr key={sId} className="hover:bg-slate-50/40 transition-colors">
+                            <td className="p-4 pl-6">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-sm">
+                                  {student.name?.charAt(0) || "S"}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-slate-900 truncate">{student.name}</h4>
+                                  <p className="text-[10px] font-mono text-slate-400 truncate mt-0.5">ID: {sId}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <span className="font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded text-[10px]">
+                                {mappingText}
+                              </span>
+                            </td>
+                            {[1, 2, 3, 4].map((term) => {
+                              const { status, record } = getTermStatusObj(sFees, term);
+                              return (
+                                <td key={term} className="p-4">
+                                  <button
+                                    onClick={() => openStatusUpdate(student, term, record)}
+                                    className={`px-3 py-1 rounded-full border text-[10px] font-bold uppercase transition-all flex items-center gap-1.5 cursor-pointer border-solid ${getStatusStyles(status)}`}
+                                  >
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      status === "paid" ? "bg-emerald-500" :
+                                      status === "pending" ? "bg-amber-500" :
+                                      status === "unpaid" ? "bg-rose-500" :
+                                      "bg-slate-400"
+                                    }`} />
+                                    {status === "no_record" ? "No Record" : status}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                            <td className="p-4 pr-6 text-right">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                student.status === "Active" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-slate-100 text-slate-600"
+                              }`}>
+                                {student.status || "Active"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 m-6">
+                    <GraduationCap className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-sm font-bold text-slate-800">No Matched Students</h3>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      Adjust your Grade or Section filters or change search queries to display students.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* In-tab inline Update Modal Overlay */}
+            {isUpdateModalOpen && modalStudent && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                  <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-indigo-50 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">Modify Term Fee</h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Year {modalYear} &bull; Term {modalTerm}</p>
+                    </div>
+                    <button
+                      onClick={() => setIsUpdateModalOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleModalSubmit} className="p-6 space-y-4">
+                    {modalSuccess && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>{modalSuccess}</span>
+                      </div>
+                    )}
+
+                    {modalError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+                        <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                        <span>{modalError}</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Student Profile</span>
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                          {modalStudent.name?.charAt(0) || "S"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">{modalStudent.name}</p>
+                          <p className="text-[10px] font-mono text-slate-400 truncate">ID: {modalStudent._id || modalStudent.id}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-400">Year</label>
+                        <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold font-mono text-slate-700">
+                          {modalYear}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] uppercase font-bold text-slate-400">Term</label>
+                        <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold font-mono text-slate-700">
+                          Term {modalTerm}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 block">Select Fee Status</label>
+                      <select
+                        value={modalStatus}
+                        onChange={(e) => setModalStatus(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                      >
+                        <option value="paid">Paid</option>
+                        <option value="unpaid">Unpaid</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                      <p className="text-[9px] text-slate-400">
+                        {modalIsNew 
+                          ? "This student does not have a fee record for this term. Creating a new one." 
+                          : "This will update the existing payment status on the live Render API."}
+                      </p>
+                    </div>
+
+                    <div className="pt-4 flex gap-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsUpdateModalOpen(false)}
+                        className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition cursor-pointer text-center text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={modalSubmitting}
+                        className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-2 text-xs"
+                      >
+                        {modalSubmitting ? (
+                          <>
+                            <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Status"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         );
       }
