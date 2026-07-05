@@ -828,7 +828,9 @@ export default function App() {
   const handleDownloadStudentTemplate = () => {
     const sampleData = [
       {
+        "Title (e.g. Mr, Mrs, Miss, Dr)": "Mr",
         "System ID / Username (NIC)": "STU99001",
+        "Registration Number": "REG2026001",
         "First Name": "John",
         "Middle Name (Optional)": "Robert",
         "Last Name": "Doe",
@@ -840,7 +842,9 @@ export default function App() {
         "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A"
       },
       {
+        "Title (e.g. Mr, Mrs, Miss, Dr)": "Miss",
         "System ID / Username (NIC)": "STU99002",
+        "Registration Number": "REG2026002",
         "First Name": "Sarah",
         "Middle Name (Optional)": "",
         "Last Name": "Connor",
@@ -916,7 +920,9 @@ export default function App() {
             return "";
           };
 
+          const rawTitle = String(getVal(["titleegmrmrsmissdr", "title", "titleid"]) || "Mr").trim();
           const rawUsername = String(getVal(["systemidusernamenic", "systemid", "username", "nic", "studentid"]) || "").trim();
+          const rawRegNo = String(getVal(["registrationnumber", "regno", "registrationno", "reg_no"]) || "").trim();
           const rawFirstName = String(getVal(["firstname", "first_name", "first"]) || "").trim();
           const rawMiddleName = String(getVal(["middlenameoptional", "middlename", "middle"]) || "").trim();
           const rawLastName = String(getVal(["lastname", "last_name", "last"]) || "").trim();
@@ -1008,7 +1014,9 @@ export default function App() {
 
           return {
             rowNumber: rowNum,
+            rawTitle: rawTitle || "Mr",
             rawUsername,
+            rawRegNo: rawRegNo || rawUsername,
             rawFirstName,
             rawMiddleName,
             rawLastName,
@@ -1074,11 +1082,11 @@ export default function App() {
         passport: "None",
         sex: row.rawSex,
         dob: row.rawDob,
-        reg_no: row.rawUsername,
+        reg_no: row.rawRegNo,
         reg_date: new Date().toISOString(),
         end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        title_id: "Mr",
-        title: "Mr",
+        title_id: row.rawTitle,
+        title: row.rawTitle,
         user_type_id: "student",
         access_level_id: 4,
         organization_id: adminOrganizationId,
@@ -1112,9 +1120,9 @@ export default function App() {
             password: row.rawPassword,
             email: row.rawEmail,
             passport: "None",
-            title_id: "Mr",
-            title: "Mr",
-            reg_no: row.rawUsername,
+            title_id: row.rawTitle,
+            title: row.rawTitle,
+            reg_no: row.rawRegNo,
             first_name: row.rawFirstName,
             middle_name: row.rawMiddleName,
             last_name: row.rawLastName,
@@ -1167,7 +1175,7 @@ export default function App() {
           const newUserObj = {
             _id: newUserId,
             username: row.rawUsername,
-            name: `${row.rawFirstName} ${row.rawMiddleName ? row.rawMiddleName + " " : ""}${row.rawLastName}`,
+            name: `${row.rawTitle}. ${row.rawFirstName} ${row.rawMiddleName ? row.rawMiddleName + " " : ""}${row.rawLastName}`,
             role: "student",
             phone: row.rawPhone,
             status: "Active",
@@ -1177,7 +1185,7 @@ export default function App() {
             email: row.rawEmail,
             password: row.rawPassword,
             passport: "None",
-            title_id: "Mr",
+            title_id: row.rawTitle,
             sex: row.rawSex,
             dob: row.rawDob,
             access_level_id: "4",
@@ -7309,8 +7317,8 @@ export default function App() {
                               <thead className="bg-slate-50 sticky top-0 z-10 text-[10px] uppercase font-black text-slate-400 font-mono">
                                 <tr>
                                   <th className="p-3 pl-4">Row</th>
-                                  <th className="p-3">System ID (NIC)</th>
-                                  <th className="p-3">Full Name</th>
+                                  <th className="p-3">System ID & Reg No</th>
+                                  <th className="p-3">Title & Full Name</th>
                                   <th className="p-3">Phone & Email</th>
                                   <th className="p-3">Resolved Class Section</th>
                                   <th className="p-3 pr-4 text-center">Status</th>
@@ -7322,12 +7330,14 @@ export default function App() {
                                     <td className="p-3 pl-4 font-mono font-bold text-slate-400">
                                       #{row.rowNumber}
                                     </td>
-                                    <td className="p-3 font-mono font-bold text-slate-700">
-                                      {row.rawUsername || <span className="text-rose-400 italic">None</span>}
+                                    <td className="p-3 text-left">
+                                      <div className="font-mono font-bold text-slate-700">ID: {row.rawUsername || <span className="text-rose-400 italic">None</span>}</div>
+                                      <div className="text-[10px] font-mono text-slate-500 font-bold">Reg No: {row.rawRegNo}</div>
                                     </td>
                                     <td className="p-3 font-medium text-slate-800 text-left">
+                                      <span className="text-[10px] bg-slate-100 border border-slate-200 text-slate-600 font-bold px-1 py-0.5 rounded font-mono mr-1">{row.rawTitle}</span>
                                       {row.rawFirstName} {row.rawMiddleName ? row.rawMiddleName + " " : ""}{row.rawLastName}
-                                      <div className="text-[9px] text-slate-400 font-semibold">{row.rawSex} (DOB: {row.rawDob})</div>
+                                      <div className="text-[9px] text-slate-400 font-semibold mt-0.5">{row.rawSex} (DOB: {row.rawDob})</div>
                                     </td>
                                     <td className="p-3 text-left">
                                       <div className="text-slate-700 font-medium">{row.rawPhone}</div>
