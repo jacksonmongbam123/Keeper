@@ -41,6 +41,7 @@ import {
   CreditCard,
   ClipboardList
 } from "lucide-react";
+import * as XLSX from "xlsx";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -243,6 +244,45 @@ export default function App() {
   const [marksFilterSubject, setMarksFilterSubject] = useState<string>("");
   const [marksFilterStudent, setMarksFilterStudent] = useState<string>("");
 
+  // df_marks_grade Local Storage Persistence & Fallback
+  const [dfMarksGrades, setDfMarksGrades] = useState<any[]>(() => {
+    const saved = localStorage.getItem("abms_df_marks_grades");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error("Error reading saved marks grades:", e);
+      }
+    }
+    return [
+      { _id: "grade_a_plus", grade: "A+", min_marks: 90 },
+      { _id: "grade_a", grade: "A", min_marks: 80 },
+      { _id: "grade_b_plus", grade: "B+", min_marks: 75 },
+      { _id: "grade_b", grade: "B", min_marks: 70 },
+      { _id: "grade_c_plus", grade: "C+", min_marks: 65 },
+      { _id: "grade_c", grade: "C", min_marks: 60 },
+      { _id: "grade_d", grade: "D", min_marks: 50 },
+      { _id: "grade_f", grade: "F", min_marks: 0 }
+    ];
+  });
+
+  // Grade Configuration States
+  const [isGradesModalOpen, setIsGradesModalOpen] = useState<boolean>(false);
+  const [newGradeName, setNewGradeName] = useState<string>("");
+  const [newGradeMin, setNewGradeMin] = useState<string>("");
+
+  // Bulk Upload States
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState<boolean>(false);
+  const [bulkParsedRows, setBulkParsedRows] = useState<any[]>([]);
+  const [isBulkUploading, setIsBulkUploading] = useState<boolean>(false);
+  const [bulkUploadSuccessCount, setBulkUploadSuccessCount] = useState<number>(0);
+  const [bulkUploadErrorCount, setBulkUploadErrorCount] = useState<number>(0);
+  const [bulkUploadLog, setBulkUploadLog] = useState<string[]>([]);
+  const [bulkUploadFileError, setBulkUploadFileError] = useState<string>("");
+
   const fetchFeeRecords = async () => {
     setIsLoadingFees(true);
     setFeesFetchError("");
@@ -438,6 +478,343 @@ export default function App() {
     setMarksModalError("");
     setMarksModalSuccess("");
     setIsMarksModalOpen(true);
+  };
+
+  const handleAddCustomGrade = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGradeName.trim()) return;
+    const score = parseInt(newGradeMin, 10);
+    const newGrade = {
+      _id: `grade_custom_${Date.now()}`,
+      grade: newGradeName.trim(),
+      min_marks: isNaN(score) ? 0 : score
+    };
+
+    const updated = [...dfMarksGrades, newGrade].sort((a, b) => (b.min_marks || 0) - (a.min_marks || 0));
+    setDfMarksGrades(updated);
+    localStorage.setItem("abms_df_marks_grades", JSON.stringify(updated));
+    setNewGradeName("");
+    setNewGradeMin("");
+  };
+
+  const handleDeleteCustomGrade = (id: string) => {
+    const updated = dfMarksGrades.filter(g => (g._id !== id && g.id !== id));
+    setDfMarksGrades(updated);
+    localStorage.setItem("abms_df_marks_grades", JSON.stringify(updated));
+  };
+
+  const handleDownloadBulkTemplate = () => {
+    // Create detailed instructions and sample rows for the Excel template
+    const sampleData = [
+      {
+        "Student Username / ID": "STU101",
+        "Student Name (Optional)": "John Doe",
+        "Class Section (e.g. Grade 10 - A)": "Grade 10 - A",
+        "Subject (e.g. Mathematics)": "Mathematics",
+        "Marks Value": "85",
+        "Academic Term (e.g. Term I)": "Term I",
+        "Grade Reference (e.g. A, B)": "A",
+        "Evaluation Date (YYYY-MM-DD)": "2026-07-05"
+      },
+      {
+        "Student Username / ID": "STU102",
+        "Student Name (Optional)": "Jane Smith",
+        "Class Section (e.g. Grade 10 - A)": "Grade 10 - A",
+        "Subject (e.g. Science)": "Science",
+        "Marks Value": "92",
+        "Academic Term (e.g. Term I)": "Term I",
+        "Grade Reference (e.g. A+)": "A+",
+        "Evaluation Date (YYYY-MM-DD)": "2026-07-05"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Marks_Template");
+
+    // Add another guide sheet listing existing students, class sections, subjects, and grade references to assist user mapping
+    const refData = [
+      { "Category": "Active Grade References", "Values": dfMarksGrades.map(g => g.grade || g.name).join(", ") },
+      { "Category": "Academic Terms Available", "Values": "Term I, Term II, Term III, Term IV, Mid Term, Final Term" },
+      { "Category": "Valid Class Sections", "Values": (classSectionsList || []).map((cs: any) => `${cs.grade} - ${cs.__section || cs.section || ""}`).join(", ") },
+      { "Category": "Valid Subjects", "Values": (subjectsList || []).map((s: any) => s.name).join(", ") }
+    ];
+    const refWorksheet = XLSX.utils.json_to_sheet(refData);
+    XLSX.utils.book_append_sheet(workbook, refWorksheet, "Data_References_Guide");
+
+    // Auto-fit column widths for excellent aesthetics
+    const fitToColumn = (dataList: any[]) => {
+      const keys = Object.keys(dataList[0] || {});
+      return keys.map(key => ({
+        wch: Math.max(
+          key.length,
+          ...dataList.map(row => String(row[key] || "").length)
+        ) + 4
+      }));
+    };
+    worksheet["!cols"] = fitToColumn(sampleData);
+    refWorksheet["!cols"] = fitToColumn(refData);
+
+    XLSX.writeFile(workbook, "Marks_Bulk_Upload_Template.xlsx");
+  };
+
+  const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploadFileError("");
+    setBulkParsedRows([]);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawRows = XLSX.utils.sheet_to_json(ws);
+        
+        if (!Array.isArray(rawRows) || rawRows.length === 0) {
+          setBulkUploadFileError("No valid rows found in the uploaded file.");
+          return;
+        }
+
+        // Validate and map each row
+        const parsedList = rawRows.map((row: any, index: number) => {
+          const rowNum = index + 2; // Row number in Excel sheet (header is row 1)
+          
+          const getVal = (possibleKeys: string[]) => {
+            for (const key of possibleKeys) {
+              const foundKey = Object.keys(row).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === key.toLowerCase().replace(/[^a-z0-9]/g, ""));
+              if (foundKey) return row[foundKey];
+            }
+            return "";
+          };
+
+          const rawStudentVal = String(getVal(["studentusernameid", "student_id", "student", "username", "studentid"]) || "").trim();
+          const rawClassVal = String(getVal(["classsectioneggrade10a", "classsection", "class_id", "class", "grade"]) || "").trim();
+          const rawSubjectVal = String(getVal(["subjectegmathematics", "subject_id", "subject", "subjectname"]) || "").trim();
+          const rawMarksVal = String(getVal(["marksvalue", "marks", "score"]) || "").trim();
+          const rawTermVal = String(getVal(["academictermegtermi", "academicterm", "term", "semester"]) || "").trim();
+          const rawGradeVal = String(getVal(["gradereferenceega", "gradereference", "grade_id", "grade"]) || "").trim();
+          const rawDateVal = String(getVal(["evaluationdateyyyymmdd", "evaluationdate", "date"]) || "").trim();
+
+          const rowErrorLogs: string[] = [];
+          
+          // 1. Resolve student
+          let resolvedStudentId = "";
+          let resolvedStudentName = "Unresolved";
+          if (!rawStudentVal) {
+            rowErrorLogs.push("Student ID/username is missing.");
+          } else {
+            const studentObj = (userDirectoryState || []).find((u: any) => 
+              u && u.role === "student" && (
+                String(u.username || "").toLowerCase() === rawStudentVal.toLowerCase() ||
+                String(u._id || "").toLowerCase() === rawStudentVal.toLowerCase() ||
+                String(u.id || "").toLowerCase() === rawStudentVal.toLowerCase()
+              )
+            );
+            if (studentObj) {
+              resolvedStudentId = studentObj._id || studentObj.id;
+              resolvedStudentName = studentObj.name;
+            } else {
+              rowErrorLogs.push(`Student '${rawStudentVal}' not found in directory.`);
+            }
+          }
+
+          // 2. Resolve class section
+          let resolvedClassId = "";
+          let resolvedClassText = "Unresolved";
+          if (!rawClassVal) {
+            rowErrorLogs.push("Class Section is missing.");
+          } else {
+            const classObj = (classSectionsList || []).find((cs: any) => {
+              if (!cs) return false;
+              const cleanVal = rawClassVal.toLowerCase();
+              const label = `${cs.grade} - ${cs.__section || cs.section || ""}`.toLowerCase();
+              return label === cleanVal || 
+                     label.includes(cleanVal) || 
+                     cleanVal.includes(label) || 
+                     String(cs.grade || "").toLowerCase() === cleanVal ||
+                     cs._id === rawClassVal;
+            });
+            if (classObj) {
+              resolvedClassId = classObj._id || classObj.id;
+              resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+            } else {
+              rowErrorLogs.push(`Class Section '${rawClassVal}' not found.`);
+            }
+          }
+
+          // 3. Resolve subject
+          let resolvedSubjectId = "";
+          let resolvedSubjectText = "Unresolved";
+          if (!rawSubjectVal) {
+            rowErrorLogs.push("Subject is missing.");
+          } else {
+            const subjectObj = (subjectsList || []).find((s: any) => {
+              if (!s) return false;
+              const cleanVal = rawSubjectVal.toLowerCase();
+              return String(s.name || "").toLowerCase() === cleanVal ||
+                     String(s.code || "").toLowerCase() === cleanVal ||
+                     s._id === rawSubjectVal;
+            });
+            if (subjectObj) {
+              resolvedSubjectId = subjectObj._id || subjectObj.id;
+              resolvedSubjectText = subjectObj.name;
+            } else {
+              rowErrorLogs.push(`Subject '${rawSubjectVal}' not found.`);
+            }
+          }
+
+          // 4. Resolve marks
+          if (!rawMarksVal) {
+            rowErrorLogs.push("Marks score value is missing.");
+          }
+
+          // 5. Resolve grade reference from local df_marks_grade
+          let resolvedGradeId = "";
+          let resolvedGradeText = "Unresolved";
+          if (!rawGradeVal) {
+            rowErrorLogs.push("Grade Reference is missing.");
+          } else {
+            const gradeObj = (dfMarksGrades || []).find((g: any) => 
+              g && (
+                String(g.grade || "").toLowerCase() === rawGradeVal.toLowerCase() ||
+                String(g.name || "").toLowerCase() === rawGradeVal.toLowerCase() ||
+                g._id === rawGradeVal
+              )
+            );
+            if (gradeObj) {
+              resolvedGradeId = gradeObj._id || gradeObj.id;
+              resolvedGradeText = gradeObj.grade || gradeObj.name;
+            } else {
+              rowErrorLogs.push(`Grade Reference '${rawGradeVal}' not found.`);
+            }
+          }
+
+          // 6. Handle date
+          let resolvedDate = new Date().toISOString().split("T")[0];
+          if (rawDateVal) {
+            try {
+              // Check if excel float date or standard date
+              let dateParsed = new Date(rawDateVal);
+              if (isNaN(dateParsed.getTime()) && !isNaN(Number(rawDateVal))) {
+                // Handle Excel serial date format
+                const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                excelEpoch.setDate(excelEpoch.getDate() + Number(rawDateVal));
+                dateParsed = excelEpoch;
+              }
+              if (!isNaN(dateParsed.getTime())) {
+                resolvedDate = dateParsed.toISOString().split("T")[0];
+              } else {
+                rowErrorLogs.push(`Invalid date format: ${rawDateVal}.`);
+              }
+            } catch (e) {
+              rowErrorLogs.push(`Error parsing date: ${rawDateVal}.`);
+            }
+          }
+
+          return {
+            rowNumber: rowNum,
+            rawStudent: rawStudentVal,
+            rawClass: rawClassVal,
+            rawSubject: rawSubjectVal,
+            rawMarks: rawMarksVal,
+            rawTerm: rawTermVal || "Term I",
+            rawGrade: rawGradeVal,
+            rawDate: rawDateVal,
+
+            resolvedStudentId,
+            resolvedStudentName,
+            resolvedClassId,
+            resolvedClassText,
+            resolvedSubjectId,
+            resolvedSubjectText,
+            resolvedGradeId,
+            resolvedGradeText,
+            resolvedDate,
+
+            errors: rowErrorLogs,
+            isValid: rowErrorLogs.length === 0
+          };
+        });
+
+        setBulkParsedRows(parsedList);
+      } catch (err: any) {
+        console.error("Error reading file:", err);
+        setBulkUploadFileError(err.message || "Failed to parse excel file. Ensure it is a valid .xlsx file.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmBulkUpload = async () => {
+    const validRows = bulkParsedRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      alert("No valid rows to upload. Please correct errors and try again.");
+      return;
+    }
+
+    setIsBulkUploading(true);
+    setBulkUploadSuccessCount(0);
+    setBulkUploadErrorCount(0);
+    setBulkUploadLog([]);
+
+    const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    let successes = 0;
+    let errors = 0;
+    const logs: string[] = [];
+
+    for (const row of validRows) {
+      const payload = {
+        student_id: row.resolvedStudentId,
+        class_id: row.resolvedClassId,
+        subject_id: row.resolvedSubjectId,
+        marks: String(row.rawMarks),
+        term: row.rawTerm,
+        date: new Date(row.resolvedDate).toISOString(),
+        grade_id: row.resolvedGradeId,
+        created_date: new Date().toISOString(),
+        created_user_id: loginResult?.data?.user?._id || "",
+        modified_date: new Date().toISOString(),
+        modified_user_id: loginResult?.data?.user?._id || ""
+      };
+
+      try {
+        const res = await fetch("https://abms-lkw9.onrender.com/m/marks/add", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          successes++;
+          setBulkUploadSuccessCount(successes);
+          logs.push(`Row ${row.rowNumber}: Marks added successfully for ${row.resolvedStudentName}`);
+        } else {
+          errors++;
+          setBulkUploadErrorCount(errors);
+          const errData = await res.json().catch(() => ({}));
+          logs.push(`Row ${row.rowNumber} failed: ${errData.message || res.statusText}`);
+        }
+      } catch (err: any) {
+        errors++;
+        setBulkUploadErrorCount(errors);
+        logs.push(`Row ${row.rowNumber} network error: ${err.message || "Unknown error"}`);
+      }
+      setBulkUploadLog([...logs]);
+    }
+
+    setIsBulkUploading(false);
+    fetchMarks();
   };
 
   const fetchDfGradesAndSections = async () => {
@@ -5615,12 +5992,44 @@ export default function App() {
                   Register, search, modify and delete academic marks. This module maps directly to the live MongoDB database using the m_marks collection schema.
                 </p>
               </div>
-              <button
-                onClick={openCreateMarkModal}
-                className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-md shadow-slate-900/10 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
-              >
-                <span>+ Register New Marks</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadBulkTemplate}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer border border-indigo-100 active:scale-95"
+                  title="Download template format for bulk upload in Excel"
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Download Excel Template</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkUploadFileError("");
+                    setBulkParsedRows([]);
+                    setIsBulkUploadModalOpen(true);
+                  }}
+                  className="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer border border-cyan-100 active:scale-95"
+                >
+                  <Upload className="w-3.5 h-3.5 text-cyan-600" />
+                  <span>Bulk Upload</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGradesModalOpen(true)}
+                  className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer border border-amber-100 active:scale-95"
+                >
+                  <Settings className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Grading Scales</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={openCreateMarkModal}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-md shadow-slate-900/10 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                >
+                  <span>+ Register New Marks</span>
+                </button>
+              </div>
             </div>
 
             {/* Filter Panel */}
@@ -5745,7 +6154,7 @@ export default function App() {
                         const subjectText = subObj ? subObj.name : mark.subject_id || "Unassigned";
                         
                         // Grade reference resolution
-                        const gradeObj = (Array.isArray(dfGrades) ? dfGrades : []).find(g => g && (g._id === mark.grade_id || g.id === mark.grade_id));
+                        const gradeObj = (Array.isArray(dfMarksGrades) ? dfMarksGrades : []).find(g => g && (g._id === mark.grade_id || g.id === mark.grade_id));
                         const gradeText = gradeObj ? (gradeObj.grade || gradeObj.name) : mark.grade_id || "None";
                         
                         // Date formatting
@@ -5874,9 +6283,32 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* Student Selection */}
+                    {/* Class Section Selection (At the top of the form) */}
                     <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700 block">Select Student *</label>
+                      <label className="text-xs font-bold text-slate-700 block">Class Section *</label>
+                      <select
+                        required
+                        value={marksFormClassId}
+                        onChange={(e) => {
+                          setMarksFormClassId(e.target.value);
+                          setMarksFormStudentId(""); // Clear student selection to enforce class-based matching
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                      >
+                        <option value="">-- Choose class section --</option>
+                        {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                          <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                            {cs.grade} - {cs.__section || cs.section || ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Student Selection (Filtered by selected Class Section) */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Select Student * {marksFormClassId && <span className="text-[10px] text-indigo-600 font-semibold font-mono">(Filtered by Class Section)</span>}
+                      </label>
                       <select
                         required
                         value={marksFormStudentId}
@@ -5884,33 +6316,24 @@ export default function App() {
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                       >
                         <option value="">-- Choose student --</option>
-                        {Array.isArray(userDirectory) && userDirectory.filter((u: any) => u && u.role === "student").map((student: any) => (
-                          <option key={student._id || student.id} value={student._id || student.id}>
-                            {student.name} ({student.username || student._id})
-                          </option>
-                        ))}
+                        {(() => {
+                          const allStudents = Array.isArray(userDirectory) ? userDirectory.filter((u: any) => u && u.role === "student") : [];
+                          const filtered = allStudents.filter((student: any) => {
+                            if (!marksFormClassId) return true; // Show all if no class is selected yet
+                            return (studentClassRelations || []).some((rel: any) => 
+                              rel && rel.class_id === marksFormClassId && (rel.student_id === student._id || rel.student_id === student.id)
+                            );
+                          });
+                          return filtered.map((student: any) => (
+                            <option key={student._id || student.id} value={student._id || student.id}>
+                              {student.name} ({student.username || student._id})
+                            </option>
+                          ));
+                        })()}
                       </select>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Class Section Selection */}
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-700 block">Class Section *</label>
-                        <select
-                          required
-                          value={marksFormClassId}
-                          onChange={(e) => setMarksFormClassId(e.target.value)}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
-                        >
-                          <option value="">-- Choose class section --</option>
-                          {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
-                            <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                              {cs.grade} - {cs.__section || cs.section || ""}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
                       {/* Subject Selection */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-700 block">Subject *</label>
@@ -5928,9 +6351,7 @@ export default function App() {
                           ))}
                         </select>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Marks Input */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-700 block">Marks Value *</label>
@@ -5943,7 +6364,9 @@ export default function App() {
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                         />
                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Term Select / Input */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-700 block">Academic Term *</label>
@@ -5962,12 +6385,19 @@ export default function App() {
                           <option value="Final Term">Final Term</option>
                         </select>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Grade Reference Selection */}
+                      {/* Grade Reference Selection (using custom df_marks_grade scale data) */}
                       <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-700 block">Grade ID Reference *</label>
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs font-bold text-slate-700 block">Grade ID Reference *</label>
+                          <button
+                            type="button"
+                            onClick={() => setIsGradesModalOpen(true)}
+                            className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                          >
+                            + Config Scales
+                          </button>
+                        </div>
                         <select
                           required
                           value={marksFormGradeId}
@@ -5975,14 +6405,16 @@ export default function App() {
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                         >
                           <option value="">-- Choose grade reference --</option>
-                          {Array.isArray(dfGrades) && dfGrades.filter(Boolean).map((g: any) => (
+                          {Array.isArray(dfMarksGrades) && dfMarksGrades.filter(Boolean).map((g: any) => (
                             <option key={g._id || g.id} value={g._id || g.id}>
-                              {g.grade || g.name || "Unnamed Grade"}
+                              {g.grade || g.name} ({g.min_marks}% Min)
                             </option>
                           ))}
                         </select>
                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Date selection */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-bold text-slate-700 block">Evaluation Date *</label>
@@ -6047,6 +6479,312 @@ export default function App() {
                       </button>
                     </div>
                   </form>
+                </div>
+              </div>
+            )}
+
+            {/* Centered Modal Overlay for Managing Grading Scales (df_marks_grade fallback) */}
+            {isGradesModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                  {/* Modal Header */}
+                  <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-amber-50/50 to-indigo-50/50 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <Settings className="w-4 h-4 text-amber-500" />
+                        Grading Scales Configuration
+                      </h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Define passing grades and score mapping rules for m_marks schema reference
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsGradesModalOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4">
+                    {/* Grade Form */}
+                    <form onSubmit={handleAddCustomGrade} className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 space-y-3">
+                      <h4 className="text-xs font-bold text-slate-800">Add New Grading Rule</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 block">Grade Label</label>
+                          <input
+                            required
+                            type="text"
+                            placeholder="e.g. A+, B, Pass"
+                            value={newGradeName}
+                            onChange={(e) => setNewGradeName(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 block">Min Score (%)</label>
+                          <input
+                            required
+                            type="number"
+                            min="0"
+                            max="100"
+                            placeholder="e.g. 85"
+                            value={newGradeMin}
+                            onChange={(e) => setNewGradeMin(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-[11px] transition cursor-pointer"
+                      >
+                        + Insert Grading Rule
+                      </button>
+                    </form>
+
+                    {/* Current Grade Scales List */}
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-slate-800">Active Grading Scales (df_marks_grade references)</h4>
+                      <div className="border border-slate-100 rounded-2xl overflow-hidden max-h-[220px] overflow-y-auto divide-y divide-slate-100">
+                        {dfMarksGrades.length > 0 ? dfMarksGrades.map((g: any) => (
+                          <div key={g._id || g.id} className="px-4 py-2.5 flex items-center justify-between text-xs hover:bg-slate-50/50">
+                            <div className="flex items-center gap-3">
+                              <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 font-black flex items-center justify-center font-mono">
+                                {g.grade || g.name}
+                              </span>
+                              <div>
+                                <p className="font-bold text-slate-800">Minimum {g.min_marks}% marks required</p>
+                                <p className="text-[9px] font-mono text-slate-400">ID: {g._id || g.id}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCustomGrade(g._id || g.id)}
+                              className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-500 rounded-lg transition"
+                              title="Delete scale rule"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )) : (
+                          <p className="p-6 text-center text-xs text-slate-400">No custom grades scales configured yet</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 font-medium text-center leading-relaxed">
+                      📌 Since the server is missing the df_marks_grade collection controller, these configurations are safely stored in local cache and perfectly integrated into m_marks queries!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Centered Modal Overlay for Excel Bulk Uploading */}
+            {isBulkUploadModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-3xl w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                  {/* Modal Header */}
+                  <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50/50 to-indigo-50/50 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-cyan-500" />
+                        Excel Bulk Marks Importer
+                      </h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Upload your Excel sheet to map, validate, and bulk register academic marks into MongoDB
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => !isBulkUploading && setIsBulkUploadModalOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer disabled:opacity-50"
+                      disabled={isBulkUploading}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                    {/* Excel Import Area */}
+                    {!isBulkUploading && bulkParsedRows.length === 0 && (
+                      <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/5 p-8 rounded-2xl text-center transition-all relative">
+                        <input
+                          type="file"
+                          accept=".xlsx, .xls, .csv"
+                          onChange={handleBulkFileChange}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                        <h4 className="text-xs font-bold text-slate-800">Drag & Drop Excel File Here</h4>
+                        <p className="text-[10px] text-slate-400 mt-1">Accepts standard .xlsx and .xls spreadsheets</p>
+                        <button
+                          type="button"
+                          className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold font-mono"
+                        >
+                          Browse Files
+                        </button>
+                      </div>
+                    )}
+
+                    {bulkUploadFileError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium font-mono">
+                        ⚠️ {bulkUploadFileError}
+                      </div>
+                    )}
+
+                    {/* Progressive Parse & Preview Section */}
+                    {bulkParsedRows.length > 0 && (
+                      <div className="space-y-4">
+                        {/* Summary Stats */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-2xl text-center">
+                            <span className="block text-[10px] text-slate-400 uppercase font-black tracking-wider">Total Parsed</span>
+                            <span className="text-lg font-black text-slate-800 font-mono">{bulkParsedRows.length}</span>
+                          </div>
+                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl text-center">
+                            <span className="block text-[10px] text-emerald-500 uppercase font-black tracking-wider">Ready to Import</span>
+                            <span className="text-lg font-black text-emerald-700 font-mono">
+                              {bulkParsedRows.filter(r => r.isValid).length}
+                            </span>
+                          </div>
+                          <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl text-center">
+                            <span className="block text-[10px] text-rose-500 uppercase font-black tracking-wider">Errors Found</span>
+                            <span className="text-lg font-black text-rose-700 font-mono">
+                              {bulkParsedRows.filter(r => !r.isValid).length}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Parsed List Table */}
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                          <div className="overflow-x-auto max-h-[250px] overflow-y-auto">
+                            <table className="w-full text-left text-xs divide-y divide-slate-100">
+                              <thead className="bg-slate-50 sticky top-0 z-10 text-[10px] uppercase font-black text-slate-400 font-mono">
+                                <tr>
+                                  <th className="p-3 pl-4">Row</th>
+                                  <th className="p-3">Student Target</th>
+                                  <th className="p-3">Class/Subject</th>
+                                  <th className="p-3 text-center">Marks</th>
+                                  <th className="p-3">Term/Scale</th>
+                                  <th className="p-3 pr-4 text-center">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {bulkParsedRows.map((row) => (
+                                  <tr key={row.rowNumber} className={`hover:bg-slate-50/50 ${!row.isValid ? "bg-rose-50/10" : ""}`}>
+                                    <td className="p-3 pl-4 font-mono font-bold text-slate-400">
+                                      #{row.rowNumber}
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="font-bold text-slate-800">{row.resolvedStudentName}</div>
+                                      <div className="text-[9px] font-mono text-slate-400 font-semibold">User ID: {row.rawStudent}</div>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="font-medium text-slate-700">{row.resolvedClassText}</div>
+                                      <div className="text-[9px] font-semibold text-slate-400">{row.resolvedSubjectText}</div>
+                                    </td>
+                                    <td className="p-3 text-center">
+                                      <span className="bg-slate-100 text-slate-800 font-black font-mono px-2 py-0.5 rounded text-[11px]">
+                                        {row.rawMarks}
+                                      </span>
+                                    </td>
+                                    <td className="p-3">
+                                      <div className="font-semibold text-slate-600">{row.rawTerm}</div>
+                                      <span className="text-[9px] font-mono bg-amber-50 text-amber-700 px-1 py-0.5 rounded">
+                                        Scale: {row.resolvedGradeText}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 pr-4 text-center">
+                                      {row.isValid ? (
+                                        <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-full font-mono border border-emerald-100">
+                                          ✓ Ready
+                                        </span>
+                                      ) : (
+                                        <div className="text-left max-w-[150px] space-y-1">
+                                          <span className="inline-flex items-center gap-1 text-[9px] bg-rose-50 text-rose-700 font-black px-2 py-0.5 rounded border border-rose-100 font-mono">
+                                            ⚠️ Blocked
+                                          </span>
+                                          {row.errors.map((err: string, i: number) => (
+                                            <p key={i} className="text-[8px] leading-tight text-rose-500 font-medium font-mono">
+                                              • {err}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Progress log and progress bar during bulk uploading */}
+                    {(isBulkUploading || bulkUploadLog.length > 0) && (
+                      <div className="space-y-3 bg-slate-900 text-slate-200 p-4 rounded-2xl border border-slate-800 shadow-inner">
+                        <div className="flex items-center justify-between text-xs font-mono font-bold">
+                          <span>Progress: {bulkUploadSuccessCount + bulkUploadErrorCount} / {bulkParsedRows.filter(r => r.isValid).length}</span>
+                          <span className={isBulkUploading ? "text-cyan-400 animate-pulse" : "text-emerald-400"}>
+                            {isBulkUploading ? "Executing Database Inserts..." : "Completed Bulk Register"}
+                          </span>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 transition-all duration-300"
+                            style={{
+                              width: `${(bulkParsedRows.filter(r => r.isValid).length > 0) ? ((bulkUploadSuccessCount + bulkUploadErrorCount) / bulkParsedRows.filter(r => r.isValid).length) * 100 : 0}%`
+                            }}
+                          />
+                        </div>
+                        {/* Log box */}
+                        <div className="h-[120px] overflow-y-auto font-mono text-[10px] leading-relaxed text-slate-400 border border-slate-800/80 p-2.5 rounded bg-slate-950">
+                          {bulkUploadLog.map((logStr, i) => (
+                            <p key={i} className={logStr.includes("failed") ? "text-rose-400" : "text-emerald-400"}>
+                              {logStr}
+                            </p>
+                          ))}
+                          {isBulkUploading && (
+                            <div className="flex items-center gap-1.5 mt-1 text-cyan-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                              <span>Awaiting MongoDB confirmation...</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBulkParsedRows([]);
+                        setBulkUploadLog([]);
+                        setIsBulkUploadModalOpen(false);
+                      }}
+                      className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition disabled:opacity-50 active:scale-95 cursor-pointer font-mono"
+                      disabled={isBulkUploading}
+                    >
+                      {bulkParsedRows.length > 0 && !isBulkUploading ? "Reset Sheet" : "Close"}
+                    </button>
+                    {bulkParsedRows.length > 0 && !isBulkUploading && (
+                      <button
+                        type="button"
+                        onClick={handleConfirmBulkUpload}
+                        disabled={bulkParsedRows.filter(r => r.isValid).length === 0}
+                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer flex items-center gap-1.5 font-mono"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Confirm Import ({bulkParsedRows.filter(r => r.isValid).length} Rows)</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
