@@ -192,6 +192,7 @@ export default function App() {
   const [studentClassRelations, setStudentClassRelations] = useState<any[]>([]);
   const [selectedDfGrade, setSelectedDfGrade] = useState<string>("");
   const [selectedDfSection, setSelectedDfSection] = useState<string>("");
+  const [selectedDfClassSection, setSelectedDfClassSection] = useState<string>("");
   const [isLoadingRelations, setIsLoadingRelations] = useState<boolean>(false);
 
   // --- Grade & Section Fee Viewer States ---
@@ -4695,12 +4696,9 @@ export default function App() {
         // Find matching relations based on selection
         const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
           if (!rel) return false;
-          const selectedGradeObj = (dfGrades || []).find(g => g && (g._id === selectedDfGrade || g.id === selectedDfGrade));
-          const matchesGrade = !selectedDfGrade || 
-                               rel.class_id === selectedDfGrade || 
-                               (selectedGradeObj && (rel.class_id === selectedGradeObj.grade || rel.class_id === selectedGradeObj.name));
-          const matchesSection = !selectedDfSection || rel.section_id === selectedDfSection;
-          return matchesGrade && matchesSection;
+          if (!selectedDfClassSection) return true;
+          // Matches the selected class section ID (_id of classSectionsList)
+          return rel.class_id === selectedDfClassSection;
         });
 
         const matchingStudentIds = new Set(matchingRelations.map(rel => rel?.student_id).filter(Boolean));
@@ -4710,7 +4708,7 @@ export default function App() {
           if (!u) return false;
           const roleLower = String(u.role || "").toLowerCase();
           if (roleLower !== "student") return false;
-          if (!selectedDfGrade && !selectedDfSection) return true;
+          if (!selectedDfClassSection) return true;
           return matchingStudentIds.has(u._id) || matchingStudentIds.has(u.id);
         });
 
@@ -4766,36 +4764,18 @@ export default function App() {
 
               <div className="p-6 space-y-6">
                 {/* Filter Selector Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  {/* Grade Dropdown */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Select Grade (from df grade)</label>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div className="space-y-1.5 max-w-md">
+                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Select Class Section (Grade & Section)</label>
                     <select
-                      value={selectedDfGrade}
-                      onChange={(e) => setSelectedDfGrade(e.target.value)}
+                      value={selectedDfClassSection}
+                      onChange={(e) => setSelectedDfClassSection(e.target.value)}
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                     >
-                      <option value="">All Grades</option>
-                      {Array.isArray(dfGrades) && dfGrades.filter(Boolean).map((g) => (
-                        <option key={g._id || g.id} value={g._id || g.id}>
-                          {g.grade || g.name || "Unnamed Grade"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Section Dropdown */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Select Section (from df section)</label>
-                    <select
-                      value={selectedDfSection}
-                      onChange={(e) => setSelectedDfSection(e.target.value)}
-                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
-                    >
-                      <option value="">All Sections</option>
-                      {Array.isArray(dfSections) && dfSections.filter(Boolean).map((s) => (
-                        <option key={s._id || s.id} value={s._id || s.id}>
-                          {s.section || s.name || s.code || "Unnamed Section"}
+                      <option value="">All Class Sections</option>
+                      {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                        <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                          {cs.grade} - {cs.__section || cs.section || ""}
                         </option>
                       ))}
                     </select>
