@@ -221,6 +221,7 @@ export default function App() {
   const [teacherQualifications, setTeacherQualifications] = useState<any[]>([]);
   const [edQualifications, setEdQualifications] = useState<any[]>([]);
   const [edSpecialities, setEdSpecialities] = useState<any[]>([]);
+  const [maritalStatusesList, setMaritalStatusesList] = useState<any[]>([]);
   const [searchRoleFilter, setSearchRoleFilter] = useState<string>("all");
   const [isLoadingSearchDetails, setIsLoadingSearchDetails] = useState<boolean>(false);
   const [searchStudentSelectedId, setSearchStudentSelectedId] = useState<string>("");
@@ -551,6 +552,17 @@ export default function App() {
       if (edsRes.ok) {
         const data = await edsRes.json();
         setEdSpecialities(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch marital statuses
+      const maritalRes = await fetch("https://abms-lkw9.onrender.com/df/maritalStatus/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (maritalRes.ok) {
+        const data = await maritalRes.json();
+        setMaritalStatusesList(Array.isArray(data) ? data.filter(Boolean) : []);
       }
     } catch (err) {
       console.warn("Error fetching student search details:", err);
@@ -1584,6 +1596,13 @@ export default function App() {
     }
   }, [activeTab, loginResult, selectedRole]);
 
+  // Fetch search details when switching to the add-user tab
+  useEffect(() => {
+    if (loginResult?.success && selectedRole === "administrator" && activeTab === "add-user") {
+      fetchSearchDetails();
+    }
+  }, [activeTab, loginResult, selectedRole]);
+
   // Fetch notifications when switching to notifications tab
   useEffect(() => {
     if (loginResult?.success && selectedRole === "administrator" && activeTab === "notifications") {
@@ -1876,11 +1895,11 @@ export default function App() {
 
   // Role-specific form states
   const [formOccupation, setFormOccupation] = useState("");
-  const [formMaritalStatus, setFormMaritalStatus] = useState("Single");
+  const [formMaritalStatus, setFormMaritalStatus] = useState("");
   const [parentFilterGrade, setParentFilterGrade] = useState("");
   const [parentFilterSection, setParentFilterSection] = useState("");
-  const [formQualification, setFormQualification] = useState("Bachelor's Degree");
-  const [formSpecialization, setFormSpecialization] = useState("Mathematics");
+  const [formQualification, setFormQualification] = useState("");
+  const [formSpecialization, setFormSpecialization] = useState("");
 
   // Sync default access levels with selected role to prevent posting "1" by default
   useEffect(() => {
@@ -1917,11 +1936,11 @@ export default function App() {
       setFormAccessLevelId("6");
     }
     setFormOccupation("");
-    setFormMaritalStatus("Single");
+    setFormMaritalStatus("");
     setParentFilterGrade("");
     setParentFilterSection("");
-    setFormQualification("Bachelor's Degree");
-    setFormSpecialization("Mathematics");
+    setFormQualification("");
+    setFormSpecialization("");
     setSelectedClass("");
     setSelectedSection("");
     setSelectedSubject("");
@@ -5362,12 +5381,12 @@ export default function App() {
                                 value={formQualification}
                                 onChange={(e) => setFormQualification(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
                               >
-                                <option value="Bachelor's Degree">Bachelor's Degree</option>
-                                <option value="Master's Degree">Master's Degree</option>
-                                <option value="Doctoral Degree (Ph.D.)">Doctoral Degree (Ph.D.)</option>
-                                <option value="Diploma in Education">Diploma in Education</option>
-                                <option value="Advanced Certified Teacher">Advanced Certified Teacher</option>
+                                <option value="">-- Choose Qualification --</option>
+                                {edQualifications.map((q: any) => (
+                                  <option key={q._id || q.id} value={q._id || q.id || q.qualification}>{q.qualification || q.name}</option>
+                                ))}
                               </select>
                             </div>
 
@@ -5379,9 +5398,9 @@ export default function App() {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
-                                <option value="">Select Specialization Subject</option>
-                                {subjectsList.map((sub: any) => (
-                                  <option key={sub._id} value={sub.subject || sub.name}>{sub.subject || sub.name}</option>
+                                <option value="">-- Choose Specialization --</option>
+                                {edSpecialities.map((spec: any) => (
+                                  <option key={spec._id || spec.id} value={spec._id || spec.id || spec.speciality}>{spec.speciality || spec.name}</option>
                                 ))}
                               </select>
                             </div>
@@ -5392,11 +5411,12 @@ export default function App() {
                                 value={formMaritalStatus}
                                 onChange={(e) => setFormMaritalStatus(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
                               >
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Divorced">Divorced</option>
-                                <option value="Widowed">Widowed</option>
+                                <option value="">-- Choose Marital Status --</option>
+                                {maritalStatusesList.map((m: any) => (
+                                  <option key={m._id || m.id} value={m._id || m.id || m.status}>{m.status}</option>
+                                ))}
                               </select>
                             </div>
                           </div>
