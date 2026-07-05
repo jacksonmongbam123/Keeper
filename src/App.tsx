@@ -1682,7 +1682,17 @@ export default function App() {
         }
         if (subjectRes && subjectRes.ok) {
           const data = await subjectRes.json();
-          if (Array.isArray(data)) setSubjectsList(data);
+          if (Array.isArray(data)) {
+            const normalized = data.filter(Boolean).map((s: any) => {
+              const subjName = s.subject || s.name || "";
+              return {
+                ...s,
+                name: subjName,
+                subject: subjName
+              };
+            });
+            setSubjectsList(normalized);
+          }
         }
         if (classSectionRes && classSectionRes.ok) {
           const data = await classSectionRes.json();
