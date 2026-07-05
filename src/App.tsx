@@ -154,6 +154,7 @@ export default function App() {
   const [feesFetchError, setFeesFetchError] = useState<string>("");
   const [feeViewerYear, setFeeViewerYear] = useState<string>("2026");
   const [feeViewerStatusFilter, setFeeViewerStatusFilter] = useState<string>("All");
+  const [feeViewerClassSection, setFeeViewerClassSection] = useState<string>("");
 
   // Inline Fee Update Modal States
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -4828,12 +4829,9 @@ export default function App() {
         // Find matching relations based on selection
         const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
           if (!rel) return false;
-          const selectedGradeObj = (dfGrades || []).find(g => g && (g._id === selectedDfGrade || g.id === selectedDfGrade));
-          const matchesGrade = !selectedDfGrade || 
-                               rel.class_id === selectedDfGrade || 
-                               (selectedGradeObj && (rel.class_id === selectedGradeObj.grade || rel.class_id === selectedGradeObj.name));
-          const matchesSection = !selectedDfSection || rel.section_id === selectedDfSection;
-          return matchesGrade && matchesSection;
+          if (!feeViewerClassSection) return true;
+          // rel.class_id matches the selected class section ID (_id of classSectionsList)
+          return rel.class_id === feeViewerClassSection;
         });
 
         const matchingStudentIds = new Set(matchingRelations.map(rel => rel?.student_id).filter(Boolean));
@@ -4843,7 +4841,7 @@ export default function App() {
           if (!u) return false;
           const roleLower = String(u.role || "").toLowerCase();
           if (roleLower !== "student") return false;
-          if (!selectedDfGrade && !selectedDfSection) return true;
+          if (!feeViewerClassSection) return true;
           return matchingStudentIds.has(u._id) || matchingStudentIds.has(u.id);
         });
 
@@ -5029,8 +5027,8 @@ export default function App() {
                 <div className="flex items-center gap-3">
                   <CreditCard className="h-6 w-6 text-indigo-600" />
                   <div>
-                    <h2 className="text-lg font-bold text-slate-900">Grade & Section Fee Viewer</h2>
-                    <p className="text-xs text-slate-500 mt-1">Select class & section to search, monitor payments and update terms</p>
+                    <h2 className="text-lg font-bold text-slate-900">Class Section Fee Viewer</h2>
+                    <p className="text-xs text-slate-500 mt-1">Select class section to search, monitor payments and update terms</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5">
@@ -5055,36 +5053,19 @@ export default function App() {
 
               {/* Filters Panel */}
               <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                  {/* Grade Dropdown */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Academic Grade</label>
-                    <select
-                      value={selectedDfGrade}
-                      onChange={(e) => setSelectedDfGrade(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
-                    >
-                      <option value="">All Grades</option>
-                      {Array.isArray(dfGrades) && dfGrades.filter(Boolean).map((g) => (
-                        <option key={g._id || g.id} value={g._id || g.id}>
-                          {g.grade || g.name || "Unnamed Grade"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Section Dropdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Class Section Dropdown */}
                   <div className="space-y-1">
                     <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Class Section</label>
                     <select
-                      value={selectedDfSection}
-                      onChange={(e) => setSelectedDfSection(e.target.value)}
+                      value={feeViewerClassSection}
+                      onChange={(e) => setFeeViewerClassSection(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                     >
-                      <option value="">All Sections</option>
-                      {Array.isArray(dfSections) && dfSections.filter(Boolean).map((s) => (
-                        <option key={s._id || s.id} value={s._id || s.id}>
-                          {s.section || s.name || s.code || "Unnamed Section"}
+                      <option value="">All Class Sections</option>
+                      {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                        <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                          {cs.grade} - {cs.__section || cs.section || ""}
                         </option>
                       ))}
                     </select>
