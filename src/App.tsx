@@ -39,7 +39,9 @@ import {
   Link,
   Building,
   CreditCard,
-  ClipboardList
+  ClipboardList,
+  Award,
+  Briefcase
 } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -197,6 +199,19 @@ export default function App() {
   const [selectedDfClassSection, setSelectedDfClassSection] = useState<string>("");
   const [isLoadingRelations, setIsLoadingRelations] = useState<boolean>(false);
 
+  // --- Student Search and Comprehensive View States ---
+  const [parentStudentRelations, setParentStudentRelations] = useState<any[]>([]);
+  const [occupationsList, setOccupationsList] = useState<any[]>([]);
+  const [absencesList, setAbsencesList] = useState<any[]>([]);
+  const [teacherSubjectClasses, setTeacherSubjectClasses] = useState<any[]>([]);
+  const [teacherQualifications, setTeacherQualifications] = useState<any[]>([]);
+  const [edQualifications, setEdQualifications] = useState<any[]>([]);
+  const [edSpecialities, setEdSpecialities] = useState<any[]>([]);
+  const [searchRoleFilter, setSearchRoleFilter] = useState<string>("all");
+  const [isLoadingSearchDetails, setIsLoadingSearchDetails] = useState<boolean>(false);
+  const [searchStudentSelectedId, setSearchStudentSelectedId] = useState<string>("");
+  const [studentSearchInput, setStudentSearchInput] = useState<string>("");
+
   // --- Grade & Section Fee Viewer States ---
   const [allFeeRecords, setAllFeeRecords] = useState<any[]>([]);
   const [isLoadingFees, setIsLoadingFees] = useState<boolean>(false);
@@ -349,6 +364,100 @@ export default function App() {
       setMarksFetchError(err.message || "Network error fetching marks records");
     } finally {
       setIsLoadingMarks(false);
+    }
+  };
+
+  const fetchSearchDetails = async () => {
+    setIsLoadingSearchDetails(true);
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Fetch parent student relations
+      const relRes = await fetch("https://abms-lkw9.onrender.com/rel/parentStudent/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (relRes.ok) {
+        const data = await relRes.json();
+        setParentStudentRelations(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch occupations
+      const occRes = await fetch("https://abms-lkw9.onrender.com/df/occupation/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (occRes.ok) {
+        const data = await occRes.json();
+        setOccupationsList(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch absences
+      const absRes = await fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
+        method: "GET",
+        headers
+      });
+      if (absRes.ok) {
+        const data = await absRes.json();
+        setAbsencesList(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch teacher subject classes
+      const tscRes = await fetch("https://abms-lkw9.onrender.com/rel/teacherSubjectClass/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (tscRes.ok) {
+        const data = await tscRes.json();
+        setTeacherSubjectClasses(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch teacher qualifications
+      const tqRes = await fetch("https://abms-lkw9.onrender.com/rel/teacherQualification/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (tqRes.ok) {
+        const data = await tqRes.json();
+        setTeacherQualifications(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch ed qualifications
+      const edqRes = await fetch("https://abms-lkw9.onrender.com/df/edQualification/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (edqRes.ok) {
+        const data = await edqRes.json();
+        setEdQualifications(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch ed specialities
+      const edsRes = await fetch("https://abms-lkw9.onrender.com/df/edSpeciality/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (edsRes.ok) {
+        const data = await edsRes.json();
+        setEdSpecialities(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+    } catch (err) {
+      console.warn("Error fetching student search details:", err);
+    } finally {
+      setIsLoadingSearchDetails(false);
     }
   };
 
@@ -1367,6 +1476,16 @@ export default function App() {
     }
   }, [activeTab, loginResult, selectedRole]);
 
+  // Fetch search details when switching to the search students tab
+  useEffect(() => {
+    if (loginResult?.success && selectedRole === "administrator" && activeTab === "search-students") {
+      fetchSearchDetails();
+      fetchFeeRecords();
+      fetchMarks();
+      fetchStudentRelations();
+    }
+  }, [activeTab, loginResult, selectedRole]);
+
   // Fetch real database users and merge them on successful administrator login or navigating to users tab
   useEffect(() => {
     if (loginResult?.success && selectedRole === "administrator") {
@@ -2247,6 +2366,7 @@ export default function App() {
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
       { id: "grade-section-fees", label: "Grade & Section Fee Viewer", icon: CreditCard },
       { id: "marks-management", label: "Marks Management", icon: ClipboardList },
+      { id: "search-students", label: "Student Comprehensive Search", icon: Search },
       { id: "institutions", label: "Institute Details", icon: Building },
       { id: "fees", label: "Fees Management", icon: CreditCard }
     ] : selectedRole === "student" ? [
@@ -5397,6 +5517,865 @@ export default function App() {
                 </form>
               </div>
             )}
+          </div>
+        );
+      }
+
+      // Student Comprehensive Search Tab
+      if (activeTab === "search-students") {
+        // We can search students, teachers (role: instructor), and parents (role: parents)
+        const usersListToSearch = (filteredUserDirectory || []).filter(u => {
+          if (!u || !u.role) return false;
+          const r = String(u.role).toLowerCase();
+          return r === "student" || r === "instructor" || r === "parents";
+        });
+
+        const roleFilteredUsers = usersListToSearch.filter(u => {
+          if (searchRoleFilter === "all") return true;
+          if (searchRoleFilter === "student") return String(u.role).toLowerCase() === "student";
+          if (searchRoleFilter === "teacher") return String(u.role).toLowerCase() === "instructor";
+          if (searchRoleFilter === "parent") return String(u.role).toLowerCase() === "parents";
+          return true;
+        });
+
+        const matchingSearchUsers = roleFilteredUsers.filter(u => {
+          if (!studentSearchInput) return true;
+          const q = studentSearchInput.toLowerCase();
+          return (
+            String(u.name || "").toLowerCase().includes(q) ||
+            String(u.reg_no || u.regNo || u.username || "").toLowerCase().includes(q) ||
+            String(u.email || "").toLowerCase().includes(q) ||
+            String(u.phone || "").toLowerCase().includes(q) ||
+            String(u._id || "").toLowerCase().includes(q)
+          );
+        });
+
+        const selectedUser = usersListToSearch.find(u => u._id === searchStudentSelectedId || u.id === searchStudentSelectedId);
+        const selectedUserRole = selectedUser ? String(selectedUser.role).toLowerCase() : "";
+
+        // helper to get class & section for students
+        const getStudentClassSectionName = (studentId: string) => {
+          const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
+          if (!rel) return "Unassigned";
+
+          const csObj = classSectionsList.find(cs => cs._id === rel.class_id);
+          if (csObj) {
+            return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+          }
+
+          const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+          const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id));
+          const sectionsList = Array.isArray(dfSections) ? dfSections : [];
+          const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
+
+          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown");
+          const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : (rel.section_id || "Unknown");
+
+          return `${gradeName} - ${sectionName}`;
+        };
+
+        // helper to get assignments for teachers
+        const getTeacherClassSubjectAssignments = (teacherId: string) => {
+          const assignments = (Array.isArray(teacherSubjectClasses) ? teacherSubjectClasses : []).filter(
+            item => item && item.teacher_id === teacherId
+          );
+          return assignments.map(item => {
+            const csObj = classSectionsList.find(cs => cs._id === item.class_id);
+            let classLabel = "Unknown Class";
+            if (csObj) {
+              classLabel = `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+            } else {
+              const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+              const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
+              classLabel = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (item.class_id || "Unknown");
+            }
+            
+            const subObj = (Array.isArray(subjectsList) ? subjectsList : []).find(
+              sub => sub && (sub._id === item.subject_id || sub.id === item.subject_id)
+            );
+            const subjectLabel = subObj ? (subObj.name || subObj.subject) : item.subject_id;
+            
+            return {
+              classLabel,
+              subjectLabel,
+              startDate: item.start_date,
+              endDate: item.end_date
+            };
+          });
+        };
+
+        // helper to get qualifications for teachers
+        const getTeacherQualificationsList = (teacherId: string) => {
+          const quals = (Array.isArray(teacherQualifications) ? teacherQualifications : []).filter(
+            item => item && item.teacher_id === teacherId
+          );
+          return quals.map(item => {
+            const qObj = (Array.isArray(edQualifications) ? edQualifications : []).find(
+              q => q && (q._id === item.ed_qualification_id || q.id === item.ed_qualification_id)
+            );
+            const qualificationLabel = qObj ? (qObj.qualification || qObj.name) : item.ed_qualification_id;
+
+            const sObj = (Array.isArray(edSpecialities) ? edSpecialities : []).find(
+              s => s && (s._id === item.ed_speciality_id || s.id === item.ed_speciality_id)
+            );
+            const specialityLabel = sObj ? (sObj.speciality || sObj.name) : item.ed_speciality_id;
+
+            return {
+              qualificationLabel,
+              specialityLabel,
+              institute: item.institute || "N/A",
+              referenceNo: item.reference_no || "N/A",
+              startedDate: item.started_date,
+              finishedDate: item.finished_date,
+              completed: item.completed
+            };
+          });
+        };
+
+        // helper to get children for parents
+        const getParentChildrenList = (parentId: string) => {
+          const rels = (Array.isArray(parentStudentRelations) ? parentStudentRelations : []).filter(
+            item => item && item.parent_id === parentId
+          );
+          const childrenList: any[] = [];
+          rels.forEach(rel => {
+            const studentObj = (filteredUserDirectory || []).find(
+              u => u && (u._id === rel.student_id || u.id === rel.student_id) && String(u.role).toLowerCase() === "student"
+            );
+            if (studentObj) {
+              childrenList.push(studentObj);
+            }
+          });
+          return childrenList;
+        };
+
+        // Get student-specific details
+        let parentName = "Not Assigned";
+        let parentPhone = "N/A";
+        let parentEmail = "N/A";
+        let parentOccupation = "N/A";
+        let parentMaritalStatus = "N/A";
+        let studentAbsences: any[] = [];
+        let studentMarks: any[] = [];
+        let studentFees: any[] = [];
+
+        if (selectedUser && selectedUserRole === "student") {
+          const sId = selectedUser._id || selectedUser.id;
+
+          // Parent mapping
+          const pRel = parentStudentRelations.find(r => r && r.student_id === sId);
+          if (pRel) {
+            const pObj = filteredUserDirectory.find(u => u && u._id === pRel.parent_id && String(u.role).toLowerCase() === "parents");
+            if (pObj) {
+              parentName = pObj.name || `${pObj.first_name || ""} ${pObj.last_name || ""}`.trim() || "Parent";
+              parentPhone = pObj.phone || "N/A";
+              parentEmail = pObj.email || "N/A";
+              parentMaritalStatus = pObj.marital_status_id || "Not Specified";
+              
+              if (pObj.occupation_id) {
+                const occObj = occupationsList.find(o => o._id === pObj.occupation_id);
+                parentOccupation = occObj ? occObj.occupation : pObj.occupation_id;
+              } else {
+                parentOccupation = "Not Specified";
+              }
+            }
+          }
+
+          // Absences
+          studentAbsences = absencesList.filter(a => a && a.studentID === sId);
+
+          // Marks
+          studentMarks = (marksList || []).filter(m => m && m.student_id === sId);
+
+          // Fees
+          studentFees = matchStudentFees(selectedUser, allFeeRecords, feeViewerYear);
+        }
+
+        return (
+          <div className="space-y-6 max-w-7xl mx-auto">
+            {/* Header Banner */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 bg-gradient-to-r from-cyan-500/5 via-transparent to-transparent">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-cyan-50 border border-cyan-100 rounded-xl text-cyan-600">
+                    <Search className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Comprehensive Directory Search</h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Search and explore detailed directory profiles for students, course instructors (teachers), and parents/guardians with integrated database records.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      setIsLoadingSearchDetails(true);
+                      await Promise.all([
+                        fetchSearchDetails(),
+                        fetchFeeRecords(),
+                        fetchMarks(),
+                        fetchStudentRelations()
+                      ]);
+                      setIsLoadingSearchDetails(false);
+                    }}
+                    disabled={isLoadingSearchDetails}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingSearchDetails ? "animate-spin" : ""}`} />
+                    Sync database
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Split Screen Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Column: Search Filters & Results List */}
+              <div className="lg:col-span-4 space-y-4">
+                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
+                  {/* Category Filter Pills */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Directory Role</label>
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                      {(["all", "student", "teacher", "parent"] as const).map((role) => (
+                        <button
+                          key={role}
+                          onClick={() => setSearchRoleFilter(role)}
+                          className={`flex-1 py-1.5 text-[10px] font-bold capitalize rounded-lg transition-all cursor-pointer ${
+                            searchRoleFilter === role
+                              ? "bg-white text-cyan-700 shadow-sm"
+                              : "bg-transparent text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          {role === "all" ? "All" : role === "student" ? "Students" : role === "teacher" ? "Teachers" : "Parents"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">Search Directory</h3>
+                    <p className="text-[10px] text-slate-400 font-medium">Search by Name, Reg No / ID, Phone, or Email</p>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder={`Type to search ${searchRoleFilter === "all" ? "directory" : searchRoleFilter + "s"}...`}
+                      value={studentSearchInput}
+                      onChange={(e) => setStudentSearchInput(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-50/50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all"
+                    />
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <div className="flex justify-between items-center text-[10px] text-slate-400 uppercase tracking-wider mb-2 px-1">
+                      <span>Matches</span>
+                      <span>{matchingSearchUsers.length} Records</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+                      {matchingSearchUsers.length === 0 ? (
+                        <div className="text-center py-8 text-slate-400 text-xs">
+                          No matching records found.
+                        </div>
+                      ) : (
+                        matchingSearchUsers.map((userObj) => {
+                          const isSelected = userObj._id === searchStudentSelectedId || userObj.id === searchStudentSelectedId;
+                          const uRole = String(userObj.role).toLowerCase();
+                          
+                          let badgeText = "Parent";
+                          let badgeStyle = "bg-indigo-50 text-indigo-700 border-indigo-100";
+                          
+                          if (uRole === "student") {
+                            badgeText = getStudentClassSectionName(userObj._id || userObj.id);
+                            badgeStyle = isSelected 
+                              ? "bg-cyan-100/50 text-cyan-700 border-cyan-200" 
+                              : "bg-slate-50 text-slate-500 border-slate-100";
+                          } else if (uRole === "instructor" || uRole === "teacher") {
+                            badgeText = "Teacher";
+                            badgeStyle = "bg-emerald-50 text-emerald-700 border-emerald-100";
+                          }
+
+                          return (
+                            <button
+                              key={userObj._id || userObj.id}
+                              onClick={() => setSearchStudentSelectedId(userObj._id || userObj.id)}
+                              className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-cyan-500/10 border-cyan-300 text-cyan-900 shadow-sm"
+                                  : "bg-white hover:bg-slate-50/70 border-slate-200 hover:border-slate-300 text-slate-700"
+                              }`}
+                            >
+                              <div className="space-y-1 min-w-0 pr-2">
+                                <p className="text-xs font-bold truncate">{userObj.name || "User"}</p>
+                                <p className="text-[10px] text-slate-400 font-mono truncate">
+                                  ID: {userObj.reg_no || userObj.regNo || userObj.username || "N/A"}
+                                </p>
+                              </div>
+                              <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 border ${badgeStyle}`}>
+                                {badgeText}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Dynamic Role Detail View */}
+              <div className="lg:col-span-8">
+                {!selectedUser ? (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center shadow-sm h-full flex flex-col justify-center items-center min-h-[400px]">
+                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 border border-slate-100 mb-4 animate-pulse">
+                      <Search className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">No Profile Selected</h3>
+                    <p className="text-xs text-slate-400 mt-1.5 max-w-md">
+                      Please select a directory profile from the list on the left to inspect their integrated records including system information, relational class assignments, contact channels, and course history.
+                    </p>
+                  </div>
+                ) : selectedUserRole === "student" ? (
+                  /* STUDENT DETAIL VIEW */
+                  <div className="space-y-6">
+                    {/* Bento Box 1: Student Core Profile Info */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-50/30 flex items-center justify-between">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">Student Profile Information</h3>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
+                          String(selectedUser.status || "").toLowerCase() === "active"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                            : "bg-rose-50 text-rose-700 border-rose-100"
+                        }`}>
+                          {selectedUser.status || "Active"}
+                        </span>
+                      </div>
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* Student Bio Column */}
+                          <div className="flex flex-col items-center text-center p-4 bg-slate-50/50 border border-slate-100 rounded-xl space-y-3">
+                            <div className="w-20 h-20 bg-cyan-100 text-cyan-600 rounded-full flex items-center justify-center font-black text-2xl border-2 border-white shadow-md">
+                              {String(selectedUser.name || "S").charAt(0).toUpperCase()}
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-bold text-slate-800">{selectedUser.name || "Student"}</h4>
+                              <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                                {getStudentClassSectionName(selectedUser._id || selectedUser.id)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Profile Fields */}
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Registration Number</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-mono font-bold text-slate-800">
+                                {selectedUser.reg_no || selectedUser.regNo || selectedUser.username || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">National Identity Code (NIC)</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.nic || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Email Address</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 truncate">
+                                {selectedUser.email || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Mobile Phone</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.phone || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Date of Birth</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Gender / Sex</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 uppercase">
+                                {selectedUser.sex || "N/A"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bento Box 2: Academic Assigned & Parents Contact */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Class Assignment Card */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                          <GraduationCap className="w-4 h-4 text-cyan-600" />
+                          Academic Class Assigned
+                        </h4>
+                        <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl space-y-3">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400 font-medium">Mapped Stream:</span>
+                            <span className="font-bold text-slate-800">
+                              {getStudentClassSectionName(selectedUser._id || selectedUser.id)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs border-t border-slate-200/50 pt-2.5">
+                            <span className="text-slate-400 font-medium">Enrollment Status:</span>
+                            <span className="text-[9px] bg-cyan-100 text-cyan-800 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border border-cyan-200">
+                              Registered Core
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Parents Detail Card */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-indigo-500" />
+                          Parent & Guardian Info
+                        </h4>
+                        <div className="space-y-2.5 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400 font-medium">Guardian Name:</span>
+                            <span className="font-bold text-slate-800">{parentName}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+                            <span className="text-slate-400 font-medium">Guardian Phone:</span>
+                            <span className="font-semibold text-slate-800">{parentPhone}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+                            <span className="text-slate-400 font-medium">Guardian Email:</span>
+                            <span className="font-medium text-slate-800 truncate max-w-[150px]">{parentEmail}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-slate-100 pt-2">
+                            <span className="text-slate-400 font-medium">Parents Occupation:</span>
+                            <span className="font-bold text-cyan-600 bg-cyan-50/60 px-2 py-0.5 rounded border border-cyan-100/50">
+                              {parentOccupation}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bento Box 3: Fees & Attendance */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Financial / Fees Tracker */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                          <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-amber-500" />
+                            Fees Ledger Status ({feeViewerYear})
+                          </h4>
+                          <select
+                            value={feeViewerYear}
+                            onChange={(e) => setFeeViewerYear(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-cyan-500 animate-none hover:bg-slate-100 transition-colors"
+                          >
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                            <option value="2024">2024</option>
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                          {[1, 2, 3, 4].map((term) => {
+                            const termRecord = studentFees.find(r => parseTermNumber(r.term) === term);
+                            const feeStatus = termRecord ? String(termRecord.fee_status || termRecord.feeStatus || "unpaid").toLowerCase() : "unpaid";
+                            
+                            return (
+                              <div key={term} className="p-3 bg-slate-50 rounded-xl border border-slate-100/80 space-y-1.5">
+                                <span className="text-[10px] font-bold text-slate-400">Term {term}</span>
+                                <div className="flex justify-center">
+                                  <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-widest ${
+                                    feeStatus === "paid"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                      : feeStatus === "pending"
+                                      ? "bg-amber-50 text-amber-700 border-amber-100"
+                                      : "bg-rose-50 text-rose-700 border-rose-100"
+                                  }`}>
+                                    {feeStatus}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Attendance Absentee Tracker */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-rose-500" />
+                          Attendance Absence Tracker
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between p-3.5 bg-rose-50/50 border border-rose-100/50 rounded-xl">
+                            <span className="text-xs text-rose-700 font-bold">Total Absent Days logged:</span>
+                            <span className="text-sm font-black font-mono text-rose-600 bg-rose-100/50 px-3 py-1 rounded-lg border border-rose-200/50">
+                              {studentAbsences.length}
+                            </span>
+                          </div>
+
+                          <div className="space-y-1 max-h-[100px] overflow-y-auto pr-1">
+                            {studentAbsences.length === 0 ? (
+                              <p className="text-[11px] text-emerald-600 font-bold text-center bg-emerald-50/50 border border-emerald-100/50 p-2 rounded-lg">
+                                Perfect Attendance! No recorded absences.
+                              </p>
+                            ) : (
+                              studentAbsences.map((abs, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-[10px] bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg text-slate-600 font-semibold font-mono">
+                                  <span>Date: {abs.date ? new Date(abs.date).toLocaleDateString() : "N/A"}</span>
+                                  <span className="text-rose-600 font-bold uppercase tracking-wider text-[9px]">ABSENT</span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bento Box 4: Marks management */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-50/30 flex items-center justify-between">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                          <ClipboardList className="w-4 h-4 text-indigo-500" />
+                          Academic Subject Marks & Term Grades
+                        </h3>
+                        <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-0.5 rounded-full font-bold">
+                          Official Records
+                        </span>
+                      </div>
+                      <div className="p-6">
+                        {studentMarks.length === 0 ? (
+                          <div className="text-center py-8 text-slate-400 text-xs">
+                            No marks records have been posted to the database for this student yet.
+                          </div>
+                        ) : (
+                          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-50 border-b border-slate-200 font-black text-slate-500 uppercase tracking-wider text-[10px]">
+                                <tr>
+                                  <th className="px-4 py-3">Term</th>
+                                  <th className="px-4 py-3">Subject Name</th>
+                                  <th className="px-4 py-3 text-center">Score</th>
+                                  <th className="px-4 py-3 text-center">Grade</th>
+                                  <th className="px-4 py-3 text-right">Exam Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {studentMarks.map((m, index) => {
+                                  const subjectObj = subjectsList.find(s => s._id === m.subject_id || s.id === m.subject_id);
+                                  const subjectName = subjectObj ? subjectObj.name : m.subject_id;
+                                  return (
+                                    <tr key={index} className="hover:bg-slate-50/50 font-semibold text-slate-700">
+                                      <td className="px-4 py-3 font-bold text-slate-900">{m.term}</td>
+                                      <td className="px-4 py-3">{subjectName}</td>
+                                      <td className="px-4 py-3 text-center font-mono font-bold text-cyan-600 bg-cyan-50/20">{m.marks}</td>
+                                      <td className="px-4 py-3 text-center">
+                                        <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded border border-indigo-100 font-bold font-mono">
+                                          {m.grade_id || "Passed"}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-right text-slate-400 font-mono text-[10px]">
+                                        {m.date ? new Date(m.date).toLocaleDateString() : "N/A"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : selectedUserRole === "instructor" || selectedUserRole === "teacher" ? (
+                  /* TEACHER DETAIL VIEW */
+                  <div className="space-y-6">
+                    {/* Bento Box 1: Teacher Profile Information */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-50/30 flex items-center justify-between">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">Teacher Profile Information</h3>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
+                          String(selectedUser.status || "").toLowerCase() === "active"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                            : "bg-rose-50 text-rose-700 border-rose-100"
+                        }`}>
+                          {selectedUser.status || "Active"}
+                        </span>
+                      </div>
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* Teacher Bio Avatar */}
+                          <div className="flex flex-col items-center text-center p-4 bg-slate-50/50 border border-slate-100 rounded-xl space-y-3">
+                            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center font-black text-2xl border-2 border-white shadow-md">
+                              {String(selectedUser.name || "T").charAt(0).toUpperCase()}
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-bold text-slate-800">{selectedUser.name || "Teacher"}</h4>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50">
+                                Faculty Member
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Profile Fields */}
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Teacher Reg / ID</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-mono font-bold text-slate-800">
+                                {selectedUser.reg_no || selectedUser.regNo || selectedUser.username || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Passport / National ID</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.passport || selectedUser.nic || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Email Address</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 truncate">
+                                {selectedUser.email || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Contact Phone</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.phone || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Date of Birth</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Gender / Sex</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 uppercase">
+                                {selectedUser.sex || "N/A"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bento Box 2: Teacher Assignments & Courses */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Course Assignments List */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                          <Presentation className="w-4 h-4 text-emerald-600" />
+                          Class & Subject Assignments
+                        </h4>
+                        
+                        <div className="space-y-2 flex-1 max-h-[300px] overflow-y-auto pr-1">
+                          {getTeacherClassSubjectAssignments(selectedUser._id || selectedUser.id).length === 0 ? (
+                            <div className="text-center py-8 text-slate-400 text-xs">
+                              No Class or Subject assignments mapped to this teacher.
+                            </div>
+                          ) : (
+                            getTeacherClassSubjectAssignments(selectedUser._id || selectedUser.id).map((assign, index) => (
+                              <div key={index} className="bg-slate-50 border border-slate-100 p-3 rounded-xl flex justify-between items-center text-xs">
+                                <div className="space-y-1">
+                                  <p className="font-bold text-slate-800">{assign.subjectLabel}</p>
+                                  <p className="text-[10px] text-slate-400 font-semibold">{assign.classLabel}</p>
+                                </div>
+                                <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200 uppercase font-black tracking-wider">
+                                  Active Class
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Educational Credentials & Qualifications */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                          <Award className="w-4 h-4 text-amber-500" />
+                          Qualifications & Credentials
+                        </h4>
+
+                        <div className="space-y-2 flex-1 max-h-[300px] overflow-y-auto pr-1">
+                          {getTeacherQualificationsList(selectedUser._id || selectedUser.id).length === 0 ? (
+                            <div className="text-center py-8 text-slate-400 text-xs">
+                              No qualification profiles recorded for this instructor yet.
+                            </div>
+                          ) : (
+                            getTeacherQualificationsList(selectedUser._id || selectedUser.id).map((qual, index) => (
+                              <div key={index} className="bg-slate-50 border border-slate-100 p-3 rounded-xl space-y-2 text-xs">
+                                <div className="flex justify-between items-start">
+                                  <div className="space-y-0.5">
+                                    <p className="font-bold text-slate-800">{qual.qualificationLabel}</p>
+                                    <p className="text-[10px] text-slate-500 font-medium">Specialty: {qual.specialityLabel}</p>
+                                  </div>
+                                  <span className={`text-[8px] px-1.5 py-0.5 rounded border font-bold uppercase tracking-wider ${
+                                    qual.completed 
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                                      : "bg-amber-50 text-amber-700 border-amber-100"
+                                  }`}>
+                                    {qual.completed ? "Completed" : "In Progress"}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-slate-400 border-t border-slate-200/50 pt-1.5 flex justify-between">
+                                  <span>Institute: <strong className="text-slate-600 font-bold">{qual.institute}</strong></span>
+                                  <span>Ref: {qual.referenceNo}</span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* PARENT DETAIL VIEW */
+                  <div className="space-y-6">
+                    {/* Bento Box 1: Parent Profile Information */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-50/30 flex items-center justify-between">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">Parent/Guardian Information</h3>
+                        <span className={`text-[10px] px-2.5 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
+                          String(selectedUser.status || "").toLowerCase() === "active"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                            : "bg-rose-50 text-rose-700 border-rose-100"
+                        }`}>
+                          {selectedUser.status || "Active"}
+                        </span>
+                      </div>
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* Parent Bio Avatar */}
+                          <div className="flex flex-col items-center text-center p-4 bg-slate-50/50 border border-slate-100 rounded-xl space-y-3">
+                            <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-black text-2xl border-2 border-white shadow-md">
+                              {String(selectedUser.name || "P").charAt(0).toUpperCase()}
+                            </div>
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-bold text-slate-800">{selectedUser.name || "Parent"}</h4>
+                              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/50">
+                                Legal Guardian
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Profile Fields */}
+                          <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Guardian ID (Username/Phone)</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-mono font-bold text-slate-800">
+                                {selectedUser.username || selectedUser.phone || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Email Address</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 truncate">
+                                {selectedUser.email || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Mobile Phone</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.phone || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Date of Birth</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800">
+                                {selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Gender / Sex</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 uppercase">
+                                {selectedUser.sex || "N/A"}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Marital Status</label>
+                              <p className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 font-medium text-slate-800 capitalize">
+                                {selectedUser.marital_status_id || "Not Specified"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bento Box 2: Occupation and Mapped Children */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Occupation Card */}
+                      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col justify-between">
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                            <Briefcase className="w-4 h-4 text-amber-500" />
+                            Professional Profile
+                          </h4>
+                          <div className="bg-amber-50/50 border border-amber-100/50 p-4 rounded-xl space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-amber-700 tracking-wider">Occupation</label>
+                            <p className="text-sm font-black text-slate-800 capitalize">
+                              {(() => {
+                                if (selectedUser.occupation_id) {
+                                  const occObj = occupationsList.find(o => o._id === selectedUser.occupation_id);
+                                  return occObj ? occObj.occupation : selectedUser.occupation_id;
+                                }
+                                return "Not specified";
+                              })()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-slate-400 pt-3 italic">
+                          Occupation is fetched from the system occupations definitions table.
+                        </div>
+                      </div>
+
+                      {/* Children (Students) Assignments */}
+                      <div className="md:col-span-2 bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4 flex flex-col">
+                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-cyan-600" />
+                          Registered Mapped Children ({getParentChildrenList(selectedUser._id || selectedUser.id).length})
+                        </h4>
+
+                        <div className="space-y-3 flex-1 max-h-[300px] overflow-y-auto pr-1">
+                          {getParentChildrenList(selectedUser._id || selectedUser.id).length === 0 ? (
+                            <div className="text-center py-8 text-slate-400 text-xs">
+                              No student profiles have been linked to this parent record yet.
+                            </div>
+                          ) : (
+                            getParentChildrenList(selectedUser._id || selectedUser.id).map((child) => (
+                              <div key={child._id || child.id} className="bg-slate-50 border border-slate-100/80 p-3 rounded-xl flex items-center justify-between">
+                                <div className="space-y-1 text-xs">
+                                  <p className="font-bold text-slate-900">{child.name}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono">Roll: {child.reg_no || child.regNo || "N/A"}</p>
+                                  <p className="text-[10px] text-cyan-700 font-semibold uppercase tracking-wider">
+                                    Class: {getStudentClassSectionName(child._id || child.id)}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => setSearchStudentSelectedId(child._id || child.id)}
+                                  className="text-[10px] px-3 py-1.5 bg-white border border-slate-200 hover:border-cyan-300 hover:bg-cyan-50 text-slate-600 hover:text-cyan-700 font-bold rounded-lg shadow-sm transition-all cursor-pointer"
+                                >
+                                  View Profile
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         );
       }
