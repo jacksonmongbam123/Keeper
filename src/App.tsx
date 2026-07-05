@@ -38,7 +38,8 @@ import {
   UserPlus,
   Link,
   Building,
-  CreditCard
+  CreditCard,
+  ClipboardList
 } from "lucide-react";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
@@ -215,6 +216,33 @@ export default function App() {
   const [modalSuccess, setModalSuccess] = useState<string>("");
   const [modalExistingStudentId, setModalExistingStudentId] = useState<string>("");
 
+  // --- Marks Management States ---
+  const [marksList, setMarksList] = useState<any[]>([]);
+  const [isLoadingMarks, setIsLoadingMarks] = useState<boolean>(false);
+  const [marksFetchError, setMarksFetchError] = useState<string>("");
+  const [isMarksModalOpen, setIsMarksModalOpen] = useState<boolean>(false);
+  const [marksModalIsNew, setMarksModalIsNew] = useState<boolean>(true);
+  const [selectedMarkId, setSelectedMarkId] = useState<string>("");
+  const [marksModalSubmitting, setMarksModalSubmitting] = useState<boolean>(false);
+  const [marksModalError, setMarksModalError] = useState<string>("");
+  const [marksModalSuccess, setMarksModalSuccess] = useState<string>("");
+
+  // Marks Form States
+  const [marksFormStudentId, setMarksFormStudentId] = useState<string>("");
+  const [marksFormClassId, setMarksFormClassId] = useState<string>("");
+  const [marksFormSubjectId, setMarksFormSubjectId] = useState<string>("");
+  const [marksFormMarks, setMarksFormMarks] = useState<string>("");
+  const [marksFormTerm, setMarksFormTerm] = useState<string>("");
+  const [marksFormDate, setMarksFormDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [marksFormGradeId, setMarksFormGradeId] = useState<string>("");
+  const [marksFormCreatedUserId, setMarksFormCreatedUserId] = useState<string>("");
+  const [marksFormModifiedUserId, setMarksFormModifiedUserId] = useState<string>("");
+
+  // Marks Filtering States
+  const [marksFilterClassSection, setMarksFilterClassSection] = useState<string>("");
+  const [marksFilterSubject, setMarksFilterSubject] = useState<string>("");
+  const [marksFilterStudent, setMarksFilterStudent] = useState<string>("");
+
   const fetchFeeRecords = async () => {
     setIsLoadingFees(true);
     setFeesFetchError("");
@@ -241,6 +269,175 @@ export default function App() {
     } finally {
       setIsLoadingFees(false);
     }
+  };
+
+  const fetchMarks = async () => {
+    setIsLoadingMarks(true);
+    setMarksFetchError("");
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch("https://abms-lkw9.onrender.com/m/marks/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMarksList(Array.isArray(data) ? data.filter(Boolean) : []);
+      } else {
+        const text = await res.text();
+        console.warn("Failed to fetch marks records:", text);
+        setMarksFetchError(`Failed to load: ${res.statusText}`);
+      }
+    } catch (err: any) {
+      console.warn("Error fetching marks records:", err);
+      setMarksFetchError(err.message || "Network error fetching marks records");
+    } finally {
+      setIsLoadingMarks(false);
+    }
+  };
+
+  const handleSaveMark = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMarksModalSubmitting(true);
+    setMarksModalError("");
+    setMarksModalSuccess("");
+
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const payload = {
+        student_id: marksFormStudentId,
+        class_id: marksFormClassId,
+        subject_id: marksFormSubjectId,
+        marks: marksFormMarks,
+        term: marksFormTerm,
+        date: marksFormDate ? new Date(marksFormDate).toISOString() : new Date().toISOString(),
+        grade_id: marksFormGradeId,
+        created_date: marksModalIsNew ? new Date().toISOString() : undefined,
+        created_user_id: marksFormCreatedUserId || loginResult?.data?.user?._id || "",
+        modified_date: new Date().toISOString(),
+        modified_user_id: marksFormModifiedUserId || loginResult?.data?.user?._id || ""
+      };
+
+      const endpoint = marksModalIsNew
+        ? "https://abms-lkw9.onrender.com/m/marks/add"
+        : `https://abms-lkw9.onrender.com/m/marks/update/${selectedMarkId}`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setMarksModalSuccess(marksModalIsNew ? "Marks created successfully!" : "Marks updated successfully!");
+        fetchMarks();
+        setTimeout(() => {
+          setIsMarksModalOpen(false);
+          // Clear form
+          setMarksFormStudentId("");
+          setMarksFormClassId("");
+          setMarksFormSubjectId("");
+          setMarksFormMarks("");
+          setMarksFormTerm("");
+          setMarksFormGradeId("");
+          setMarksFormCreatedUserId("");
+          setMarksFormModifiedUserId("");
+        }, 1500);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setMarksModalError(errData.message || `Failed to save marks: ${res.statusText}`);
+      }
+    } catch (err: any) {
+      console.error("Error saving marks:", err);
+      setMarksModalError(err.message || "Network error while saving marks");
+    } finally {
+      setMarksModalSubmitting(false);
+    }
+  };
+
+  const handleDeleteMark = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this mark record?")) return;
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(`https://abms-lkw9.onrender.com/m/marks/delete/${id}`, {
+        method: "POST",
+        headers
+      });
+      if (res.ok) {
+        fetchMarks();
+      } else {
+        alert("Failed to delete mark record");
+      }
+    } catch (err: any) {
+      console.error("Error deleting mark:", err);
+      alert("Error deleting mark record");
+    }
+  };
+
+  const openEditMarkModal = (mark: any) => {
+    setSelectedMarkId(mark._id || mark.id);
+    setMarksFormStudentId(mark.student_id || "");
+    setMarksFormClassId(mark.class_id || "");
+    setMarksFormSubjectId(mark.subject_id || "");
+    setMarksFormMarks(mark.marks || "");
+    setMarksFormTerm(mark.term || "");
+    setMarksFormGradeId(mark.grade_id || "");
+    setMarksFormCreatedUserId(mark.created_user_id || "");
+    setMarksFormModifiedUserId(mark.modified_user_id || "");
+    
+    // Parse date safely
+    if (mark.date) {
+      try {
+        const d = new Date(mark.date);
+        setMarksFormDate(d.toISOString().split('T')[0]);
+      } catch (e) {
+        setMarksFormDate(new Date().toISOString().split('T')[0]);
+      }
+    } else {
+      setMarksFormDate(new Date().toISOString().split('T')[0]);
+    }
+
+    setMarksModalIsNew(false);
+    setMarksModalError("");
+    setMarksModalSuccess("");
+    setIsMarksModalOpen(true);
+  };
+
+  const openCreateMarkModal = () => {
+    setMarksModalIsNew(true);
+    setSelectedMarkId("");
+    setMarksFormStudentId("");
+    setMarksFormClassId("");
+    setMarksFormSubjectId("");
+    setMarksFormMarks("");
+    setMarksFormTerm("");
+    setMarksFormGradeId("");
+    setMarksFormCreatedUserId(loginResult?.data?.user?._id || "");
+    setMarksFormModifiedUserId(loginResult?.data?.user?._id || "");
+    setMarksFormDate(new Date().toISOString().split('T')[0]);
+    setMarksModalError("");
+    setMarksModalSuccess("");
+    setIsMarksModalOpen(true);
   };
 
   const fetchDfGradesAndSections = async () => {
@@ -382,6 +579,13 @@ export default function App() {
   useEffect(() => {
     if (loginResult?.success && selectedRole === "administrator" && activeTab === "grade-section-fees") {
       fetchFeeRecords();
+    }
+  }, [activeTab, loginResult, selectedRole]);
+
+  // Fetch marks when switching to the marks management tab
+  useEffect(() => {
+    if (loginResult?.success && selectedRole === "administrator" && activeTab === "marks-management") {
+      fetchMarks();
     }
   }, [activeTab, loginResult, selectedRole]);
 
@@ -1253,6 +1457,7 @@ export default function App() {
       { id: "add-user", label: "Register Profile", icon: UserPlus },
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
       { id: "grade-section-fees", label: "Grade & Section Fee Viewer", icon: CreditCard },
+      { id: "marks-management", label: "Marks Management", icon: ClipboardList },
       { id: "institutions", label: "Institute Details", icon: Building },
       { id: "fees", label: "Fees Management", icon: CreditCard }
     ] : selectedRole === "student" ? [
@@ -5362,6 +5567,482 @@ export default function App() {
                           </>
                         ) : (
                           "Save Status"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      if (activeTab === "marks-management") {
+        // Apply filters
+        const filteredMarks = (Array.isArray(marksList) ? marksList : []).filter((mark: any) => {
+          if (!mark) return false;
+          
+          const matchesClass = !marksFilterClassSection || mark.class_id === marksFilterClassSection;
+          const matchesSubject = !marksFilterSubject || mark.subject_id === marksFilterSubject;
+          const matchesStudent = !marksFilterStudent || mark.student_id === marksFilterStudent;
+          
+          const query = searchQuery.toLowerCase();
+          const studentObj = (Array.isArray(userDirectory) ? userDirectory : []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
+          const studentName = studentObj ? String(studentObj.name || "").toLowerCase() : "";
+          const termName = String(mark.term || "").toLowerCase();
+          const marksVal = String(mark.marks || "").toLowerCase();
+          
+          const matchesSearch = !searchQuery || 
+                                studentName.includes(query) || 
+                                termName.includes(query) || 
+                                marksVal.includes(query) ||
+                                String(mark.student_id || "").toLowerCase().includes(query);
+                                
+          return matchesClass && matchesSubject && matchesStudent && matchesSearch;
+        });
+
+        return (
+          <div className="space-y-6">
+            {/* Header Card */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+              <div className="space-y-1">
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-indigo-500" />
+                  Marks Records System
+                </h2>
+                <p className="text-xs text-slate-500 max-w-2xl">
+                  Register, search, modify and delete academic marks. This module maps directly to the live MongoDB database using the m_marks collection schema.
+                </p>
+              </div>
+              <button
+                onClick={openCreateMarkModal}
+                className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-md shadow-slate-900/10 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+              >
+                <span>+ Register New Marks</span>
+              </button>
+            </div>
+
+            {/* Filter Panel */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Class Section Filter */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Class Section</label>
+                  <select
+                    value={marksFilterClassSection}
+                    onChange={(e) => setMarksFilterClassSection(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                  >
+                    <option value="">All Classes & Sections</option>
+                    {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                      <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                        {cs.grade} - {cs.__section || cs.section || ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subject Filter */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Subject</label>
+                  <select
+                    value={marksFilterSubject}
+                    onChange={(e) => setMarksFilterSubject(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                  >
+                    <option value="">All Subjects</option>
+                    {Array.isArray(subjectsList) && subjectsList.filter(Boolean).map((sub: any) => (
+                      <option key={sub._id || sub.id} value={sub._id || sub.id}>
+                        {sub.name || sub.code || "Unnamed Subject"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Student Filter */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Student Profile</label>
+                  <select
+                    value={marksFilterStudent}
+                    onChange={(e) => setMarksFilterStudent(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                  >
+                    <option value="">All Students</option>
+                    {Array.isArray(userDirectory) && userDirectory.filter((u: any) => u && u.role === "student").map((student: any) => (
+                      <option key={student._id || student.id} value={student._id || student.id}>
+                        {student.name} ({student.username})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Search query */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Search keyword</label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search term or marks value..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List Table */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              {isLoadingMarks ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-3">
+                  <div className="w-8 h-8 rounded-full border-3 border-indigo-600 border-t-transparent animate-spin" />
+                  <p className="text-xs font-semibold text-slate-500">Querying live MongoDB records...</p>
+                </div>
+              ) : marksFetchError ? (
+                <div className="py-16 text-center text-rose-600 bg-rose-50/50 m-4 rounded-xl border border-rose-100">
+                  <p className="text-sm font-bold">Failed to sync with API</p>
+                  <p className="text-xs text-rose-500 mt-1">{marksFetchError}</p>
+                  <button
+                    onClick={fetchMarks}
+                    className="mt-3 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg"
+                  >
+                    Retry Connection
+                  </button>
+                </div>
+              ) : filteredMarks.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-left">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-mono uppercase text-slate-400">
+                        <th className="p-4 pl-6 font-bold">Student Profile</th>
+                        <th className="p-4 font-bold">Class Section</th>
+                        <th className="p-4 font-bold">Subject</th>
+                        <th className="p-4 font-bold text-center">Marks</th>
+                        <th className="p-4 font-bold">Term</th>
+                        <th className="p-4 font-bold">Grade Reference</th>
+                        <th className="p-4 font-bold">Evaluation Date</th>
+                        <th className="p-4 pr-6 text-right font-bold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {filteredMarks.map((mark: any) => {
+                        const mId = mark._id || mark.id;
+                        
+                        // Student resolution
+                        const studentObj = (Array.isArray(userDirectory) ? userDirectory : []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
+                        const studentName = studentObj ? studentObj.name : "Unresolved Student";
+                        const studentCode = studentObj ? studentObj.username : mark.student_id;
+                        
+                        // Class/Section resolution
+                        const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && cs._id === mark.class_id);
+                        const classSectionText = csObj ? `${csObj.grade} - ${csObj.__section || csObj.section || ""}` : mark.class_id || "Unassigned";
+                        
+                        // Subject resolution
+                        const subObj = (Array.isArray(subjectsList) ? subjectsList : []).find(s => s && (s._id === mark.subject_id || s.id === mark.subject_id));
+                        const subjectText = subObj ? subObj.name : mark.subject_id || "Unassigned";
+                        
+                        // Grade reference resolution
+                        const gradeObj = (Array.isArray(dfGrades) ? dfGrades : []).find(g => g && (g._id === mark.grade_id || g.id === mark.grade_id));
+                        const gradeText = gradeObj ? (gradeObj.grade || gradeObj.name) : mark.grade_id || "None";
+                        
+                        // Date formatting
+                        let formattedDate = "N/A";
+                        if (mark.date) {
+                          try {
+                            formattedDate = new Date(mark.date).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            });
+                          } catch (e) {
+                            formattedDate = String(mark.date);
+                          }
+                        }
+
+                        return (
+                          <tr key={mId} className="hover:bg-slate-50/40 transition-colors">
+                            <td className="p-4 pl-6">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                                  {studentName.charAt(0)}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-slate-900 truncate">{studentName}</h4>
+                                  <p className="text-[10px] font-mono text-slate-400 truncate font-semibold">ID/Username: {studentCode}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
+                                {classSectionText}
+                              </span>
+                            </td>
+                            <td className="p-4 font-semibold text-slate-700">
+                              {subjectText}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className="font-black text-sm bg-cyan-50 text-cyan-700 px-3 py-1 rounded-xl border border-cyan-100 font-mono">
+                                {mark.marks}
+                              </span>
+                            </td>
+                            <td className="p-4 font-medium text-slate-600">
+                              {mark.term || "N/A"}
+                            </td>
+                            <td className="p-4 font-mono text-[10px] text-slate-500">
+                              {gradeText}
+                            </td>
+                            <td className="p-4 text-slate-500 font-mono text-[10px]">
+                              {formattedDate}
+                            </td>
+                            <td className="p-4 pr-6 text-right space-x-1 shrink-0">
+                              <button
+                                onClick={() => openEditMarkModal(mark)}
+                                className="text-[10px] bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold px-2.5 py-1.5 rounded-lg shadow-sm cursor-pointer transition-all inline-flex items-center gap-1"
+                              >
+                                <Pencil className="w-3 h-3 text-slate-500" />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMark(mId)}
+                                className="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 font-bold px-2.5 py-1.5 rounded-lg shadow-sm cursor-pointer transition-all inline-flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-500" />
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-20 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 m-6">
+                  <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-sm font-bold text-slate-800">No Marks Records Found</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    There are no recorded academic achievements matching your selection criteria. Create a new mark using the form to populate.
+                  </p>
+                  <button
+                    onClick={openCreateMarkModal}
+                    className="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow cursor-pointer transition-all"
+                  >
+                    Create First Mark
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Centered Modal Overlay for Creating/Editing Marks */}
+            {isMarksModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                  {/* Modal Header */}
+                  <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50/50 to-indigo-50/50 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">
+                        {marksModalIsNew ? "Register Student Marks" : "Modify Registered Marks"}
+                      </h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {marksModalIsNew ? "Create a live document mapping achievements to m_marks" : `Updating mark ID: ${selectedMarkId}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setIsMarksModalOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  {/* Form Container */}
+                  <form onSubmit={handleSaveMark} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                    {marksModalSuccess && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <span>{marksModalSuccess}</span>
+                      </div>
+                    )}
+
+                    {marksModalError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center gap-2">
+                        <XCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                        <span>{marksModalError}</span>
+                      </div>
+                    )}
+
+                    {/* Student Selection */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 block">Select Student *</label>
+                      <select
+                        required
+                        value={marksFormStudentId}
+                        onChange={(e) => setMarksFormStudentId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                      >
+                        <option value="">-- Choose student --</option>
+                        {Array.isArray(userDirectory) && userDirectory.filter((u: any) => u && u.role === "student").map((student: any) => (
+                          <option key={student._id || student.id} value={student._id || student.id}>
+                            {student.name} ({student.username || student._id})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Class Section Selection */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Class Section *</label>
+                        <select
+                          required
+                          value={marksFormClassId}
+                          onChange={(e) => setMarksFormClassId(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="">-- Choose class section --</option>
+                          {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                            <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                              {cs.grade} - {cs.__section || cs.section || ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Subject Selection */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Subject *</label>
+                        <select
+                          required
+                          value={marksFormSubjectId}
+                          onChange={(e) => setMarksFormSubjectId(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="">-- Choose subject --</option>
+                          {Array.isArray(subjectsList) && subjectsList.filter(Boolean).map((sub: any) => (
+                            <option key={sub._id || sub.id} value={sub._id || sub.id}>
+                              {sub.name || sub.code || "Unnamed Subject"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Marks Input */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Marks Value *</label>
+                        <input
+                          required
+                          type="text"
+                          placeholder="e.g. 85, 92, Grade A"
+                          value={marksFormMarks}
+                          onChange={(e) => setMarksFormMarks(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        />
+                      </div>
+
+                      {/* Term Select / Input */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Academic Term *</label>
+                        <select
+                          required
+                          value={marksFormTerm}
+                          onChange={(e) => setMarksFormTerm(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="">-- Choose term --</option>
+                          <option value="Term I">Term I</option>
+                          <option value="Term II">Term II</option>
+                          <option value="Term III">Term III</option>
+                          <option value="Term IV">Term IV</option>
+                          <option value="Mid Term">Mid Term</option>
+                          <option value="Final Term">Final Term</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Grade Reference Selection */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Grade ID Reference *</label>
+                        <select
+                          required
+                          value={marksFormGradeId}
+                          onChange={(e) => setMarksFormGradeId(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="">-- Choose grade reference --</option>
+                          {Array.isArray(dfGrades) && dfGrades.filter(Boolean).map((g: any) => (
+                            <option key={g._id || g.id} value={g._id || g.id}>
+                              {g.grade || g.name || "Unnamed Grade"}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Date selection */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Evaluation Date *</label>
+                        <input
+                          required
+                          type="date"
+                          value={marksFormDate}
+                          onChange={(e) => setMarksFormDate(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                      {/* Created User ID (Optional/Admin) */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Created User ID (Schema payload)</label>
+                        <input
+                          type="text"
+                          placeholder="Current Admin User"
+                          value={marksFormCreatedUserId}
+                          onChange={(e) => setMarksFormCreatedUserId(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-[11px] font-mono focus:outline-none"
+                        />
+                      </div>
+
+                      {/* Modified User ID (Optional/Admin) */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase font-mono">Modified User ID (Schema payload)</label>
+                        <input
+                          type="text"
+                          placeholder="Current Admin User"
+                          value={marksFormModifiedUserId}
+                          onChange={(e) => setMarksFormModifiedUserId(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 text-[11px] font-mono focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="pt-4 flex gap-3 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsMarksModalOpen(false)}
+                        className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition cursor-pointer text-center text-xs"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={marksModalSubmitting}
+                        className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white font-bold rounded-xl transition shadow-sm cursor-pointer flex items-center justify-center gap-2 text-xs"
+                      >
+                        {marksModalSubmitting ? (
+                          <>
+                            <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                            Saving live...
+                          </>
+                        ) : (
+                          "Save Document"
                         )}
                       </button>
                     </div>
