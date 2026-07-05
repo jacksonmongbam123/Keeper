@@ -37,7 +37,8 @@ import {
   Pencil,
   UserPlus,
   Link,
-  Building
+  Building,
+  CreditCard
 } from "lucide-react";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
@@ -547,6 +548,17 @@ export default function App() {
   const [formSex, setFormSex] = useState("Male");
   const [formDob, setFormDob] = useState("2000-01-01");
   const [formAccessLevelId, setFormAccessLevelId] = useState("4");
+
+  // Fees tab state management
+  const [feeStudentID, setFeeStudentID] = useState("");
+  const [feeTerm, setFeeTerm] = useState("1");
+  const [feeYear, setFeeYear] = useState("2026");
+  const [feeStatus, setFeeStatus] = useState("paid");
+  const [feeSubmitting, setFeeSubmitting] = useState(false);
+  const [feeError, setFeeError] = useState("");
+  const [feeSuccess, setFeeSuccess] = useState("");
+  const [feeSubTab, setFeeSubTab] = useState<"add" | "update">("add");
+  const [feeSearchQuery, setFeeSearchQuery] = useState("");
 
   // Role-specific form states
   const [formOccupation, setFormOccupation] = useState("");
@@ -1132,7 +1144,8 @@ export default function App() {
       { id: "users", label: "User Directory", icon: Users },
       { id: "add-user", label: "Register Profile", icon: UserPlus },
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
-      { id: "institutions", label: "Institute Details", icon: Building }
+      { id: "institutions", label: "Institute Details", icon: Building },
+      { id: "fees", label: "Fees Management", icon: CreditCard }
     ] : selectedRole === "student" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "courses", label: "My Curriculum", icon: BookOpen },
@@ -4182,6 +4195,383 @@ export default function App() {
                   <p className="text-xs text-slate-400">Organization details from m_organization collection not found</p>
                 </div>
               )}
+            </div>
+          </div>
+        );
+      }
+
+      // Fees Management Tab
+      if (activeTab === "fees") {
+        const studentsList = (userDirectory || []).filter((u: any) => u && u.role === "student");
+        const filteredStudents = studentsList.filter((u: any) => 
+          u && (
+            (u.name && u.name.toLowerCase().includes(feeSearchQuery.toLowerCase())) || 
+            (u.username && u.username.toLowerCase().includes(feeSearchQuery.toLowerCase())) ||
+            (u._id && u._id.includes(feeSearchQuery)) ||
+            (u.id && u.id.includes(feeSearchQuery))
+          )
+        );
+
+        const handleAddFee = async (e: React.FormEvent) => {
+          e.preventDefault();
+          if (!feeStudentID.trim()) {
+            setFeeError("Please enter or select a Student ID.");
+            return;
+          }
+          setFeeSubmitting(true);
+          setFeeError("");
+          setFeeSuccess("");
+
+          try {
+            const response = await fetch("https://abms-lkw9.onrender.com/class/fee/add", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${loginResult?.data?.token}`
+              },
+              body: JSON.stringify({
+                studentID: feeStudentID.trim(),
+                student_id: feeStudentID.trim(),
+                term: Number(feeTerm),
+                year: Number(feeYear),
+                feeStatus: feeStatus,
+                fee_status: feeStatus
+              })
+            });
+
+            if (!response.ok) {
+              const text = await response.text();
+              throw new Error(text || `Request failed with status ${response.status}`);
+            }
+
+            const data = await response.json();
+            setFeeSuccess(`Fee record created successfully! Reference ID: ${data.createdAttendance?._id || "N/A"}`);
+          } catch (err: any) {
+            setFeeError(err.message || "An error occurred while adding the fee record.");
+          } finally {
+            setFeeSubmitting(false);
+          }
+        };
+
+        const handleUpdateFee = async (e: React.FormEvent) => {
+          e.preventDefault();
+          if (!feeStudentID.trim()) {
+            setFeeError("Please enter or select a Student ID.");
+            return;
+          }
+          setFeeSubmitting(true);
+          setFeeError("");
+          setFeeSuccess("");
+
+          try {
+            const response = await fetch("https://abms-lkw9.onrender.com/class/fee/updateStatus", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${loginResult?.data?.token}`
+              },
+              body: JSON.stringify({
+                studentID: feeStudentID.trim(),
+                student_id: feeStudentID.trim(),
+                term: Number(feeTerm),
+                year: Number(feeYear),
+                feeStatus: feeStatus,
+                fee_status: feeStatus
+              })
+            });
+
+            if (!response.ok) {
+              const text = await response.text();
+              throw new Error(text || `Request failed with status ${response.status}`);
+            }
+
+            const textResponse = await response.text();
+            setFeeSuccess(textResponse || "Fee status updated successfully!");
+          } catch (err: any) {
+            setFeeError(err.message || "An error occurred while updating the fee status.");
+          } finally {
+            setFeeSubmitting(false);
+          }
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-teal-50 flex items-center gap-3">
+                <CreditCard className="h-6 w-6 text-emerald-600" />
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Fees Management</h2>
+                  <p className="text-xs text-slate-500 mt-1">Record student payments and manage outstanding invoices</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column: Student Quick Select Selector */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4 lg:col-span-1">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Student Selector</h3>
+                  <p className="text-[11px] text-slate-500">Search and click a student to pre-fill the form</p>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search student name/ID..."
+                    value={feeSearchQuery}
+                    onChange={(e) => setFeeSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
+                  {filteredStudents.length > 0 ? (
+                    filteredStudents.map((student: any) => {
+                      const studentId = student._id || student.id;
+                      const isSelected = feeStudentID === studentId;
+                      return (
+                        <button
+                          key={studentId}
+                          type="button"
+                          onClick={() => {
+                            setFeeStudentID(studentId);
+                            setFeeSuccess("");
+                            setFeeError("");
+                          }}
+                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                            isSelected
+                              ? "bg-cyan-50 border-cyan-300 ring-2 ring-cyan-100"
+                              : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">{student.name}</p>
+                            <p className="text-[10px] text-slate-500 truncate font-mono mt-0.5">ID: {studentId}</p>
+                          </div>
+                          <span className="text-[9px] font-mono text-slate-400 bg-slate-200/50 px-1.5 py-0.5 rounded uppercase font-semibold shrink-0">
+                            {student.username}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-6 text-slate-400 text-xs">
+                      No students found matching search.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Fees Actions Forms */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 lg:col-span-2 space-y-6">
+                {/* Form type tabs */}
+                <div className="flex border-b border-slate-200">
+                  <button
+                    onClick={() => {
+                      setFeeSubTab("add");
+                      setFeeSuccess("");
+                      setFeeError("");
+                    }}
+                    className={`pb-3 px-4 font-bold text-xs transition-colors relative cursor-pointer ${
+                      feeSubTab === "add"
+                        ? "text-cyan-600 border-b-2 border-cyan-500"
+                        : "text-slate-400 hover:text-slate-600"
+                    }`}
+                  >
+                    Add New Fee Record
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFeeSubTab("update");
+                      setFeeSuccess("");
+                      setFeeError("");
+                    }}
+                    className={`pb-3 px-4 font-bold text-xs transition-colors relative cursor-pointer ${
+                      feeSubTab === "update"
+                        ? "text-cyan-600 border-b-2 border-cyan-500"
+                        : "text-slate-400 hover:text-slate-600"
+                    }`}
+                  >
+                    Update Fee Status
+                  </button>
+                </div>
+
+                {/* Alerts */}
+                {feeSuccess && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Success</p>
+                      <p className="mt-0.5">{feeSuccess}</p>
+                    </div>
+                  </div>
+                )}
+
+                {feeError && (
+                  <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-start gap-2.5">
+                    <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold">Error</p>
+                      <p className="mt-0.5">{feeError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {feeSubTab === "add" ? (
+                  <form onSubmit={handleAddFee} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Student ID (required) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 6a48c7a49d2a94efbfb4d79f"
+                        value={feeStudentID}
+                        onChange={(e) => setFeeStudentID(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        required
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        The unique MongoDB ObjectID or identifier for the student. Select from the list on the left to pre-fill instantly.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Term</label>
+                        <select
+                          value={feeTerm}
+                          onChange={(e) => setFeeTerm(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="1">Term 1</option>
+                          <option value="2">Term 2</option>
+                          <option value="3">Term 3</option>
+                          <option value="4">Term 4</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Year</label>
+                        <input
+                          type="number"
+                          placeholder="2026"
+                          value={feeYear}
+                          onChange={(e) => setFeeYear(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Fee Status</label>
+                        <select
+                          value={feeStatus}
+                          onChange={(e) => setFeeStatus(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="paid">Paid</option>
+                          <option value="unpaid">Unpaid</option>
+                          <option value="pending">Pending</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={feeSubmitting}
+                        className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm shadow-emerald-600/10"
+                      >
+                        {feeSubmitting ? (
+                          <>
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            Creating Fee Record...
+                          </>
+                        ) : (
+                          "Create Fee Record"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleUpdateFee} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 block">
+                        Student ID (required) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 6a48c7a49d2a94efbfb4d79f"
+                        value={feeStudentID}
+                        onChange={(e) => setFeeStudentID(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        required
+                      />
+                      <p className="text-[10px] text-slate-400">
+                        The student identifier for updating. Select from the student selector on the left.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Term</label>
+                        <select
+                          value={feeTerm}
+                          onChange={(e) => setFeeTerm(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="1">Term 1</option>
+                          <option value="2">Term 2</option>
+                          <option value="3">Term 3</option>
+                          <option value="4">Term 4</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">Year</label>
+                        <input
+                          type="number"
+                          placeholder="2026"
+                          value={feeYear}
+                          onChange={(e) => setFeeYear(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-700 block">New Fee Status</label>
+                        <select
+                          value={feeStatus}
+                          onChange={(e) => setFeeStatus(e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                        >
+                          <option value="paid">Paid</option>
+                          <option value="unpaid">Unpaid</option>
+                          <option value="pending">Pending</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={feeSubmitting}
+                        className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-400 text-white font-bold text-xs px-5 py-2.5 rounded-lg flex items-center gap-2 transition-colors cursor-pointer shadow-sm shadow-cyan-600/10"
+                      >
+                        {feeSubmitting ? (
+                          <>
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                            Updating Fee Status...
+                          </>
+                        ) : (
+                          "Update Fee Status"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           </div>
         );
