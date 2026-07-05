@@ -1931,9 +1931,9 @@ export default function App() {
                                           let endpoint = "";
                                           let method = "DELETE";
                                           // Use _id for DB delete (required by backend routes)
-                                          const idParam = u._id;
+                                          const idParam = u._id || u.id;
 
-                                          if (!idParam) {
+                                          if (!idParam || idParam === "undefined" || String(idParam).trim() === "") {
                                             alert(`Cannot delete ${u.name}: missing database ID. Please refresh the user list.`);
                                             return;
                                           }
@@ -2663,7 +2663,11 @@ export default function App() {
                         }
 
                         let endpoint = "";
-                        const idParam = selectedUserToEdit._id || selectedUserToEdit.username;
+                        const idParam = selectedUserToEdit._id || selectedUserToEdit.id || selectedUserToEdit.username;
+
+                        if (!idParam || idParam === "undefined" || String(idParam).trim() === "") {
+                          throw new Error("Invalid user identifier. Please reload and try again.");
+                        }
 
                         if (formRole === "student") {
                           endpoint = `https://abms-lkw9.onrender.com/m/student/update/${idParam}`;
