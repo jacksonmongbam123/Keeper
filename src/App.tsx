@@ -4551,15 +4551,6 @@ export default function App() {
               <div className="flex flex-row items-center gap-1.5 max-w-full overflow-x-auto no-scrollbar pb-1 sm:pb-0 shrink-0">
                 <button
                   type="button"
-                  onClick={handleDownloadStudentTemplate}
-                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-indigo-100 active:scale-95 shrink-0"
-                  title="Download standard template for bulk student upload"
-                >
-                  <FileText className="w-3 h-3 text-indigo-600" />
-                  <span>Download Student Template</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
                     setStudentBulkParsedRows([]);
                     setIsStudentBulkModalOpen(true);
@@ -4568,6 +4559,15 @@ export default function App() {
                 >
                   <Upload className="w-3 h-3 text-cyan-600" />
                   <span>Bulk Upload Students</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadStudentTemplate}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-indigo-100 active:scale-95 shrink-0"
+                  title="Download standard template for bulk student upload"
+                >
+                  <FileText className="w-3 h-3 text-indigo-600" />
+                  <span>Download Student Template</span>
                 </button>
               </div>
             </div>
