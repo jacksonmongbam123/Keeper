@@ -4538,7 +4538,7 @@ export default function App() {
             </div>
 
             {/* Student Bulk Registration Option Box */}
-            <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-5 shadow-sm flex flex-col gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full font-mono uppercase">Bulk student registration</span>
@@ -4548,7 +4548,7 @@ export default function App() {
                   Download our pre-arranged student Excel spreadsheet, fill it with student information & class sections, and upload it back.
                 </p>
               </div>
-              <div className="flex flex-row items-center gap-1.5 max-w-full overflow-x-auto no-scrollbar pb-1 sm:pb-0 shrink-0">
+              <div className="flex flex-row items-center justify-end gap-1.5 max-w-full overflow-x-auto no-scrollbar pb-1 sm:pb-0 w-full">
                 <button
                   type="button"
                   onClick={() => {
