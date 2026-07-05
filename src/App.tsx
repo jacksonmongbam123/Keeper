@@ -67,7 +67,8 @@ const matchStudentFees = (student: any, allRecords: any[], targetYear: string): 
   const sIdAlt = String(student.id || "").trim().toLowerCase();
   const sName = String(student.name || "").trim().toLowerCase();
   const sUsername = String(student.username || "").trim().toLowerCase();
-  const sRegNo = String(student.regNo || "").trim().toLowerCase();
+  const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
+  const sNic = String(student.nic || "").trim().toLowerCase();
 
   return allRecords.filter(r => {
     if (!r) return false;
@@ -79,7 +80,8 @@ const matchStudentFees = (student: any, allRecords: any[], targetYear: string): 
       rId === sIdAlt || 
       rId === sName || 
       rId === sUsername || 
-      rId === sRegNo;
+      rId === sRegNo ||
+      rId === sNic;
 
     const matchesYear = String(r.year || "") === String(targetYear);
 
@@ -433,6 +435,9 @@ export default function App() {
                     passport: s.passport || "",
                     dob: s.dob || "",
                     sex: s.sex || "",
+                    nic: s.nic || "",
+                    reg_no: s.reg_no || "",
+                    regNo: s.reg_no || "",
                     organization_id: orgId
                   });
                 });
@@ -514,7 +519,10 @@ export default function App() {
                   email: s.email || "",
                   passport: s.passport || "",
                   dob: s.dob || "",
-                  sex: s.sex || ""
+                  sex: s.sex || "",
+                  nic: s.nic || "",
+                  reg_no: s.reg_no || "",
+                  regNo: s.reg_no || ""
                 });
               });
             }
@@ -4432,13 +4440,14 @@ export default function App() {
                   {filteredStudents.length > 0 ? (
                     filteredStudents.map((student: any) => {
                       const studentId = student._id || student.id;
-                      const isSelected = feeStudentID === studentId;
+                      const studentIdentifier = student.nic || student.username || studentId;
+                      const isSelected = feeStudentID === studentId || feeStudentID === studentIdentifier;
                       return (
                         <button
                           key={studentId}
                           type="button"
                           onClick={() => {
-                            setFeeStudentID(studentId);
+                            setFeeStudentID(studentIdentifier);
                             setFeeSuccess("");
                             setFeeError("");
                           }}
@@ -4970,9 +4979,10 @@ export default function App() {
               ? "https://abms-lkw9.onrender.com/class/fee/add"
               : "https://abms-lkw9.onrender.com/class/fee/updateStatus";
 
+            const finalStudentId = modalStudent.nic || modalStudent.username || modalStudent._id || modalStudent.id;
             const payload = {
-              studentID: modalStudent._id || modalStudent.id,
-              student_id: modalStudent._id || modalStudent.id,
+              studentID: finalStudentId,
+              student_id: finalStudentId,
               term: Number(modalTerm),
               year: Number(modalYear),
               feeStatus: modalStatus,
