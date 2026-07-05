@@ -61,6 +61,32 @@ const parseTermNumber = (termVal: any): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+const matchStudentFees = (student: any, allRecords: any[], targetYear: string): any[] => {
+  if (!student || !Array.isArray(allRecords)) return [];
+  const sId = String(student._id || "").trim().toLowerCase();
+  const sIdAlt = String(student.id || "").trim().toLowerCase();
+  const sName = String(student.name || "").trim().toLowerCase();
+  const sUsername = String(student.username || "").trim().toLowerCase();
+  const sRegNo = String(student.regNo || "").trim().toLowerCase();
+
+  return allRecords.filter(r => {
+    if (!r) return false;
+    const rId = String(r.student_id || r.studentID || "").trim().toLowerCase();
+    if (!rId) return false;
+
+    const matchesStudent = 
+      rId === sId || 
+      rId === sIdAlt || 
+      rId === sName || 
+      rId === sUsername || 
+      rId === sRegNo;
+
+    const matchesYear = String(r.year || "") === String(targetYear);
+
+    return matchesStudent && matchesYear;
+  });
+};
+
 const ROLE_CONFIGS: Record<
   RoleType,
   {
@@ -4995,11 +5021,7 @@ export default function App() {
         let pendingCohortCount = 0;
 
         filteredStudents.forEach(s => {
-          const sId = s._id || s.id;
-          const sFees = allFeeRecords.filter(r => 
-            (r.student_id === sId || r.studentID === sId) && 
-            String(r.year) === feeViewerYear
-          );
+          const sFees = matchStudentFees(s, allFeeRecords, feeViewerYear);
           
           for (let t = 1; t <= 4; t++) {
             const rec = sFees.find(r => parseTermNumber(r.term) === t);
@@ -5022,11 +5044,7 @@ export default function App() {
         // Apply final status filtering if not "All"
         const finalDisplayedStudents = filteredStudents.filter(student => {
           if (feeViewerStatusFilter === "All") return true;
-          const sId = student._id || student.id;
-          const sFees = allFeeRecords.filter(r => 
-            (r.student_id === sId || r.studentID === sId) && 
-            String(r.year) === feeViewerYear
-          );
+          const sFees = matchStudentFees(student, allFeeRecords, feeViewerYear);
 
           if (feeViewerStatusFilter === "Paid") {
             return sFees.some(r => String(r.fee_status || r.feeStatus || "").toLowerCase() === "paid");
@@ -5188,10 +5206,7 @@ export default function App() {
                     <tbody className="divide-y divide-slate-100 text-xs">
                       {finalDisplayedStudents.map((student) => {
                         const sId = student._id || student.id;
-                        const sFees = allFeeRecords.filter(r => 
-                          (r.student_id === sId || r.studentID === sId) && 
-                          String(r.year) === feeViewerYear
-                        );
+                        const sFees = matchStudentFees(student, allFeeRecords, feeViewerYear);
 
                         const mappingText = getStudentMappingText(sId);
 
