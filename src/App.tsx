@@ -2136,7 +2136,8 @@ export default function App() {
         body: JSON.stringify({
           student_id: selectedUserForMapping._id,
           class_id: selectedClass,
-          section_id: selectedSection
+          section_id: selectedSection || "",
+          reg_date: new Date().toISOString()
         })
       });
       if (res.ok) {
@@ -4878,7 +4879,7 @@ export default function App() {
             const newUserId = resData._id || resData.id || resData.data?._id || `user_${Date.now()}`;
 
             // Handle mappings
-            if (formRole === "student" && selectedClass && selectedSection) {
+            if (formRole === "student" && selectedClass) {
               try {
                 await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
                   method: "POST",
@@ -4886,7 +4887,8 @@ export default function App() {
                   body: JSON.stringify({
                     student_id: newUserId,
                     class_id: selectedClass,
-                    section_id: selectedSection
+                    section_id: selectedSection || "",
+                    reg_date: new Date().toISOString()
                   })
                 });
               } catch (err) {
