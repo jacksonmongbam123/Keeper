@@ -2899,39 +2899,41 @@ export default function App() {
           const totalUsers = userDirectory.length;
           const activeClassesCount = (classSectionsList || []).length;
 
+          const orgName = institutionDetails?.name || adminOrganizationId || "SFS School";
+
           return (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Institutional Welcome banner */}
-              <div className="bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 rounded-3xl p-6 text-white shadow-lg border border-indigo-200/20 relative overflow-hidden">
-                <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute left-1/3 bottom-0 w-48 h-48 bg-cyan-400/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 rounded-2xl p-4 px-5 text-white shadow-md border border-indigo-200/10 relative overflow-hidden">
+                <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute left-1/3 bottom-0 w-36 h-36 bg-cyan-400/10 rounded-full blur-xl pointer-events-none" />
                 
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full text-[10px] font-black tracking-wider uppercase">
-                      <Sparkles className="w-3.5 h-3.5 text-cyan-300 animate-pulse" />
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-white/10 backdrop-blur-md rounded-full text-[9px] font-black tracking-wider uppercase">
+                      <Sparkles className="w-3 h-3 text-cyan-300 animate-pulse" />
                       Administrative Control Center
                     </div>
-                    <h2 className="text-2xl font-black tracking-tight font-sans">
-                      {adminOrganizationId || "SFS School"} Overview
+                    <h2 className="text-lg font-extrabold tracking-tight font-sans">
+                      {orgName} Overview
                     </h2>
-                    <p className="text-xs text-cyan-100 max-w-xl font-medium">
-                      You are in control of the academic directory, registration portals, and data mapping grids. Monitor overall metrics and take quick administrative action below.
+                    <p className="text-[11px] text-cyan-100 max-w-xl font-medium leading-relaxed">
+                      Manage academic directories, configure course registration pathways, and view institutional analytics.
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2.5">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setActiveTab("add-user")}
-                      className="px-4 py-2 bg-white text-indigo-700 hover:bg-cyan-50 text-xs font-bold rounded-xl shadow-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-1.5 font-sans"
+                      className="px-3 py-1.5 bg-white text-indigo-700 hover:bg-cyan-50 text-[11px] font-bold rounded-lg shadow-sm transition-all duration-200 cursor-pointer flex items-center gap-1 font-sans"
                     >
-                      <UserPlus className="w-3.5 h-3.5" />
+                      <UserPlus className="w-3 h-3" />
                       Register Profile
                     </button>
                     <button
                       onClick={() => setIsStudentBulkModalOpen(true)}
-                      className="px-4 py-2 bg-indigo-500/30 hover:bg-indigo-500/40 text-white text-xs font-bold rounded-xl border border-white/10 backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer flex items-center gap-1.5 font-sans"
+                      className="px-3 py-1.5 bg-indigo-500/30 hover:bg-indigo-500/40 text-white text-[11px] font-bold rounded-lg border border-white/10 backdrop-blur-md transition-all duration-200 cursor-pointer flex items-center gap-1 font-sans"
                     >
-                      <Upload className="w-3.5 h-3.5" />
+                      <Upload className="w-3 h-3" />
                       Bulk Import Students
                     </button>
                   </div>
@@ -2939,7 +2941,7 @@ export default function App() {
               </div>
 
               {/* Stats bento grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {[
                   { label: "Overall Students", val: studentCount, desc: "Enrolled active profiles", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50 border-cyan-100/70", tab: "users", filter: "student" },
                   { label: "Faculty Teachers", val: teacherCount, desc: "Assigned course instructors", icon: Users, color: "text-emerald-600 bg-emerald-50 border-emerald-100/70", tab: "users", filter: "instructor" },
@@ -2957,20 +2959,20 @@ export default function App() {
                           setUserTypeFilter(item.filter as any);
                         }
                       }}
-                      className="bg-white border border-slate-200 hover:border-slate-300 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-250 cursor-pointer group flex flex-col justify-between"
+                      className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-3.5 shadow-sm hover:shadow transition-all duration-200 cursor-pointer group flex flex-col justify-between"
                     >
                       <div>
                         <div className="flex justify-between items-start">
-                          <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block font-sans">{item.label}</span>
-                          <div className={`p-2 rounded-2xl border transition-all duration-300 group-hover:scale-110 ${item.color}`}>
-                            <Icon className="w-4 h-4" />
+                          <span className="text-[8px] uppercase font-black text-slate-400 tracking-wider block font-sans">{item.label}</span>
+                          <div className={`p-1.5 rounded-xl border transition-all duration-200 group-hover:scale-105 ${item.color}`}>
+                            <Icon className="w-3.5 h-3.5" />
                           </div>
                         </div>
-                        <p className="text-3xl font-black text-slate-900 mt-3 font-mono tracking-tight">{item.val}</p>
+                        <p className="text-xl font-black text-slate-900 mt-1.5 font-mono tracking-tight">{item.val}</p>
                       </div>
-                      <div className="mt-4 pt-3 border-t border-slate-50 flex items-center justify-between">
-                        <span className="text-[10px] text-slate-500 font-medium block">{item.desc}</span>
-                        <span className="text-[10px] text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+                      <div className="mt-2.5 pt-1.5 border-t border-slate-50 flex items-center justify-between">
+                        <span className="text-[9px] text-slate-400 font-medium block leading-none">{item.desc}</span>
+                        <span className="text-[9px] text-indigo-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 leading-none">
                           View →
                         </span>
                       </div>
@@ -2980,33 +2982,30 @@ export default function App() {
               </div>
 
               {/* Bottom panels: Quick Actions & Live Logs */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                 
                 {/* Visual User Distribution & Shortcuts */}
-                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm lg:col-span-5 flex flex-col justify-between space-y-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm lg:col-span-5 flex flex-col justify-between space-y-3">
                   <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-                      <Activity className="w-3.5 h-3.5 text-cyan-500" />
+                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                      <Activity className="w-3 h-3 text-cyan-500" />
                       Roster Distribution & Metrics
                     </h3>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Visual break-down of system-wide registration volumes
-                    </p>
                   </div>
 
                   {/* Manual visual bars representing the users */}
-                  <div className="space-y-4 py-2">
+                  <div className="space-y-3 py-1">
                     {[
                       { label: "Students", count: studentCount, pct: totalUsers ? (studentCount / totalUsers) * 100 : 0, color: "bg-cyan-500" },
                       { label: "Teachers", count: teacherCount, pct: totalUsers ? (teacherCount / totalUsers) * 100 : 0, color: "bg-emerald-500" },
                       { label: "Parents", count: parentCount, pct: totalUsers ? (parentCount / totalUsers) * 100 : 0, color: "bg-violet-500" }
                     ].map((row, i) => (
-                      <div key={i} className="space-y-1">
-                        <div className="flex justify-between text-xs font-bold text-slate-700">
+                      <div key={i} className="space-y-0.5">
+                        <div className="flex justify-between text-[11px] font-bold text-slate-700">
                           <span>{row.label}</span>
-                          <span className="font-mono text-slate-500">{row.count} ({Math.round(row.pct)}%)</span>
+                          <span className="font-mono text-slate-500 text-[10px]">{row.count} ({Math.round(row.pct)}%)</span>
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                           <div 
                             className={`h-full ${row.color} rounded-full transition-all duration-500`} 
                             style={{ width: `${row.pct}%` }}
@@ -3016,45 +3015,42 @@ export default function App() {
                     ))}
                   </div>
 
-                  <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4 space-y-2">
-                    <span className="text-[9px] uppercase font-black text-slate-400 tracking-wider block">Operational Status</span>
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-xs font-bold text-slate-800">Database Pool Fully Operational</span>
+                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-3 space-y-1">
+                    <span className="text-[8px] uppercase font-black text-slate-400 tracking-wider block">Operational Status</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[11px] font-bold text-slate-800">Operational Gateway</span>
                     </div>
-                    <p className="text-[10px] text-slate-500 font-medium">
-                      Live connection synchronized with active MongoDB & Render endpoint clusters.
+                    <p className="text-[9px] text-slate-400 font-medium">
+                      Direct cloud synchronization active with primary database pool.
                     </p>
                   </div>
                 </div>
 
                 {/* System Activity Log Feed */}
-                <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm lg:col-span-7 flex flex-col justify-between">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm lg:col-span-7 flex flex-col justify-between space-y-3">
                   <div>
-                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-3">
-                      <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                    <h3 className="text-[10px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                      <ClipboardList className="w-3 h-3 text-indigo-500" />
                       Live System Activity Feed
                     </h3>
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Real-time gateway routing and bypass logging
-                    </p>
                   </div>
 
-                  <div className="space-y-2.5 py-4 overflow-y-auto max-h-[220px]">
+                  <div className="space-y-2 py-1 overflow-y-auto max-h-[160px]">
                     {systemLogs.map((log, idx) => (
-                      <div key={idx} className="flex gap-3 text-xs p-2.5 rounded-xl bg-slate-50 border border-slate-100/80 hover:bg-slate-100/50 transition-all font-mono">
+                      <div key={idx} className="flex gap-2 text-[10px] p-2 rounded-lg bg-slate-50 border border-slate-100/60 hover:bg-slate-100/30 transition-all font-mono">
                         <span className="text-slate-400 font-bold shrink-0">{log.timestamp}</span>
                         <div className="space-y-0.5">
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-black tracking-wider uppercase bg-slate-200/80 text-slate-700 border border-slate-300/30">
+                          <span className="inline-block px-1 py-0.2 bg-slate-200/80 text-slate-600 rounded text-[7px] font-black uppercase">
                             {log.event}
                           </span>
-                          <p className="text-slate-600 text-[11px] leading-relaxed mt-1 font-sans font-medium">{log.message}</p>
+                          <p className="text-slate-600 text-[10px] leading-tight font-sans font-medium mt-0.5">{log.message}</p>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-400">
                     <span>Showing latest administrative traces</span>
                     <button 
                       onClick={() => {
@@ -3062,7 +3058,7 @@ export default function App() {
                       }} 
                       className="text-indigo-600 hover:underline font-bold cursor-pointer font-mono"
                     >
-                      Log snapshot printed to console
+                      Console log dump
                     </button>
                   </div>
                 </div>
