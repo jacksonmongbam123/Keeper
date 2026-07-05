@@ -8766,7 +8766,7 @@ export default function App() {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto simple-scrollbar">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider px-3 block mb-2">Portal Services</span>
             {menuItems.map((item) => {
               const Icon = item.icon;
