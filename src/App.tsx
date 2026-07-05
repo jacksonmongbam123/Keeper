@@ -1065,11 +1065,7 @@ export default function App() {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    let successes = 0;
-    let errors = 0;
-    const addedUsersList: any[] = [];
-
-    for (const row of validRows) {
+    const uploadPromises = validRows.map(async (row) => {
       const payload = {
         user_type: "student",
         password: row.rawPassword,
@@ -1191,26 +1187,30 @@ export default function App() {
             access_level_id: "4",
             organization_id: adminOrganizationId
           };
-          addedUsersList.push(newUserObj);
-          successes++;
-          setStudentBulkSuccessCount(successes);
+          setStudentBulkSuccessCount(prev => prev + 1);
+          return newUserObj;
         } else {
-          errors++;
-          setStudentBulkErrorCount(errors);
+          setStudentBulkErrorCount(prev => prev + 1);
+          return null;
         }
       } catch (err) {
         console.error("Bulk upload row error:", err);
-        errors++;
-        setStudentBulkErrorCount(errors);
+        setStudentBulkErrorCount(prev => prev + 1);
+        return null;
       }
-    }
+    });
 
-    if (addedUsersList.length > 0) {
-      setUserDirectoryState(prev => [...prev, ...addedUsersList]);
+    const results = await Promise.all(uploadPromises);
+    const successfulUsers = results.filter((u): u is any => u !== null);
+
+    if (successfulUsers.length > 0) {
+      setUserDirectoryState(prev => [...prev, ...successfulUsers]);
     }
     fetchStudentRelations();
 
     setIsStudentBulkUploading(false);
+    const successes = successfulUsers.length;
+    const errors = validRows.length - successes;
     alert(`Bulk student registration completed! Successes: ${successes}, Failures: ${errors}`);
     if (successes > 0) {
       setIsStudentBulkModalOpen(false);
