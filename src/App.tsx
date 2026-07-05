@@ -28,11 +28,13 @@ import {
   Home,
   Settings,
   Bell,
+  Send,
   ChevronDown,
   Search,
   Database,
   Cpu,
   Clock,
+  AlertCircle,
   UserCog,
   Pencil,
   UserPlus,
@@ -199,6 +201,18 @@ export default function App() {
   const [selectedDfClassSection, setSelectedDfClassSection] = useState<string>("");
   const [isLoadingRelations, setIsLoadingRelations] = useState<boolean>(false);
 
+  // --- Admin Notifications States ---
+  const [notificationsList, setNotificationsList] = useState<any[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState<boolean>(false);
+  const [notificationError, setNotificationError] = useState<string>("");
+  const [notificationSuccessMsg, setNotificationSuccessMsg] = useState<string>("");
+  const [notifTitle, setNotifTitle] = useState<string>("");
+  const [notifMessage, setNotifMessage] = useState<string>("");
+  const [notifTargetType, setNotifTargetType] = useState<string>("all_students");
+  const [notifTargetClassSection, setNotifTargetClassSection] = useState<string>("");
+  const [notifTargetStudentId, setNotifTargetStudentId] = useState<string>("");
+  const [isSubmittingNotification, setIsSubmittingNotification] = useState<boolean>(false);
+
   // --- Student Search and Comprehensive View States ---
   const [parentStudentRelations, setParentStudentRelations] = useState<any[]>([]);
   const [occupationsList, setOccupationsList] = useState<any[]>([]);
@@ -364,6 +378,90 @@ export default function App() {
       setMarksFetchError(err.message || "Network error fetching marks records");
     } finally {
       setIsLoadingMarks(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    setIsLoadingNotifications(true);
+    setNotificationError("");
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch("https://abms-lkw9.onrender.com/m/notification/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotificationsList(Array.isArray(data) ? data.filter(Boolean) : []);
+      } else {
+        const text = await res.text();
+        console.warn("Failed to fetch notifications:", text);
+      }
+    } catch (err: any) {
+      console.warn("Error fetching notifications:", err);
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  const sendNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifTitle.trim() || !notifMessage.trim()) {
+      setNotificationError("Please fill out both the title and message.");
+      return;
+    }
+    setIsSubmittingNotification(true);
+    setNotificationError("");
+    setNotificationSuccessMsg("");
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const payload = {
+        title: notifTitle,
+        message: notifMessage,
+        target_type: notifTargetType,
+        target_class_id: notifTargetType === "class_section" ? notifTargetClassSection : undefined,
+        target_student_id: notifTargetType === "parents_of_student" ? notifTargetStudentId : undefined,
+        sender_id: loginResult?.data?.user?._id || loginResult?.data?.user?.id || "Admin"
+      };
+
+      const res = await fetch("https://abms-lkw9.onrender.com/m/notification/add", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setNotificationSuccessMsg("Notification sent and saved successfully!");
+        setNotifTitle("");
+        setNotifMessage("");
+        setNotifTargetType("all_students");
+        setNotifTargetClassSection("");
+        setNotifTargetStudentId("");
+        fetchNotifications();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setNotificationError(data.message || "Failed to send notification. Please try again.");
+      }
+    } catch (err: any) {
+      console.error("Error sending notification:", err);
+      setNotificationError(err.message || "Network error sending notification.");
+    } finally {
+      setIsSubmittingNotification(false);
     }
   };
 
@@ -1486,6 +1584,13 @@ export default function App() {
     }
   }, [activeTab, loginResult, selectedRole]);
 
+  // Fetch notifications when switching to notifications tab
+  useEffect(() => {
+    if (loginResult?.success && selectedRole === "administrator" && activeTab === "notifications") {
+      fetchNotifications();
+    }
+  }, [activeTab, loginResult, selectedRole]);
+
   // Fetch real database users and merge them on successful administrator login or navigating to users tab
   useEffect(() => {
     if (loginResult?.success && selectedRole === "administrator") {
@@ -2366,7 +2471,8 @@ export default function App() {
       { id: "students-by-grade", label: "Students by Grade & Section", icon: GraduationCap },
       { id: "grade-section-fees", label: "Grade & Section Fee Viewer", icon: CreditCard },
       { id: "marks-management", label: "Marks Management", icon: ClipboardList },
-      { id: "search-students", label: "Student Comprehensive Search", icon: Search },
+      { id: "search-students", label: "Comprehensive Search", icon: Search },
+      { id: "notifications", label: "Notifications Portal", icon: Bell },
       { id: "institutions", label: "Institute Details", icon: Building },
       { id: "fees", label: "Fees Management", icon: CreditCard }
     ] : selectedRole === "student" ? [
@@ -6868,6 +6974,231 @@ export default function App() {
                       </button>
                     </div>
                   </form>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Notifications Portal Tab
+      if (activeTab === "notifications") {
+        const studentsList = (userDirectory || []).filter((u: any) => u && u.role === "student");
+        const safeClassSections = Array.isArray(classSectionsList) ? classSectionsList : [];
+        const safeNotifications = Array.isArray(notificationsList) ? notificationsList : [];
+
+        return (
+          <div className="space-y-6 max-w-6xl animate-in fade-in duration-300">
+            {/* Header */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 rounded-xl border border-indigo-100">
+                    <Bell className="h-6 w-6 text-indigo-600 animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Notifications Portal</h2>
+                    <p className="text-xs text-slate-500 mt-1">Broadcast notifications to students, class sections, parents, or teachers</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Send Notification Form */}
+              <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 self-start">
+                <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <Send className="h-4 w-4 text-indigo-500" />
+                  Compose Broadcast
+                </h3>
+
+                {notificationError && (
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-xl border border-red-100 text-xs flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>{notificationError}</span>
+                  </div>
+                )}
+
+                {notificationSuccessMsg && (
+                  <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 text-xs flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>{notificationSuccessMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={sendNotification} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Recipient Target Group
+                    </label>
+                    <select
+                      value={notifTargetType}
+                      onChange={(e) => {
+                        setNotifTargetType(e.target.value);
+                        setNotifTargetClassSection("");
+                        setNotifTargetStudentId("");
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="all_students">All Students</option>
+                      <option value="class_section">Students in Class Section</option>
+                      <option value="parents_of_student">Parents of Specific Student</option>
+                      <option value="teachers">Teachers</option>
+                    </select>
+                  </div>
+
+                  {notifTargetType === "class_section" && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Select Class & Section
+                      </label>
+                      <select
+                        value={notifTargetClassSection}
+                        onChange={(e) => setNotifTargetClassSection(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        required
+                      >
+                        <option value="">-- Choose Class Section --</option>
+                        {safeClassSections.map((cs) => (
+                          <option key={cs._id} value={cs._id}>
+                            {cs.grade} - {cs.__section || cs.section || ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {notifTargetType === "parents_of_student" && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">
+                        Select Student
+                      </label>
+                      <select
+                        value={notifTargetStudentId}
+                        onChange={(e) => setNotifTargetStudentId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        required
+                      >
+                        <option value="">-- Choose Student --</option>
+                        {studentsList.map((stud) => (
+                          <option key={stud._id || stud.id} value={stud._id || stud.id}>
+                            {stud.name} ({stud.username || stud.email || "No Reg No"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Notification Title
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Exam Schedule Release"
+                      value={notifTitle}
+                      onChange={(e) => setNotifTitle(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">
+                      Message Content
+                    </label>
+                    <textarea
+                      placeholder="Type your announcement details here..."
+                      rows={5}
+                      value={notifMessage}
+                      onChange={(e) => setNotifMessage(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      required
+                    ></textarea>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingNotification}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-white font-semibold py-2 px-4 rounded-xl text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    {isSubmittingNotification ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-3.5 w-3.5" />
+                        Send Broadcast
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* History List */}
+              <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-indigo-500" />
+                    Sent Broadcast History
+                  </h3>
+                  <button
+                    onClick={fetchNotifications}
+                    className="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                    title="Refresh List"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingNotifications ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {isLoadingNotifications ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                    <RefreshCw className="h-8 w-8 animate-spin mb-3 text-indigo-500" />
+                    <p className="text-xs">Retrieving sent notifications...</p>
+                  </div>
+                ) : safeNotifications.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 border border-dashed border-slate-200 rounded-xl">
+                    <Bell className="h-10 w-10 mx-auto mb-3 text-slate-300" />
+                    <p className="text-xs font-semibold">No notifications sent yet</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Fill out the compose form to send your first broadcast.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2">
+                    {safeNotifications.map((notif: any) => {
+                      let targetLabel = "All Students";
+                      if (notif.target_type === "class_section") {
+                        const cs = safeClassSections.find(c => c._id === notif.target_class_id);
+                        targetLabel = cs ? `Class: ${cs.grade} - ${cs.__section || cs.section || ""}` : "Specific Class Section";
+                      } else if (notif.target_type === "parents_of_student") {
+                        const stud = studentsList.find(s => s._id === notif.target_student_id || s.id === notif.target_student_id);
+                        targetLabel = stud ? `Parents of: ${stud.name}` : "Parents of Specific Student";
+                      } else if (notif.target_type === "teachers") {
+                        targetLabel = "All Teachers";
+                      }
+
+                      return (
+                        <div
+                          key={notif._id}
+                          className="p-4 bg-slate-50/50 rounded-xl border border-slate-100 hover:border-slate-200/80 hover:bg-slate-50 transition-all duration-200"
+                        >
+                          <div className="flex items-start justify-between gap-4 mb-2">
+                            <div>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-100/50 mb-1.5">
+                                {targetLabel}
+                              </span>
+                              <h4 className="text-xs font-bold text-slate-900">{notif.title}</h4>
+                            </div>
+                            <span className="text-[9px] text-slate-400 whitespace-nowrap">
+                              {new Date(notif.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{notif.message}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             </div>
