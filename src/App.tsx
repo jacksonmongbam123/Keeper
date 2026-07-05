@@ -4904,6 +4904,16 @@ export default function App() {
                     subject_id: selectedSubject
                   })
                 });
+
+                await fetch("https://abms-lkw9.onrender.com/rel/teacherClass/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    teacher_id: newUserId,
+                    class_id: selectedClass,
+                    start_date: new Date().toISOString()
+                  })
+                });
               } catch (err) {
                 console.error("Teacher mapping error:", err);
               }
