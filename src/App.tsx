@@ -4319,6 +4319,8 @@ export default function App() {
 
             const data = await response.json();
             setFeeSuccess(`Fee record created successfully! Reference ID: ${data.createdAttendance?._id || "N/A"}`);
+            // Refresh live fee list automatically
+            fetchFeeRecords();
           } catch (err: any) {
             setFeeError(err.message || "An error occurred while adding the fee record.");
           } finally {
@@ -4360,6 +4362,8 @@ export default function App() {
 
             const textResponse = await response.text();
             setFeeSuccess(textResponse || "Fee status updated successfully!");
+            // Refresh live fee list automatically
+            fetchFeeRecords();
           } catch (err: any) {
             setFeeError(err.message || "An error occurred while updating the fee status.");
           } finally {
