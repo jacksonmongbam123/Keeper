@@ -2033,6 +2033,154 @@ export default function App() {
     }
   };
 
+  // Attendance History state management (Instructor Portal)
+  const [historyDate, setHistoryDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [historyFilterStatus, setHistoryFilterStatus] = useState<"all" | "present" | "absent" | "unmarked">("all");
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+
+  const fetchAttendanceHistory = async (dateStr: string) => {
+    if (!dateStr) return;
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      if (!token) return;
+
+      const students = (userDirectoryState || []).filter((u: any) => u && u.role === "student");
+      
+      const promises = students.map(async (student: any) => {
+        try {
+          const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/lookup", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              studentID: student.username,
+              date: dateStr
+            })
+          });
+          
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0) {
+              return {
+                studentID: student.username,
+                name: student.name,
+                phone: student.phone || "N/A",
+                attended: data[0].attended,
+                marked: true,
+                _id: data[0]._id
+              };
+            }
+          }
+
+          // Fallback check in absencesList
+          const isAbsentInGlobalList = absencesList.some((abs: any) => {
+            if (!abs || !abs.date || abs.studentID !== student.username) return false;
+            try {
+              const absDateStr = new Date(abs.date).toISOString().split("T")[0];
+              return absDateStr === dateStr;
+            } catch (e) {
+              return false;
+            }
+          });
+
+          if (isAbsentInGlobalList) {
+            return {
+              studentID: student.username,
+              name: student.name,
+              phone: student.phone || "N/A",
+              attended: false,
+              marked: true
+            };
+          }
+
+          return {
+            studentID: student.username,
+            name: student.name,
+            phone: student.phone || "N/A",
+            attended: false,
+            marked: false
+          };
+        } catch (err) {
+          console.error(`Error looking up attendance for ${student.username}:`, err);
+          return {
+            studentID: student.username,
+            name: student.name,
+            phone: student.phone || "N/A",
+            attended: false,
+            marked: false,
+            error: true
+          };
+        }
+      });
+
+      const records = await Promise.all(promises);
+      setHistoryRecords(records);
+    } catch (err: any) {
+      setHistoryError(err.message || "Failed to load attendance history records.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedRole === "instructor" && activeTab === "attendance-history" && userDirectoryState && userDirectoryState.length > 0) {
+      fetchAttendanceHistory(historyDate);
+    }
+  }, [historyDate, activeTab, userDirectoryState, selectedRole]);
+
+  const handleInlineAttendanceMark = async (studentID: string, attended: boolean) => {
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      if (!token) return;
+
+      const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          studentID: studentID,
+          date: historyDate,
+          attended: attended
+        })
+      });
+
+      if (res.ok) {
+        fetchAttendanceHistory(historyDate);
+        
+        fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        })
+          .then(r => r.ok ? r.json() : [])
+          .then(d => {
+            if (Array.isArray(d)) {
+              setAbsencesList(d.filter(Boolean));
+            }
+          })
+          .catch(err => console.error("Could not sync absences list:", err));
+      }
+    } catch (err) {
+      console.error("Error updating attendance inline:", err);
+    }
+  };
+
   // Role-specific form states
   const [formOccupation, setFormOccupation] = useState("");
   const [formMaritalStatus, setFormMaritalStatus] = useState("");
@@ -2645,7 +2793,8 @@ export default function App() {
       { id: "settings", label: "Portal Settings", icon: Settings }
     ] : selectedRole === "instructor" ? [
       { id: "roster", label: "Student Rosters", icon: Users },
-      { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 }
+      { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
+      { id: "attendance-history", label: "Attendance History", icon: Calendar }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -3177,6 +3326,243 @@ export default function App() {
                     <li>The system requires the student's unique Registration Key (<code className="font-mono bg-slate-200/50 px-1 rounded text-slate-700">studentID</code>) as identifier.</li>
                     <li>If attendance has already been logged for a student on a specific date, submitting again will overwrite or append the record accordingly.</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (activeTab === "attendance-history") {
+          // Calculations
+          const totalCount = historyRecords.length;
+          const presentCount = historyRecords.filter(r => r.marked && r.attended).length;
+          const absentCount = historyRecords.filter(r => r.marked && !r.attended).length;
+          const unmarkedCount = historyRecords.filter(r => !r.marked).length;
+          const attendanceRate = totalCount > unmarkedCount 
+            ? ((presentCount / (totalCount - unmarkedCount)) * 100).toFixed(1) 
+            : "0.0";
+
+          // Filtering
+          const filtered = historyRecords.filter(r => {
+            const matchesSearch = r.name.toLowerCase().includes(historySearchQuery.toLowerCase()) || 
+                                  r.studentID.toLowerCase().includes(historySearchQuery.toLowerCase());
+            
+            if (historyFilterStatus === "present") return matchesSearch && r.marked && r.attended;
+            if (historyFilterStatus === "absent") return matchesSearch && r.marked && !r.attended;
+            if (historyFilterStatus === "unmarked") return matchesSearch && !r.marked;
+            return matchesSearch;
+          });
+
+          return (
+            <div className="space-y-6">
+              {/* Header section with Datepicker & Refresh */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-cyan-600" />
+                    Attendance History & Logs
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Select a date to view, manage, and correct records for all active student roster profiles.
+                  </p>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Date:</span>
+                    <input
+                      type="date"
+                      value={historyDate}
+                      onChange={(e) => setHistoryDate(e.target.value)}
+                      className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 font-mono"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => fetchAttendanceHistory(historyDate)}
+                    disabled={historyLoading}
+                    className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 transition flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? "animate-spin" : ""}`} />
+                    Refresh Logs
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Alert */}
+              {historyError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs font-medium">
+                  ⚠️ {historyError}
+                </div>
+              )}
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider block">Total Pupils</span>
+                  <p className="text-2xl font-black text-slate-900 mt-1">{totalCount}</p>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Roster total</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm border-l-4 border-l-emerald-500">
+                  <span className="text-[9px] uppercase font-bold text-emerald-600 tracking-wider block">Present</span>
+                  <p className="text-2xl font-black text-emerald-700 mt-1">{presentCount}</p>
+                  <span className="text-[10px] text-emerald-500 block mt-0.5">Marked present</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm border-l-4 border-l-rose-500">
+                  <span className="text-[9px] uppercase font-bold text-rose-600 tracking-wider block">Absent</span>
+                  <p className="text-2xl font-black text-rose-700 mt-1">{absentCount}</p>
+                  <span className="text-[10px] text-rose-500 block mt-0.5">Marked absent</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm border-l-4 border-l-amber-500">
+                  <span className="text-[9px] uppercase font-bold text-amber-600 tracking-wider block">Not Marked</span>
+                  <p className="text-2xl font-black text-amber-700 mt-1">{unmarkedCount}</p>
+                  <span className="text-[10px] text-amber-500 block mt-0.5">Awaiting logs</span>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm col-span-2 lg:col-span-1 bg-gradient-to-br from-cyan-50/50 to-indigo-50/50">
+                  <span className="text-[9px] uppercase font-bold text-cyan-600 tracking-wider block">Attendance Rate</span>
+                  <p className="text-2xl font-black text-cyan-700 mt-1">{attendanceRate}%</p>
+                  <span className="text-[10px] text-slate-500 block mt-0.5">Of marked students</span>
+                </div>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                {/* Search & Filtering bar */}
+                <div className="flex flex-col sm:flex-row gap-3 justify-between items-stretch sm:items-center">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      placeholder="Search student by name or registration key..."
+                      value={historySearchQuery}
+                      onChange={(e) => setHistorySearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                    />
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-50 border border-slate-200 rounded-xl">
+                    {[
+                      { key: "all", label: "All Logs", count: totalCount, color: "text-slate-700 bg-white border-slate-200" },
+                      { key: "present", label: "Present", count: presentCount, color: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+                      { key: "absent", label: "Absent Only", count: absentCount, color: "text-rose-700 bg-rose-50 border-rose-200" },
+                      { key: "unmarked", label: "Unmarked", count: unmarkedCount, color: "text-amber-700 bg-amber-50 border-amber-200" }
+                    ].map((pill) => {
+                      const isActive = historyFilterStatus === pill.key;
+                      return (
+                        <button
+                          key={pill.key}
+                          onClick={() => setHistoryFilterStatus(pill.key as any)}
+                          className={`px-3 py-1.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                            isActive
+                              ? `${pill.color} shadow-sm font-extrabold scale-102`
+                              : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                          }`}
+                        >
+                          {pill.label} ({pill.count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Table list */}
+                <div className="border border-slate-100 rounded-xl overflow-hidden">
+                  {historyLoading ? (
+                    <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+                      <RefreshCw className="w-6 h-6 animate-spin text-cyan-600" />
+                      <p className="text-xs font-medium animate-pulse">Retrieving and syncing database attendance records...</p>
+                    </div>
+                  ) : filtered.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse text-left">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-[9px] font-mono uppercase text-slate-400 font-black">
+                            <th className="p-3 pl-5">Student / Registration Key</th>
+                            <th className="p-3">Mobile Contact</th>
+                            <th className="p-3">Current Status</th>
+                            <th className="p-3 pr-5 text-right">Quick Database Modification</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-xs">
+                          {filtered.map((record) => {
+                            return (
+                              <tr key={record.studentID} className="hover:bg-slate-50/30 transition-colors">
+                                <td className="p-3 pl-5">
+                                  <div className="font-bold text-slate-900">{record.name}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">{record.studentID}</div>
+                                </td>
+                                <td className="p-3 font-mono text-slate-500 text-[11px]">
+                                  {record.phone}
+                                </td>
+                                <td className="p-3">
+                                  {record.marked ? (
+                                    record.attended ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        PRESENT
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                        ABSENT
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                      NOT MARKED
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-3 pr-5 text-right">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {/* Mark present button */}
+                                    <button
+                                      onClick={() => handleInlineAttendanceMark(record.studentID, true)}
+                                      disabled={record.marked && record.attended}
+                                      title="Mark Present"
+                                      className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                                        record.marked && record.attended
+                                          ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
+                                          : "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                                      }`}
+                                    >
+                                      ✓ Present
+                                    </button>
+
+                                    {/* Mark absent button */}
+                                    <button
+                                      onClick={() => handleInlineAttendanceMark(record.studentID, false)}
+                                      disabled={record.marked && !record.attended}
+                                      title="Mark Absent"
+                                      className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
+                                        record.marked && !record.attended
+                                          ? "bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed"
+                                          : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                                      }`}
+                                    >
+                                      ✗ Absent
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 space-y-2">
+                      <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-semibold">No attendance log entries match the current query criteria.</p>
+                      <p className="text-[10px] text-slate-400">Try choosing a different date or clearing the status filter.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
