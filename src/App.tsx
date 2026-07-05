@@ -43,6 +43,24 @@ import {
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
+const parseTermNumber = (termVal: any): number => {
+  if (termVal === undefined || termVal === null) return 0;
+  const str = String(termVal).trim().toLowerCase();
+  
+  if (str === "i" || str === "term i" || str === "term_i" || str === "term-i") return 1;
+  if (str === "ii" || str === "term ii" || str === "term_ii" || str === "term-ii") return 2;
+  if (str === "iii" || str === "term iii" || str === "term_iii" || str === "term-iii") return 3;
+  if (str === "iv" || str === "term iv" || str === "term_iv" || str === "term-iv") return 4;
+  
+  const numMatch = str.match(/\d+/);
+  if (numMatch) {
+    return parseInt(numMatch[0], 10);
+  }
+  
+  const parsed = parseInt(str, 10);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 const ROLE_CONFIGS: Record<
   RoleType,
   {
@@ -4960,7 +4978,7 @@ export default function App() {
 
         // Helper to find term status
         const getTermStatusObj = (studentFees: any[], termNum: number) => {
-          const record = studentFees.find(r => Number(r.term) === termNum);
+          const record = studentFees.find(r => parseTermNumber(r.term) === termNum);
           if (!record) return { status: "no_record", record: null };
           const status = String(record.fee_status || record.feeStatus || "unpaid").toLowerCase();
           return { status, record };
@@ -4980,7 +4998,7 @@ export default function App() {
           );
           
           for (let t = 1; t <= 4; t++) {
-            const rec = sFees.find(r => Number(r.term) === t);
+            const rec = sFees.find(r => parseTermNumber(r.term) === t);
             if (rec) {
               const st = String(rec.fee_status || rec.feeStatus || "unpaid").toLowerCase();
               if (st === "paid") paidCohortCount++;
