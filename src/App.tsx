@@ -283,6 +283,14 @@ export default function App() {
   const [bulkUploadLog, setBulkUploadLog] = useState<string[]>([]);
   const [bulkUploadFileError, setBulkUploadFileError] = useState<string>("");
 
+  // Student Bulk Upload States
+  const [isStudentBulkModalOpen, setIsStudentBulkModalOpen] = useState<boolean>(false);
+  const [studentBulkParsedRows, setStudentBulkParsedRows] = useState<any[]>([]);
+  const [isStudentBulkUploading, setIsStudentBulkUploading] = useState<boolean>(false);
+  const [studentBulkSuccessCount, setStudentBulkSuccessCount] = useState<number>(0);
+  const [studentBulkErrorCount, setStudentBulkErrorCount] = useState<number>(0);
+  const [studentBulkFileError, setStudentBulkFileError] = useState<string>("");
+
   const fetchFeeRecords = async () => {
     setIsLoadingFees(true);
     setFeesFetchError("");
@@ -815,6 +823,391 @@ export default function App() {
 
     setIsBulkUploading(false);
     fetchMarks();
+  };
+
+  const handleDownloadStudentTemplate = () => {
+    const sampleData = [
+      {
+        "System ID / Username (NIC)": "STU99001",
+        "First Name": "John",
+        "Middle Name (Optional)": "Robert",
+        "Last Name": "Doe",
+        "Mobile Phone": "0771234567",
+        "Email (Optional)": "johndoe@example.com",
+        "Password (Optional)": "demoPassword123",
+        "Biological Sex (Male/Female/Other)": "Male",
+        "Date of Birth (YYYY-MM-DD)": "2010-05-15",
+        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A"
+      },
+      {
+        "System ID / Username (NIC)": "STU99002",
+        "First Name": "Sarah",
+        "Middle Name (Optional)": "",
+        "Last Name": "Connor",
+        "Mobile Phone": "0777654321",
+        "Email (Optional)": "sarah@example.com",
+        "Password (Optional)": "demoPassword123",
+        "Biological Sex (Male/Female/Other)": "Female",
+        "Date of Birth (YYYY-MM-DD)": "2011-09-20",
+        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A"
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Student_Registration_Template");
+
+    // Add another sheet listing active class sections as reference helper!
+    const activeSections = (classSectionsList || []).map((cs: any) => ({
+      "Class Section (Excel input format)": `${cs.grade} - ${cs.__section || cs.section || ""}`,
+      "Grade ID": cs.grade || "",
+      "Section": cs.__section || cs.section || ""
+    }));
+
+    const refWorksheet = XLSX.utils.json_to_sheet(activeSections.length > 0 ? activeSections : [{ "Class Section (Excel input format)": "No active classes found" }]);
+    XLSX.utils.book_append_sheet(workbook, refWorksheet, "Class_Sections_Guide");
+
+    // Auto-fit column widths
+    const fitToColumn = (dataList: any[]) => {
+      const keys = Object.keys(dataList[0] || {});
+      return keys.map(key => ({
+        wch: Math.max(
+          key.length,
+          ...dataList.map(row => String(row[key] || "").length)
+        ) + 4
+      }));
+    };
+    worksheet["!cols"] = fitToColumn(sampleData);
+    if (activeSections.length > 0) {
+      refWorksheet["!cols"] = fitToColumn(activeSections);
+    }
+
+    XLSX.writeFile(workbook, "Student_Bulk_Registration_Template.xlsx");
+  };
+
+  const handleStudentBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStudentBulkFileError("");
+    setStudentBulkParsedRows([]);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawRows = XLSX.utils.sheet_to_json(ws);
+
+        if (!Array.isArray(rawRows) || rawRows.length === 0) {
+          setStudentBulkFileError("No valid rows found in the uploaded file.");
+          return;
+        }
+
+        const parsedList = rawRows.map((row: any, index: number) => {
+          const rowNum = index + 2;
+
+          const getVal = (possibleKeys: string[]) => {
+            for (const key of possibleKeys) {
+              const foundKey = Object.keys(row).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === key.toLowerCase().replace(/[^a-z0-9]/g, ""));
+              if (foundKey) return row[foundKey];
+            }
+            return "";
+          };
+
+          const rawUsername = String(getVal(["systemidusernamenic", "systemid", "username", "nic", "studentid"]) || "").trim();
+          const rawFirstName = String(getVal(["firstname", "first_name", "first"]) || "").trim();
+          const rawMiddleName = String(getVal(["middlenameoptional", "middlename", "middle"]) || "").trim();
+          const rawLastName = String(getVal(["lastname", "last_name", "last"]) || "").trim();
+          const rawPhone = String(getVal(["mobilephone", "phone", "mobile", "phonenumber"]) || "").trim();
+          const rawEmail = String(getVal(["emailoptional", "email"]) || "").trim();
+          const rawPassword = String(getVal(["passwordoptional", "password"]) || "demoPassword123").trim();
+          const rawSex = String(getVal(["biologicalsexmalefemaleother", "biologicalsex", "sex", "gender"]) || "Male").trim();
+          const rawDob = String(getVal(["dateofbirthyyyymmdd", "dateofbirth", "dob"]) || "").trim();
+          const rawClassSection = String(getVal(["classsectioneggrade1sectiona", "classsection", "class", "section"]) || "").trim();
+
+          const rowErrorLogs: string[] = [];
+
+          // Validation
+          if (!rawUsername) {
+            rowErrorLogs.push("System ID / Username is missing.");
+          } else {
+            const userExists = userDirectoryState.some(u => u && String(u.username || "").toLowerCase() === rawUsername.toLowerCase());
+            if (userExists) {
+              rowErrorLogs.push(`System ID '${rawUsername}' already exists in the directory.`);
+            }
+          }
+
+          if (!rawFirstName) {
+            rowErrorLogs.push("First Name is missing.");
+          }
+          if (!rawLastName) {
+            rowErrorLogs.push("Last Name is missing.");
+          }
+          if (!rawPhone) {
+            rowErrorLogs.push("Mobile Phone is missing.");
+          }
+
+          // Resolve class section
+          let resolvedClassId = "";
+          let resolvedClassText = "Unresolved";
+          let resolvedSection = "";
+          if (!rawClassSection) {
+            rowErrorLogs.push("Class Section is missing.");
+          } else {
+            const classObj = (classSectionsList || []).find((cs: any) => {
+              if (!cs) return false;
+              const cleanVal = rawClassSection.toLowerCase();
+              const label = `${cs.grade} - ${cs.__section || cs.section || ""}`.toLowerCase();
+              return label === cleanVal || 
+                     label.includes(cleanVal) || 
+                     cleanVal.includes(label) || 
+                     String(cs.grade || "").toLowerCase() === cleanVal ||
+                     cs._id === rawClassSection;
+            });
+            if (classObj) {
+              resolvedClassId = classObj._id || classObj.id;
+              resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+              resolvedSection = classObj.__section || classObj.section || "";
+            } else {
+              rowErrorLogs.push(`Class Section '${rawClassSection}' not found.`);
+            }
+          }
+
+          // Format sex
+          let formattedSex = "Male";
+          if (rawSex) {
+            const cleanSex = rawSex.toLowerCase();
+            if (cleanSex.startsWith("f")) formattedSex = "Female";
+            else if (cleanSex.startsWith("m")) formattedSex = "Male";
+            else formattedSex = "Other";
+          }
+
+          // Format date of birth
+          let resolvedDob = "2010-01-01";
+          if (rawDob) {
+            try {
+              let dateParsed = new Date(rawDob);
+              if (isNaN(dateParsed.getTime()) && !isNaN(Number(rawDob))) {
+                const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                excelEpoch.setDate(excelEpoch.getDate() + Number(rawDob));
+                dateParsed = excelEpoch;
+              }
+              if (!isNaN(dateParsed.getTime())) {
+                resolvedDob = dateParsed.toISOString().split("T")[0];
+              } else {
+                rowErrorLogs.push(`Invalid birth date format: ${rawDob}.`);
+              }
+            } catch (e) {
+              rowErrorLogs.push(`Error parsing birth date: ${rawDob}.`);
+            }
+          } else {
+            rowErrorLogs.push("Date of birth is missing.");
+          }
+
+          return {
+            rowNumber: rowNum,
+            rawUsername,
+            rawFirstName,
+            rawMiddleName,
+            rawLastName,
+            rawPhone,
+            rawEmail: rawEmail || `${rawUsername.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`,
+            rawPassword,
+            rawSex: formattedSex,
+            rawDob: resolvedDob,
+            rawClassSection,
+
+            resolvedClassId,
+            resolvedClassText,
+            resolvedSection,
+
+            errors: rowErrorLogs,
+            isValid: rowErrorLogs.length === 0
+          };
+        });
+
+        setStudentBulkParsedRows(parsedList);
+      } catch (err: any) {
+        console.error("Error reading file:", err);
+        setStudentBulkFileError(err.message || "Failed to parse excel file. Ensure it is a valid .xlsx file.");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmStudentBulkUpload = async () => {
+    const validRows = studentBulkParsedRows.filter(r => r.isValid);
+    if (validRows.length === 0) {
+      alert("No valid rows to upload. Please correct errors and try again.");
+      return;
+    }
+
+    setIsStudentBulkUploading(true);
+    setStudentBulkSuccessCount(0);
+    setStudentBulkErrorCount(0);
+
+    const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    let successes = 0;
+    let errors = 0;
+    const addedUsersList: any[] = [];
+
+    for (const row of validRows) {
+      const payload = {
+        user_type: "student",
+        password: row.rawPassword,
+        first_name: row.rawFirstName,
+        middle_name: row.rawMiddleName,
+        last_name: row.rawLastName,
+        nic: row.rawUsername,
+        email: row.rawEmail,
+        phone: row.rawPhone,
+        passport: "None",
+        sex: row.rawSex,
+        dob: row.rawDob,
+        reg_no: row.rawUsername,
+        reg_date: new Date().toISOString(),
+        end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        title_id: "Mr",
+        title: "Mr",
+        user_type_id: "student",
+        access_level_id: 4,
+        organization_id: adminOrganizationId,
+        is_active: true
+      };
+
+      try {
+        let requestSuccess = false;
+        let resData: any = {};
+
+        const response = await fetch("https://abms-lkw9.onrender.com/m/student/add", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload)
+        });
+
+        const resText = await response.text();
+        try {
+          resData = JSON.parse(resText);
+        } catch (e) {
+          resData = { rawResponse: resText };
+        }
+
+        if (response.ok) {
+          requestSuccess = true;
+        } else {
+          // Fallback registration endpoint
+          const fallbackPayload = {
+            user_type_id: "student",
+            nic: row.rawUsername,
+            password: row.rawPassword,
+            email: row.rawEmail,
+            passport: "None",
+            title_id: "Mr",
+            title: "Mr",
+            reg_no: row.rawUsername,
+            first_name: row.rawFirstName,
+            middle_name: row.rawMiddleName,
+            last_name: row.rawLastName,
+            sex: row.rawSex,
+            dob: row.rawDob,
+            phone: row.rawPhone,
+            access_level_id: 4,
+            organization_id: adminOrganizationId
+          };
+
+          const fallbackResponse = await fetch("https://abms-lkw9.onrender.com/df/register/add", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(fallbackPayload)
+          });
+          
+          const fbText = await fallbackResponse.text();
+          try {
+            resData = JSON.parse(fbText);
+          } catch (e) {
+            resData = { rawResponse: fbText };
+          }
+          if (fallbackResponse.ok) {
+            requestSuccess = true;
+          }
+        }
+
+        if (requestSuccess) {
+          const newUserId = resData._id || resData.id || resData.data?._id || `user_${Date.now()}`;
+
+          // Relational Student-Class mapping
+          try {
+            await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                student_id: newUserId,
+                class_id: row.resolvedClassId,
+                section_id: row.resolvedSection
+              })
+            });
+          } catch (mapErr) {
+            console.error("Bulk Student Mapping err:", mapErr);
+          }
+
+          // Build local state object
+          const newUserObj = {
+            _id: newUserId,
+            username: row.rawUsername,
+            name: `${row.rawFirstName} ${row.rawMiddleName ? row.rawMiddleName + " " : ""}${row.rawLastName}`,
+            role: "student",
+            phone: row.rawPhone,
+            status: "Active",
+            first_name: row.rawFirstName,
+            middle_name: row.rawMiddleName,
+            last_name: row.rawLastName,
+            email: row.rawEmail,
+            password: row.rawPassword,
+            passport: "None",
+            title_id: "Mr",
+            sex: row.rawSex,
+            dob: row.rawDob,
+            access_level_id: "4",
+            organization_id: adminOrganizationId
+          };
+          addedUsersList.push(newUserObj);
+          successes++;
+          setStudentBulkSuccessCount(successes);
+        } else {
+          errors++;
+          setStudentBulkErrorCount(errors);
+        }
+      } catch (err) {
+        console.error("Bulk upload row error:", err);
+        errors++;
+        setStudentBulkErrorCount(errors);
+      }
+    }
+
+    if (addedUsersList.length > 0) {
+      setUserDirectoryState(prev => [...prev, ...addedUsersList]);
+    }
+    fetchStudentRelations();
+
+    setIsStudentBulkUploading(false);
+    alert(`Bulk student registration completed! Successes: ${successes}, Failures: ${errors}`);
+    if (successes > 0) {
+      setIsStudentBulkModalOpen(false);
+      setStudentBulkParsedRows([]);
+    }
   };
 
   const fetchDfGradesAndSections = async () => {
@@ -4144,6 +4537,41 @@ export default function App() {
               </div>
             </div>
 
+            {/* Student Bulk Registration Option Box */}
+            <div className="bg-slate-50 border border-slate-200/60 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full font-mono uppercase">Bulk student registration</span>
+                </div>
+                <h4 className="text-xs font-bold text-slate-800">Add Students in Bulk using Excel Spreadsheet</h4>
+                <p className="text-[11px] text-slate-500">
+                  Download our pre-arranged student Excel spreadsheet, fill it with student information & class sections, and upload it back.
+                </p>
+              </div>
+              <div className="flex flex-row items-center gap-1.5 max-w-full overflow-x-auto no-scrollbar pb-1 sm:pb-0 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDownloadStudentTemplate}
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-indigo-100 active:scale-95 shrink-0"
+                  title="Download standard template for bulk student upload"
+                >
+                  <FileText className="w-3 h-3 text-indigo-600" />
+                  <span>Download Student Template</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStudentBulkParsedRows([]);
+                    setIsStudentBulkModalOpen(true);
+                  }}
+                  className="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-cyan-100 active:scale-95 shrink-0"
+                >
+                  <Upload className="w-3 h-3 text-cyan-600" />
+                  <span>Bulk Upload Students</span>
+                </button>
+              </div>
+            </div>
+
             {crudError && (
               <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-xs text-red-800 font-bold">
                 ⚠️ {crudError}
@@ -6792,6 +7220,191 @@ export default function App() {
                       >
                         <Upload className="w-3.5 h-3.5" />
                         <span>Confirm Import ({bulkParsedRows.filter(r => r.isValid).length} Rows)</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Centered Modal Overlay for Excel Student Bulk Uploading */}
+            {isStudentBulkModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/45 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-4xl w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+                  {/* Modal Header */}
+                  <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50/50 to-indigo-50/50 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <Upload className="w-4 h-4 text-cyan-500" />
+                        Excel Bulk Students Importer
+                      </h3>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Upload your student spreadsheet to map, validate, and bulk register academic student profiles with Class Sections
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => !isStudentBulkUploading && setIsStudentBulkModalOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 text-lg font-bold p-1 cursor-pointer disabled:opacity-50"
+                      disabled={isStudentBulkUploading}
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                    {/* Drag & Drop Upload Area */}
+                    {!isStudentBulkUploading && studentBulkParsedRows.length === 0 && (
+                      <div className="border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-indigo-50/5 p-8 rounded-2xl text-center transition-all relative">
+                        <input
+                          type="file"
+                          accept=".xlsx, .xls, .csv"
+                          onChange={handleStudentBulkFileChange}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <Upload className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                        <h4 className="text-xs font-bold text-slate-800">Drag & Drop Excel Student File Here</h4>
+                        <p className="text-[10px] text-slate-400 mt-1">Accepts standard .xlsx and .xls student rosters</p>
+                        <button
+                          type="button"
+                          className="mt-3 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-bold font-mono"
+                        >
+                          Browse Files
+                        </button>
+                      </div>
+                    )}
+
+                    {studentBulkFileError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl font-medium font-mono">
+                        ⚠️ {studentBulkFileError}
+                      </div>
+                    )}
+
+                    {/* Parse Stats and Grid Table */}
+                    {studentBulkParsedRows.length > 0 && (
+                      <div className="space-y-4">
+                        {/* Summary Stats */}
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-slate-50 border border-slate-200/60 p-3 rounded-2xl text-center">
+                            <span className="block text-[10px] text-slate-400 uppercase font-black tracking-wider">Total Parsed</span>
+                            <span className="text-lg font-black text-slate-800 font-mono">{studentBulkParsedRows.length}</span>
+                          </div>
+                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-2xl text-center">
+                            <span className="block text-[10px] text-emerald-500 uppercase font-black tracking-wider">Ready to Register</span>
+                            <span className="text-lg font-black text-emerald-700 font-mono">
+                              {studentBulkParsedRows.filter(r => r.isValid).length}
+                            </span>
+                          </div>
+                          <div className="bg-rose-50 border border-rose-100 p-3 rounded-2xl text-center">
+                            <span className="block text-[10px] text-rose-500 uppercase font-black tracking-wider">Errors Found</span>
+                            <span className="text-lg font-black text-rose-700 font-mono">
+                              {studentBulkParsedRows.filter(r => !r.isValid).length}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* List Preview Table */}
+                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                          <div className="overflow-x-auto max-h-[300px] overflow-y-auto font-sans">
+                            <table className="w-full text-left text-xs divide-y divide-slate-100">
+                              <thead className="bg-slate-50 sticky top-0 z-10 text-[10px] uppercase font-black text-slate-400 font-mono">
+                                <tr>
+                                  <th className="p-3 pl-4">Row</th>
+                                  <th className="p-3">System ID (NIC)</th>
+                                  <th className="p-3">Full Name</th>
+                                  <th className="p-3">Phone & Email</th>
+                                  <th className="p-3">Resolved Class Section</th>
+                                  <th className="p-3 pr-4 text-center">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {studentBulkParsedRows.map((row) => (
+                                  <tr key={row.rowNumber} className={`hover:bg-slate-50/50 ${!row.isValid ? "bg-rose-50/10" : ""}`}>
+                                    <td className="p-3 pl-4 font-mono font-bold text-slate-400">
+                                      #{row.rowNumber}
+                                    </td>
+                                    <td className="p-3 font-mono font-bold text-slate-700">
+                                      {row.rawUsername || <span className="text-rose-400 italic">None</span>}
+                                    </td>
+                                    <td className="p-3 font-medium text-slate-800 text-left">
+                                      {row.rawFirstName} {row.rawMiddleName ? row.rawMiddleName + " " : ""}{row.rawLastName}
+                                      <div className="text-[9px] text-slate-400 font-semibold">{row.rawSex} (DOB: {row.rawDob})</div>
+                                    </td>
+                                    <td className="p-3 text-left">
+                                      <div className="text-slate-700 font-medium">{row.rawPhone}</div>
+                                      <div className="text-[9px] text-slate-400 font-mono">{row.rawEmail}</div>
+                                    </td>
+                                    <td className="p-3 text-left">
+                                      <div className="font-semibold text-slate-700">{row.resolvedClassText}</div>
+                                      <div className="text-[9px] text-slate-400 font-semibold">Source: "{row.rawClassSection}"</div>
+                                    </td>
+                                    <td className="p-3 pr-4 text-center">
+                                      {row.isValid ? (
+                                        <span className="inline-flex items-center bg-emerald-50 text-emerald-700 font-black px-2.5 py-1 rounded-full text-[10px] font-mono border border-emerald-100">
+                                          ✓ Valid
+                                        </span>
+                                      ) : (
+                                        <div className="text-left min-w-[150px] space-y-1">
+                                          <span className="inline-flex items-center bg-rose-50 text-rose-700 font-black px-2 py-0.5 rounded text-[9px] border border-rose-100 font-mono">
+                                            ⚠️ Blocked
+                                          </span>
+                                          {row.errors.map((err: string, i: number) => (
+                                            <p key={i} className="text-[8px] leading-tight text-rose-500 font-medium font-mono">
+                                              • {err}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Progress feedback bar during uploads */}
+                    {isStudentBulkUploading && (
+                      <div className="space-y-3 bg-slate-900 text-slate-200 p-4 rounded-2xl border border-slate-800 shadow-inner">
+                        <div className="flex items-center justify-between text-xs font-mono font-bold">
+                          <span>Registering: {studentBulkSuccessCount + studentBulkErrorCount} / {studentBulkParsedRows.filter(r => r.isValid).length}</span>
+                          <span className="text-cyan-400 animate-pulse">Running Database Transactions...</span>
+                        </div>
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden font-sans">
+                          <div
+                            className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 transition-all duration-300"
+                            style={{
+                              width: `${(studentBulkParsedRows.filter(r => r.isValid).length > 0) ? ((studentBulkSuccessCount + studentBulkErrorCount) / studentBulkParsedRows.filter(r => r.isValid).length) * 100 : 0}%`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 font-sans">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStudentBulkParsedRows([]);
+                        setIsStudentBulkModalOpen(false);
+                      }}
+                      className="px-4 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition disabled:opacity-50 active:scale-95 cursor-pointer font-mono"
+                      disabled={isStudentBulkUploading}
+                    >
+                      {studentBulkParsedRows.length > 0 && !isStudentBulkUploading ? "Reset Sheet" : "Close"}
+                    </button>
+                    {studentBulkParsedRows.length > 0 && !isStudentBulkUploading && (
+                      <button
+                        type="button"
+                        onClick={handleConfirmStudentBulkUpload}
+                        disabled={studentBulkParsedRows.filter(r => r.isValid).length === 0}
+                        className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer flex items-center gap-1.5 font-mono"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Confirm Register ({studentBulkParsedRows.filter(r => r.isValid).length} Students)</span>
                       </button>
                     )}
                   </div>
