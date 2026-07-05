@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Custom utility to hide scrollbars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
 /* Custom utility for simple, thin scrollbars */
 .simple-scrollbar::-webkit-scrollbar {
   width: 5px;

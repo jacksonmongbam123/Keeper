@@ -222,6 +222,7 @@ export default function App() {
   const [edQualifications, setEdQualifications] = useState<any[]>([]);
   const [edSpecialities, setEdSpecialities] = useState<any[]>([]);
   const [maritalStatusesList, setMaritalStatusesList] = useState<any[]>([]);
+  const [teacherGradesList, setTeacherGradesList] = useState<any[]>([]);
   const [searchRoleFilter, setSearchRoleFilter] = useState<string>("all");
   const [isLoadingSearchDetails, setIsLoadingSearchDetails] = useState<boolean>(false);
   const [searchStudentSelectedId, setSearchStudentSelectedId] = useState<string>("");
@@ -563,6 +564,17 @@ export default function App() {
       if (maritalRes.ok) {
         const data = await maritalRes.json();
         setMaritalStatusesList(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch teacher grades
+      const gradeRes = await fetch("https://abms-lkw9.onrender.com/df/teacherGrade/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (gradeRes.ok) {
+        const data = await gradeRes.json();
+        setTeacherGradesList(Array.isArray(data) ? data.filter(Boolean) : []);
       }
     } catch (err) {
       console.warn("Error fetching student search details:", err);
@@ -1900,6 +1912,7 @@ export default function App() {
   const [parentFilterSection, setParentFilterSection] = useState("");
   const [formQualification, setFormQualification] = useState("");
   const [formSpecialization, setFormSpecialization] = useState("");
+  const [formTeacherGrade, setFormTeacherGrade] = useState("");
 
   // Sync default access levels with selected role to prevent posting "1" by default
   useEffect(() => {
@@ -1941,6 +1954,7 @@ export default function App() {
     setParentFilterSection("");
     setFormQualification("");
     setFormSpecialization("");
+    setFormTeacherGrade("");
     setSelectedClass("");
     setSelectedSection("");
     setSelectedSubject("");
@@ -4754,7 +4768,7 @@ export default function App() {
                 user_type_id: "teacher",
                 access_level_id: parseInt(access_level_id) || 5,
                 organization_id: adminOrganizationId,
-                teacher_grade_id: formQualification || "None",
+                teacher_grade_id: formTeacherGrade || "None",
                 specialization: formSpecialization || "None",
                 marital_status_id: formMaritalStatus || "None",
                 is_active: true
@@ -5374,7 +5388,7 @@ export default function App() {
                             <p className="text-[11px] text-emerald-700">Set professional qualifications and assign class/subject teaching scope.</p>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="space-y-1.5">
                               <label className="text-xs font-bold text-slate-700">Educational Qualification <span className="text-red-500">*</span></label>
                               <select
@@ -5406,6 +5420,21 @@ export default function App() {
                             </div>
 
                             <div className="space-y-1.5">
+                              <label className="text-xs font-bold text-slate-700">Teacher Grade <span className="text-red-500">*</span></label>
+                              <select
+                                value={formTeacherGrade}
+                                onChange={(e) => setFormTeacherGrade(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                              >
+                                <option value="">-- Choose Teacher Grade --</option>
+                                {teacherGradesList.map((g: any) => (
+                                  <option key={g._id || g.id} value={g._id || g.id}>{g.level || g.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5">
                               <label className="text-xs font-bold text-slate-700">Marital Status <span className="text-red-500">*</span></label>
                               <select
                                 value={formMaritalStatus}
@@ -5415,7 +5444,7 @@ export default function App() {
                               >
                                 <option value="">-- Choose Marital Status --</option>
                                 {maritalStatusesList.map((m: any) => (
-                                  <option key={m._id || m.id} value={m._id || m.id || m.status}>{m.status}</option>
+                                  <option key={m._id || m.id} value={m.status}>{m.status}</option>
                                 ))}
                               </select>
                             </div>
@@ -8766,7 +8795,7 @@ export default function App() {
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto simple-scrollbar">
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
             <span className="text-[9px] uppercase font-bold text-slate-500 tracking-wider px-3 block mb-2">Portal Services</span>
             {menuItems.map((item) => {
               const Icon = item.icon;
