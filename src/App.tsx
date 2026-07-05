@@ -1905,6 +1905,134 @@ export default function App() {
   const [feeSubTab, setFeeSubTab] = useState<"add" | "update">("add");
   const [feeSearchQuery, setFeeSearchQuery] = useState("");
 
+  // Mark Attendance state management (Instructor Portal)
+  const [attStudentID, setAttStudentID] = useState("");
+  const [attDate, setAttDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+  const [attAttended, setAttAttended] = useState(true);
+  const [attSubmitting, setAttSubmitting] = useState(false);
+  const [attError, setAttError] = useState("");
+  const [attSuccess, setAttSuccess] = useState("");
+  const [attSearchQuery, setAttSearchQuery] = useState("");
+  const [attStatusLookup, setAttStatusLookup] = useState<string | null>(null);
+  const [attCheckingStatus, setAttCheckingStatus] = useState(false);
+
+  // Auto-check attendance status when student or date changes
+  const checkExistingAttendance = async (studentId: string, dateStr: string) => {
+    if (!studentId || !dateStr) return;
+    setAttCheckingStatus(true);
+    setAttStatusLookup(null);
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      if (!token) return;
+      const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/lookup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          studentID: studentId,
+          date: dateStr
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          const record = data[0];
+          setAttStatusLookup(record.attended ? "present" : "absent");
+        } else {
+          setAttStatusLookup("none");
+        }
+      } else {
+        setAttStatusLookup("error");
+      }
+    } catch (err) {
+      console.error("Error checking attendance status:", err);
+      setAttStatusLookup("error");
+    } finally {
+      setAttCheckingStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    if (attStudentID && attDate) {
+      checkExistingAttendance(attStudentID, attDate);
+    } else {
+      setAttStatusLookup(null);
+    }
+  }, [attStudentID, attDate, loginResult]);
+
+  const handleSaveAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!attStudentID.trim()) {
+      setAttError("Please select a student from the directory.");
+      return;
+    }
+    if (!attDate) {
+      setAttError("Please select a valid date.");
+      return;
+    }
+
+    setAttSubmitting(true);
+    setAttError("");
+    setAttSuccess("");
+
+    try {
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      if (!token) {
+        throw new Error("Your session has expired. Please sign in again.");
+      }
+
+      const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          studentID: attStudentID.trim(),
+          date: attDate,
+          attended: attAttended
+        })
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Failed to submit attendance (status ${res.status})`);
+      }
+
+      const data = await res.json();
+      setAttSuccess(`Attendance marked successfully! Status: ${attAttended ? "Present" : "Absent"}`);
+      setAttStatusLookup(attAttended ? "present" : "absent");
+
+      // Sync the global absences state as well
+      fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
+        .then(r => r.ok ? r.json() : [])
+        .then(d => {
+          if (Array.isArray(d)) {
+            setAbsencesList(d.filter(Boolean));
+          }
+        })
+        .catch(err => console.error("Could not sync absences list:", err));
+
+    } catch (err: any) {
+      setAttError(err.message || "An error occurred while marking attendance.");
+    } finally {
+      setAttSubmitting(false);
+    }
+  };
+
   // Role-specific form states
   const [formOccupation, setFormOccupation] = useState("");
   const [formMaritalStatus, setFormMaritalStatus] = useState("");
@@ -2516,11 +2644,8 @@ export default function App() {
       { id: "schedule", label: "Weekly Schedule", icon: Calendar },
       { id: "settings", label: "Portal Settings", icon: Settings }
     ] : selectedRole === "instructor" ? [
-      { id: "overview", label: "Instructor Dashboard", icon: Home },
       { id: "roster", label: "Student Rosters", icon: Users },
-      { id: "grading", label: "Assignment Grading", icon: CheckCircle2 },
-      { id: "schedule", label: "Teaching Schedule", icon: Calendar },
-      { id: "settings", label: "Portal Settings", icon: Settings }
+      { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -2789,62 +2914,6 @@ export default function App() {
 
       // Instructor views
       if (selectedRole === "instructor") {
-        if (activeTab === "overview") {
-          return (
-            <div className="space-y-6">
-              {/* Stat grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[
-                  { label: "Active Cohorts", val: "4 rosters", desc: "128 total pupils", icon: Users, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-                  { label: "Pending Grading", val: "12 Submissions", desc: "Needs evaluation", icon: FileText, color: "text-amber-600 bg-amber-50 border-amber-100" },
-                  { label: "Next Scheduled Session", val: "13:00 Monday", desc: "CS-415 (Lab A)", icon: Clock, color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
-                  { label: "Office Hours", val: "Mon / Wed", desc: "2:00 PM - 4:00 PM", icon: User, color: "text-violet-600 bg-violet-50 border-violet-100" }
-                ].map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">{item.label}</span>
-                        <div className={`p-1.5 rounded-lg border ${item.color}`}>
-                          <Icon className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
-                      <p className="text-2xl font-black text-slate-900 mt-2">{item.val}</p>
-                      <span className="text-[10px] text-slate-500 block mt-1">{item.desc}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Roster overview */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <div className="flex justify-between items-center border-b border-slate-100 pb-2.5 mb-3">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-emerald-600" />
-                    Student Cohort Quick-View
-                  </h3>
-                  <button onClick={() => { setActiveTab("roster"); setSearchQuery(""); }} className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer">View Full Roster</button>
-                </div>
-                <div className="space-y-2 text-xs">
-                  {[
-                    { id: "REG-2026-1049", name: "Jackson Evaluation User", class: "Distributed Database Systems", score: "94/100" },
-                    { id: "ALMAMATER", name: "Elena R Rostova", class: "Advanced Software Architecture", score: "98/100" },
-                    { id: "REG-2026-0044", name: "Aaron Smith", class: "Cloud Infrastructure", score: "82/100" }
-                  ].map((stu) => (
-                    <div key={stu.id} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                      <div>
-                        <p className="font-bold text-slate-800">{stu.name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">{stu.id} &bull; {stu.class}</p>
-                      </div>
-                      <span className="font-mono text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">{stu.score}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        }
-
         if (activeTab === "roster") {
           const filtered = userDirectory.filter(u => u.role === "student" && (u.name.toLowerCase().includes(lowerQuery) || u.username.toLowerCase().includes(lowerQuery)));
           return (
@@ -2879,8 +2948,16 @@ export default function App() {
                         <td className="p-3.5 text-slate-500 font-mono">{s.phone}</td>
                         <td className="p-3.5 font-semibold text-slate-700">98.4%</td>
                         <td className="p-3.5 pr-5 text-right">
-                          <button className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 transition-colors cursor-pointer">
-                            View Record
+                          <button 
+                            onClick={() => {
+                              setAttStudentID(s.username);
+                              setActiveTab("attendance");
+                              setAttSuccess("");
+                              setAttError("");
+                            }}
+                            className="text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                          >
+                            Mark Attendance
                           </button>
                         </td>
                       </tr>
@@ -2892,93 +2969,215 @@ export default function App() {
           );
         }
 
-        if (activeTab === "grading") {
-          return (
-            <div className="space-y-4">
-              <p className="text-xs text-slate-500 font-medium">Below are the student submittals waiting for grade evaluations.</p>
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                <table className="w-full border-collapse text-left">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-mono uppercase text-slate-400">
-                      <th className="p-3.5 pl-5 font-bold">File / Task</th>
-                      <th className="p-3.5 font-bold">Author Student</th>
-                      <th className="p-3.5 font-bold">Submitted Date</th>
-                      <th className="p-3.5 font-bold">Course Group</th>
-                      <th className="p-3.5 pr-5 text-right font-bold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs">
-                    {[
-                      { file: "Gateway_CORS_Config_Report.pdf", student: "Jackson Evaluation User", date: "June 26, 2026", course: "CS-420" },
-                      { file: "Database_Clustering_Strategy.docx", student: "Elena R Rostova", date: "June 25, 2026", course: "CS-415" },
-                      { file: "Final_Design_System_Spec.pdf", student: "Aaron Smith", date: "June 24, 2026", course: "CS-401" }
-                    ].map((sub, i) => (
-                      <tr key={i} className="hover:bg-slate-50/50">
-                        <td className="p-3.5 pl-5 font-bold text-slate-900">{sub.file}</td>
-                        <td className="p-3.5 text-slate-600">{sub.student}</td>
-                        <td className="p-3.5 text-slate-500 font-mono">{sub.date}</td>
-                        <td className="p-3.5 font-mono text-slate-500">{sub.course}</td>
-                        <td className="p-3.5 pr-5 text-right">
-                          <button className="text-[10px] bg-slate-900 hover:bg-slate-800 text-white font-bold px-2.5 py-1.5 rounded-lg shadow-sm cursor-pointer">
-                            Evaluate
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        if (activeTab === "attendance") {
+          const students = userDirectory.filter(u => u.role === "student");
+          const filteredStudents = students.filter(s => 
+            s.name.toLowerCase().includes(attSearchQuery.toLowerCase()) || 
+            s.username.toLowerCase().includes(attSearchQuery.toLowerCase())
           );
-        }
 
-        if (activeTab === "schedule") {
           return (
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              {[
-                { day: "Monday", classes: [{ time: "09:00 - 11:30", course: "CS-401 Lecture", room: "Hall B" }, { time: "13:00 - 15:00", course: "CS-415 Lecture", room: "Lab A" }] },
-                { day: "Tuesday", classes: [] },
-                { day: "Wednesday", classes: [{ time: "09:00 - 11:30", course: "CS-401 Tutorial", room: "Lab C" }] },
-                { day: "Thursday", classes: [{ time: "13:00 - 15:00", course: "CS-415 Tutorial", room: "Hall B" }] },
-                { day: "Friday", classes: [] }
-              ].map((d) => (
-                <div key={d.day} className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm flex flex-col min-h-[220px]">
-                  <span className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-1.5 mb-2 block">{d.day}</span>
-                  <div className="space-y-2 flex-1">
-                    {d.classes.map((c, i) => (
-                      <div key={i} className="p-2 rounded bg-slate-50 border border-slate-100 text-[11px]">
-                        <p className="font-bold text-slate-800">{c.course}</p>
-                        <p className="text-slate-400 font-mono mt-0.5">{c.time}</p>
-                        <p className="text-emerald-600 font-semibold mt-0.5">{c.room}</p>
-                      </div>
-                    ))}
-                    {d.classes.length === 0 && <p className="text-[10px] text-slate-400 py-8 text-center">No lecturing sessions</p>}
-                  </div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Student Selection list */}
+              <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-4">
+                <div className="border-b border-slate-100 pb-2">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Select Student</h3>
+                  <p className="text-[10px] text-slate-400">Choose a student to mark attendance</p>
                 </div>
-              ))}
-            </div>
-          );
-        }
 
-        if (activeTab === "settings") {
-          return (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm max-w-xl space-y-4">
-              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2">Instructor Preferences</h3>
-              <div className="space-y-4 text-xs">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" defaultChecked className="rounded text-emerald-500 focus:ring-emerald-500/20 w-4 h-4 border-slate-300 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-slate-800 block">Class Attendance Alert</span>
-                    <span className="text-[10px] text-slate-500">Alert me immediately if a student attendance falls below the 80% threshold.</span>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search student name/registration key..."
+                    value={attSearchQuery}
+                    onChange={(e) => setAttSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
+                  />
+                </div>
+
+                <div className="max-h-96 overflow-y-auto space-y-2 pr-1">
+                  {filteredStudents.length > 0 ? (
+                    filteredStudents.map((student: any) => {
+                      const isSelected = attStudentID === student.username;
+                      return (
+                        <button
+                          key={student.username}
+                          type="button"
+                          onClick={() => {
+                            setAttStudentID(student.username);
+                            setAttSuccess("");
+                            setAttError("");
+                          }}
+                          className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
+                            isSelected
+                              ? "bg-cyan-50 border-cyan-300 ring-2 ring-cyan-100"
+                              : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">{student.name}</p>
+                            <p className="text-[10px] text-slate-500 truncate font-mono mt-0.5">Phone: {student.phone || "N/A"}</p>
+                          </div>
+                          <span className="text-[9px] font-mono text-slate-400 bg-slate-200/50 px-1.5 py-0.5 rounded uppercase font-semibold shrink-0">
+                            {student.username}
+                          </span>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="text-[11px] text-slate-400 text-center py-6">No matching students found.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Attendance Marking Form */}
+              <div className="lg:col-span-7 space-y-4">
+                <form onSubmit={handleSaveAttendance} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+                  <div className="border-b border-slate-100 pb-3">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Attendance Configuration</h3>
+                    <p className="text-[10px] text-slate-400">Specify details for the attendance log</p>
                   </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" className="rounded text-emerald-500 focus:ring-emerald-500/20 w-4 h-4 border-slate-300 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-slate-800 block">System Roster Syncs</span>
-                    <span className="text-[10px] text-slate-500">Automatically synchronize rosters from central database daily.</span>
+
+                  {attError && (
+                    <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs font-medium">
+                      ⚠️ {attError}
+                    </div>
+                  )}
+
+                  {attSuccess && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-bold">
+                      🎉 {attSuccess}
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    {/* Selected Student Profile Banner */}
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Target Student</label>
+                      {attStudentID ? (
+                        (() => {
+                          const matched = students.find(s => s.username === attStudentID);
+                          return (
+                            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">{matched?.name || "Selected Student"}</p>
+                                <p className="text-[10px] text-slate-500 font-mono mt-0.5">Reg Key: {attStudentID}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setAttStudentID("")}
+                                className="text-[10px] text-rose-600 hover:underline font-bold cursor-pointer"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
+                          Please select a student from the directory on the left.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Date picker */}
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Attendance Date</label>
+                      <input
+                        type="date"
+                        value={attDate}
+                        onChange={(e) => {
+                          setAttDate(e.target.value);
+                          setAttSuccess("");
+                          setAttError("");
+                        }}
+                        required
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    {/* Check if already marked */}
+                    {attStudentID && attDate && (
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px] font-mono">
+                        <span className="text-slate-500 font-bold">Database Status Check:</span>
+                        {attCheckingStatus ? (
+                          <span className="text-slate-400 animate-pulse">Checking records...</span>
+                        ) : attStatusLookup === "present" ? (
+                          <span className="text-emerald-700 font-black bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-semibold">✓ Present (Already Marked)</span>
+                        ) : attStatusLookup === "absent" ? (
+                          <span className="text-rose-700 font-black bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 font-semibold">✗ Absent (Already Marked)</span>
+                        ) : attStatusLookup === "none" ? (
+                          <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 font-semibold">⚠ Not marked yet</span>
+                        ) : (
+                          <span className="text-slate-400">Unable to query</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Attendance Status Picker */}
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1.5">Mark Status</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAttAttended(true);
+                            setAttSuccess("");
+                            setAttError("");
+                          }}
+                          className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                            attAttended
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-800 ring-2 ring-emerald-100"
+                              : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                          <span className="text-xs font-bold">Present / Attended</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAttAttended(false);
+                            setAttSuccess("");
+                            setAttError("");
+                          }}
+                          className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                            !attAttended
+                              ? "bg-rose-50 border-rose-300 text-rose-800 ring-2 ring-rose-100"
+                              : "bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          <XCircle className="w-5 h-5 text-rose-600" />
+                          <span className="text-xs font-bold">Absent</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </label>
+
+                  <button
+                    type="submit"
+                    disabled={attSubmitting || !attStudentID}
+                    className={`w-full py-3 text-xs font-bold rounded-xl transition duration-200 text-white flex items-center justify-center gap-2 cursor-pointer ${
+                      attSubmitting || !attStudentID
+                        ? "bg-slate-300 cursor-not-allowed"
+                        : "bg-slate-950 hover:bg-slate-800 shadow-sm"
+                    }`}
+                  >
+                    {attSubmitting ? "Saving Attendance Record..." : "Submit Attendance Log"}
+                  </button>
+                </form>
+
+                {/* Info Card / Quick Guidelines */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-[11px] text-slate-500 space-y-1.5">
+                  <p className="font-bold text-slate-700">💡 Teacher Guidelines for Attendance</p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    <li>Attendance is logged in real-time to the Mongo <code className="font-mono bg-slate-200/50 px-1 rounded text-slate-700">attendances</code> collection.</li>
+                    <li>The system requires the student's unique Registration Key (<code className="font-mono bg-slate-200/50 px-1 rounded text-slate-700">studentID</code>) as identifier.</li>
+                    <li>If attendance has already been logged for a student on a specific date, submitting again will overwrite or append the record accordingly.</li>
+                  </ul>
+                </div>
               </div>
             </div>
           );
