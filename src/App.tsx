@@ -5992,17 +5992,17 @@ export default function App() {
         return (
           <div className="space-y-6">
             {/* Header Card */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+            <div className="flex flex-col gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
               <div className="space-y-1">
                 <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-indigo-500" />
                   Marks Records System
                 </h2>
-                <p className="text-xs text-slate-500 max-w-2xl">
+                <p className="text-xs text-slate-500 max-w-3xl">
                   Register, search, modify and delete academic marks. This module maps directly to the live MongoDB database using the m_marks collection schema.
                 </p>
               </div>
-              <div className="flex flex-row items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full no-scrollbar shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 max-w-full">
                 <button
                   type="button"
                   onClick={handleDownloadBulkTemplate}
