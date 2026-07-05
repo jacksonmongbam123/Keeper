@@ -212,6 +212,7 @@ export default function App() {
   const [modalSubmitting, setModalSubmitting] = useState<boolean>(false);
   const [modalError, setModalError] = useState<string>("");
   const [modalSuccess, setModalSuccess] = useState<string>("");
+  const [modalExistingStudentId, setModalExistingStudentId] = useState<string>("");
 
   const fetchFeeRecords = async () => {
     setIsLoadingFees(true);
@@ -4959,9 +4960,11 @@ export default function App() {
           if (currentRecord) {
             setModalStatus(currentRecord.fee_status || currentRecord.feeStatus || "unpaid");
             setModalIsNew(false);
+            setModalExistingStudentId(currentRecord.student_id || currentRecord.studentID || "");
           } else {
             setModalStatus("unpaid");
             setModalIsNew(true);
+            setModalExistingStudentId("");
           }
           setModalError("");
           setModalSuccess("");
@@ -4979,7 +4982,7 @@ export default function App() {
               ? "https://abms-lkw9.onrender.com/class/fee/add"
               : "https://abms-lkw9.onrender.com/class/fee/updateStatus";
 
-            const finalStudentId = modalStudent.nic || modalStudent.username || modalStudent._id || modalStudent.id;
+            const finalStudentId = modalExistingStudentId || modalStudent.nic || modalStudent.username || modalStudent._id || modalStudent.id;
             const payload = {
               studentID: finalStudentId,
               student_id: finalStudentId,
@@ -5321,7 +5324,7 @@ export default function App() {
                         </div>
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-slate-800 truncate">{modalStudent.name}</p>
-                          <p className="text-[10px] font-mono text-slate-400 truncate">ID: {modalStudent._id || modalStudent.id}</p>
+                          <p className="text-[10px] font-mono text-slate-400 truncate">ID: {modalExistingStudentId || modalStudent.nic || modalStudent.username || modalStudent._id || modalStudent.id}</p>
                         </div>
                       </div>
                     </div>
