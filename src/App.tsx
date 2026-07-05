@@ -6002,14 +6002,14 @@ export default function App() {
                   Register, search, modify and delete academic marks. This module maps directly to the live MongoDB database using the m_marks collection schema.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-row items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 max-w-full no-scrollbar shrink-0">
                 <button
                   type="button"
                   onClick={handleDownloadBulkTemplate}
-                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer border border-indigo-100 active:scale-95"
+                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-indigo-100 active:scale-95 shrink-0"
                   title="Download template format for bulk upload in Excel"
                 >
-                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  <FileText className="w-3 h-3 text-indigo-600" />
                   <span>Download Excel Template</span>
                 </button>
                 <button
@@ -6019,23 +6019,23 @@ export default function App() {
                     setBulkParsedRows([]);
                     setIsBulkUploadModalOpen(true);
                   }}
-                  className="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer border border-cyan-100 active:scale-95"
+                  className="bg-cyan-50 hover:bg-cyan-100 text-cyan-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-cyan-100 active:scale-95 shrink-0"
                 >
-                  <Upload className="w-3.5 h-3.5 text-cyan-600" />
+                  <Upload className="w-3 h-3 text-cyan-600" />
                   <span>Bulk Upload</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsGradesModalOpen(true)}
-                  className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 text-xs transition-all cursor-pointer border border-amber-100 active:scale-95"
+                  className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2.5 py-1.5 rounded-lg flex items-center justify-center gap-1 text-[11px] transition-all cursor-pointer border border-amber-100 active:scale-95 shrink-0"
                 >
-                  <Settings className="w-3.5 h-3.5 text-amber-600" />
+                  <Settings className="w-3 h-3 text-amber-600" />
                   <span>Grading Scales</span>
                 </button>
                 <button
                   type="button"
                   onClick={openCreateMarkModal}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 text-xs shadow-md shadow-slate-900/10 transition-all cursor-pointer hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg flex items-center justify-center gap-1.5 text-[11px] shadow-sm transition-all cursor-pointer hover:shadow hover:-translate-y-0.5 active:translate-y-0 shrink-0"
                 >
                   <span>+ Register New Marks</span>
                 </button>
