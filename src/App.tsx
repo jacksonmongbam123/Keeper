@@ -1921,12 +1921,14 @@ export default function App() {
   const [attSearchQuery, setAttSearchQuery] = useState("");
   const [attStatusLookup, setAttStatusLookup] = useState<string | null>(null);
   const [attCheckingStatus, setAttCheckingStatus] = useState(false);
+  const [attExistingId, setAttExistingId] = useState<string | null>(null);
 
   // Auto-check attendance status when student or date changes
   const checkExistingAttendance = async (studentId: string, dateStr: string) => {
     if (!studentId || !dateStr) return;
     setAttCheckingStatus(true);
     setAttStatusLookup(null);
+    setAttExistingId(null);
     try {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
@@ -1946,15 +1948,19 @@ export default function App() {
         if (Array.isArray(data) && data.length > 0) {
           const record = data[0];
           setAttStatusLookup(record.attended ? "present" : "absent");
+          setAttExistingId(record._id || record.id || null);
         } else {
           setAttStatusLookup("none");
+          setAttExistingId(null);
         }
       } else {
         setAttStatusLookup("error");
+        setAttExistingId(null);
       }
     } catch (err) {
       console.error("Error checking attendance status:", err);
       setAttStatusLookup("error");
+      setAttExistingId(null);
     } finally {
       setAttCheckingStatus(false);
     }
@@ -1965,6 +1971,7 @@ export default function App() {
       checkExistingAttendance(attStudentID, attDate);
     } else {
       setAttStatusLookup(null);
+      setAttExistingId(null);
     }
   }, [attStudentID, attDate, loginResult]);
 
@@ -1989,17 +1996,24 @@ export default function App() {
         throw new Error("Your session has expired. Please sign in again.");
       }
 
+      const payload: any = {
+        studentID: attStudentID.trim(),
+        date: attDate,
+        attended: attAttended
+      };
+
+      if (attExistingId) {
+        payload._id = attExistingId;
+        payload.id = attExistingId;
+      }
+
       const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({
-          studentID: attStudentID.trim(),
-          date: attDate,
-          attended: attAttended
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!res.ok) {
@@ -2010,6 +2024,9 @@ export default function App() {
       const data = await res.json();
       setAttSuccess(`Attendance marked successfully! Status: ${attAttended ? "Present" : "Absent"}`);
       setAttStatusLookup(attAttended ? "present" : "absent");
+      if (data && (data._id || data.id)) {
+        setAttExistingId(data._id || data.id);
+      }
 
       // Sync the global absences state as well
       fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
@@ -2146,17 +2163,25 @@ export default function App() {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
 
+      const existingRecord = historyRecords.find(r => r.studentID === studentID);
+      const payload: any = {
+        studentID: studentID,
+        date: historyDate,
+        attended: attended
+      };
+
+      if (existingRecord && existingRecord._id) {
+        payload._id = existingRecord._id;
+        payload.id = existingRecord._id;
+      }
+
       const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({
-          studentID: studentID,
-          date: historyDate,
-          attended: attended
-        })
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
