@@ -53,6 +53,9 @@ import ViewTimetableView from "./components/ViewTimetableView";
 import TeacherNotificationsView from "./components/TeacherNotificationsView";
 import HeaderNotificationsDropdown from "./components/HeaderNotificationsDropdown";
 import AssignExtraActivitiesView from "./components/AssignExtraActivitiesView";
+import TeacherLeavesView from "./components/TeacherLeavesView";
+import AdminLeavesView from "./components/AdminLeavesView";
+import TeacherAssignedActivitiesView from "./components/TeacherAssignedActivitiesView";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2947,7 +2950,8 @@ export default function App() {
       { id: "institutions", label: "Institute Details", icon: Building },
       { id: "fees", label: "Fees Management", icon: CreditCard },
       { id: "timetable", label: "Manage Timetable", icon: Calendar },
-      { id: "assign-activities", label: "Assign Extra Activities", icon: Briefcase }
+      { id: "assign-activities", label: "Assign Extra Activities", icon: Briefcase },
+      { id: "manage-leaves", label: "Manage Teacher Leaves", icon: ClipboardList }
     ] : selectedRole === "student" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "courses", label: "My Curriculum", icon: BookOpen },
@@ -2959,7 +2963,9 @@ export default function App() {
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
       { id: "attendance-history", label: "Attendance History", icon: Calendar },
       { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
-      { id: "view-timetable", label: "My Class Timetable", icon: Calendar }
+      { id: "view-timetable", label: "My Class Timetable", icon: Calendar },
+      { id: "request-leave", label: "Request Leave", icon: FileText },
+      { id: "my-activities", label: "My Extra Activities", icon: Briefcase }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -3771,6 +3777,32 @@ export default function App() {
                 token={token}
                 classSectionsList={classSectionsList}
                 userDirectory={userDirectory}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "request-leave") {
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          return (
+            <div className="space-y-6">
+              <TeacherLeavesView 
+                token={token}
+                currentUserId={currentUserId}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "my-activities") {
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          return (
+            <div className="space-y-6">
+              <TeacherAssignedActivitiesView 
+                token={token}
+                currentUserId={currentUserId}
               />
             </div>
           );
@@ -7860,6 +7892,19 @@ export default function App() {
         return (
           <div className="space-y-6">
             <AssignExtraActivitiesView 
+              token={token}
+              userDirectory={filteredUserDirectory}
+            />
+          </div>
+        );
+      }
+
+      // Manage Teacher Leaves Tab
+      if (activeTab === "manage-leaves") {
+        const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+        return (
+          <div className="space-y-6">
+            <AdminLeavesView 
               token={token}
               userDirectory={filteredUserDirectory}
             />
