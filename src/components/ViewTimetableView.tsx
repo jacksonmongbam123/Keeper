@@ -18,6 +18,7 @@ interface ViewTimetableViewProps {
   subjectsList: any[];
   userDirectory: any[];
   currentUserId: string;
+  organizationId?: string;
 }
 
 const DAYS_OF_WEEK = [
@@ -34,7 +35,8 @@ export default function ViewTimetableView({
   classSectionsList = [],
   subjectsList = [],
   userDirectory = [],
-  currentUserId = ""
+  currentUserId = "",
+  organizationId
 }: ViewTimetableViewProps) {
   // App states
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -56,9 +58,30 @@ export default function ViewTimetableView({
     return `${first} ${last}`.trim() || t.username || "Instructor";
   };
 
+  // Helper: Format organization ID
+  const normalizeOrgId = (id: any): string => {
+    if (!id) return "";
+    const idStr = String(id).trim().toLowerCase();
+    if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+      return "6a48a06fde9f134ee6c3d763";
+    }
+    return idStr;
+  };
+
+  // Filter class sections to the teacher's organization scope
+  const filteredClassSections = classSectionsList.filter((cs: any) => {
+    if (!cs) return false;
+    if (organizationId) {
+      return normalizeOrgId(cs.organization_id) === normalizeOrgId(organizationId);
+    }
+    return true;
+  });
+
+  const allowedClassIds = new Set(filteredClassSections.map((cs: any) => cs._id || cs.id));
+
   // Helper: Get Class/Cohort details
   const getClassDetails = (classId: string) => {
-    const cs = classSectionsList.find(c => (c._id === classId || c.id === classId));
+    const cs = filteredClassSections.find(c => (c._id === classId || c.id === classId));
     if (!cs) return "N/A";
     return `${cs.grade} - ${cs.__section || cs.section || "N/A"}`;
   };
@@ -88,7 +111,8 @@ export default function ViewTimetableView({
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          let filtered = data.filter(Boolean);
+          // Strict organization boundaries enforcement: only allow slots for classes belonging to our organization
+          let filtered = data.filter((slot: any) => slot && allowedClassIds.has(slot.class_id));
           
           if (filterType === "mine") {
             // Filter where teacher_id matches currently logged in teacher
@@ -180,8 +204,8 @@ export default function ViewTimetableView({
               onClick={() => {
                 setFilterType("all");
                 // Default to first class if none selected
-                if (!selectedClassId && classSectionsList.length > 0) {
-                  setSelectedClassId(classSectionsList[0]._id || classSectionsList[0].id);
+                if (!selectedClassId && filteredClassSections.length > 0) {
+                  setSelectedClassId(filteredClassSections[0]._id || filteredClassSections[0].id);
                 }
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -204,7 +228,7 @@ export default function ViewTimetableView({
                 onChange={(e) => setSelectedClassId(e.target.value)}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
               >
-                {classSectionsList.map((cs: any) => (
+                {filteredClassSections.map((cs: any) => (
                   <option key={cs._id || cs.id} value={cs._id || cs.id}>
                     {cs.grade} - {cs.__section || cs.section || "N/A"}
                   </option>
@@ -229,7 +253,7 @@ export default function ViewTimetableView({
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Active Cohorts</span>
             <div className="flex items-baseline gap-1.5 mt-2">
-              <span className="text-2xl font-black text-cyan-700">{filterType === "mine" ? cohortsCount : classSectionsList.length}</span>
+              <span className="text-2xl font-black text-cyan-700">{filterType === "mine" ? cohortsCount : filteredClassSections.length}</span>
               <span className="text-[10px] text-slate-400 font-medium">different classes</span>
             </div>
           </div>

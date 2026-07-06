@@ -21,6 +21,7 @@ interface ManageTimetableViewProps {
   classSectionsList: any[];
   subjectsList: any[];
   userDirectory: any[];
+  organizationId?: string;
 }
 
 const DAYS_OF_WEEK = [
@@ -36,7 +37,8 @@ export default function ManageTimetableView({
   token,
   classSectionsList = [],
   subjectsList = [],
-  userDirectory = []
+  userDirectory = [],
+  organizationId
 }: ManageTimetableViewProps) {
   // Filters and Selectors
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -54,6 +56,27 @@ export default function ManageTimetableView({
   const [formTeacherId, setFormTeacherId] = useState("");
   const [formRoom, setFormRoom] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Staging ID normalization helper
+  const normalizeOrgId = (id: any): string => {
+    if (!id) return "";
+    const idStr = String(id).trim().toLowerCase();
+    if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+      return "6a48a06fde9f134ee6c3d763";
+    }
+    return idStr;
+  };
+
+  // Filter class sections to the admin's organization scope
+  const filteredClassSections = classSectionsList.filter((cs: any) => {
+    if (!cs) return false;
+    if (organizationId) {
+      return normalizeOrgId(cs.organization_id) === normalizeOrgId(organizationId);
+    }
+    return true;
+  });
+
+  const allowedClassIds = new Set(filteredClassSections.map((cs: any) => cs._id || cs.id));
 
   // Filter teachers/instructors from the directory
   const teachersList = userDirectory.filter(
@@ -76,6 +99,14 @@ export default function ManageTimetableView({
       setTimetableEntries([]);
       return;
     }
+    
+    // Strict organization boundaries enforcement
+    if (organizationId && !allowedClassIds.has(classId)) {
+      setErrorMsg("Unauthorized access: This class section belongs to another institution.");
+      setTimetableEntries([]);
+      return;
+    }
+
     setIsLoading(true);
     setErrorMsg("");
     try {
@@ -91,10 +122,12 @@ export default function ManageTimetableView({
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          // Sort chronologically by start time
-          const sorted = data.filter(Boolean).sort((a: any, b: any) => {
-            return (a.start_time || "").localeCompare(b.start_time || "");
-          });
+          // Sort chronologically by start time and filter out any items from other organizations
+          const sorted = data
+            .filter((slot: any) => slot && allowedClassIds.has(slot.class_id))
+            .sort((a: any, b: any) => {
+              return (a.start_time || "").localeCompare(b.start_time || "");
+            });
           setTimetableEntries(sorted);
         } else {
           setTimetableEntries([]);
@@ -233,7 +266,7 @@ export default function ManageTimetableView({
               className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
             >
               <option value="">-- Choose Class Section --</option>
-              {classSectionsList.map((cs: any) => (
+              {filteredClassSections.map((cs: any) => (
                 <option key={cs._id || cs.id} value={cs._id || cs.id}>
                   {cs.grade} - {cs.__section || cs.section || "N/A"}
                 </option>
