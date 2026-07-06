@@ -1742,6 +1742,52 @@ export default function App() {
                 });
               }
 
+              // Fetch and include administrators belonging to the organization
+              try {
+                const adminsRes = await fetch("https://abms-lkw9.onrender.com/m/admin/retrieve/", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({})
+                });
+                if (adminsRes.ok) {
+                  const resJson = await adminsRes.json();
+                  const admins = resJson.adminList || resJson;
+                  if (Array.isArray(admins)) {
+                    const normalizeId = (id: any): string => {
+                      if (!id) return "";
+                      const s = String(id).trim().toLowerCase();
+                      if (s === "6a489ad4de9f134ee6c3b5ef") return "6a48a06fde9f134ee6c3d763";
+                      return s;
+                    };
+                    const normOrgId = normalizeId(orgId);
+                    admins.forEach((a: any) => {
+                      const adminOrg = a.organization_id ? normalizeId(a.organization_id) : "";
+                      if (!adminOrg || adminOrg === normOrgId) {
+                        fetchedUsers.push({
+                          _id: a._id,
+                          username: a.reg_no || a.nic || a.username || "",
+                          name: a.name || `${a.first_name || ""} ${a.last_name || ""}`.trim() || "Admin",
+                          role: "administrator",
+                          status: a.status || (a.is_active === false ? "Inactive" : "Active"),
+                          phone: a.phone || "",
+                          first_name: a.first_name || "",
+                          middle_name: a.middle_name || "",
+                          last_name: a.last_name || "",
+                          email: a.email || "",
+                          passport: a.passport || "",
+                          dob: a.dob || "",
+                          sex: a.sex || "",
+                          organization_id: a.organization_id || orgId,
+                          access_level: String(a.access_level_id || a.access_level || "1")
+                        });
+                      }
+                    });
+                  }
+                }
+              } catch (adminErr) {
+                console.warn("Failed to fetch admins in directory scope:", adminErr);
+              }
+
               setUserDirectoryState(fetchedUsers);
               return;
             }
@@ -8359,12 +8405,11 @@ export default function App() {
             }
             if (!notifOrg) {
               const sender = (userDirectoryState || []).find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id || u.username === notif.sender_id));
-              if (!sender) {
-                return false; // Safe fallback: filter out if sender cannot be resolved
-              }
-              const senderOrg = sender.organization_id ? normalizeOrgId(sender.organization_id) : "";
-              if (senderOrg && senderOrg !== targetOrgNormalized) {
-                return false;
+              if (sender) {
+                const senderOrg = sender.organization_id ? normalizeOrgId(sender.organization_id) : "";
+                if (senderOrg && senderOrg !== targetOrgNormalized) {
+                  return false;
+                }
               }
             }
           }

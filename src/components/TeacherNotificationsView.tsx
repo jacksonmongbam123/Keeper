@@ -86,12 +86,11 @@ export default function TeacherNotificationsView({
               }
               if (!notifOrg) {
                 const sender = userDirectory.find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id));
-                if (!sender) {
-                  return false; // Safe fallback: filter out if sender cannot be resolved
-                }
-                const senderOrg = sender.organization_id ? normalizeOrgId(sender.organization_id) : "";
-                if (senderOrg && senderOrg !== targetOrgNormalized) {
-                  return false;
+                if (sender) {
+                  const senderOrg = sender.organization_id ? normalizeOrgId(sender.organization_id) : "";
+                  if (senderOrg && senderOrg !== targetOrgNormalized) {
+                    return false;
+                  }
                 }
               }
             }
