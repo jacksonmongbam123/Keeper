@@ -375,10 +375,11 @@ export default function App() {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
+      const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
       const res = await fetch("https://abms-lkw9.onrender.com/m/marks/retrieve", {
         method: "POST",
         headers,
-        body: JSON.stringify({})
+        body: JSON.stringify(currentOrgId ? { organization_id: currentOrgId } : {})
       });
       if (res.ok) {
         const data = await res.json();
@@ -621,6 +622,7 @@ export default function App() {
         term: marksFormTerm,
         date: marksFormDate ? new Date(marksFormDate).toISOString() : new Date().toISOString(),
         grade_id: marksFormGradeId,
+        organization_id: adminOrganizationId || loginResult?.data?.user?.organization_id || undefined,
         created_date: marksModalIsNew ? new Date().toISOString() : undefined,
         created_user_id: marksFormCreatedUserId || loginResult?.data?.user?._id || "",
         modified_date: new Date().toISOString(),
@@ -9256,9 +9258,43 @@ export default function App() {
       }
 
       if (activeTab === "marks-management") {
+        // Normalize organization ID helper
+        const normalizeOrgId = (id: any): string => {
+          if (!id) return "";
+          const idStr = String(id).trim().toLowerCase();
+          if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+            return "6a48a06fde9f134ee6c3d763";
+          }
+          return idStr;
+        };
+
+        const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+        const targetOrgNormalized = normalizeOrgId(currentOrgId);
+
         // Apply filters
         const filteredMarks = (Array.isArray(marksList) ? marksList : []).filter((mark: any) => {
           if (!mark) return false;
+
+          // Enforce organization scope
+          if (targetOrgNormalized) {
+            if (mark.organization_id && normalizeOrgId(mark.organization_id) !== targetOrgNormalized) {
+              return false;
+            }
+            if (!mark.organization_id) {
+              const studentObj = (Array.isArray(userDirectory) ? userDirectory : []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
+              const classObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
+              
+              const studentOrg = studentObj ? normalizeOrgId(studentObj.organization_id) : "";
+              const classOrg = classObj ? normalizeOrgId(classObj.organization_id) : "";
+              
+              if (studentOrg && studentOrg !== targetOrgNormalized) {
+                return false;
+              }
+              if (classOrg && classOrg !== targetOrgNormalized) {
+                return false;
+              }
+            }
+          }
           
           const matchesClass = !marksFilterClassSection || mark.class_id === marksFilterClassSection;
           const matchesSubject = !marksFilterSubject || mark.subject_id === marksFilterSubject;
@@ -9344,7 +9380,13 @@ export default function App() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                   >
                     <option value="">All Classes & Sections</option>
-                    {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                    {Array.isArray(classSectionsList) && classSectionsList.filter((cs: any) => {
+                      if (!cs) return false;
+                      if (targetOrgNormalized) {
+                        return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
+                      }
+                      return true;
+                    }).map((cs: any) => (
                       <option key={cs._id || cs.id} value={cs._id || cs.id}>
                         {cs.grade} - {cs.__section || cs.section || ""}
                       </option>
@@ -9361,7 +9403,13 @@ export default function App() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                   >
                     <option value="">All Subjects</option>
-                    {Array.isArray(subjectsList) && subjectsList.filter(Boolean).map((sub: any) => (
+                    {Array.isArray(subjectsList) && subjectsList.filter((sub: any) => {
+                      if (!sub) return false;
+                      if (targetOrgNormalized && sub.organization_id) {
+                        return normalizeOrgId(sub.organization_id) === targetOrgNormalized;
+                      }
+                      return true;
+                    }).map((sub: any) => (
                       <option key={sub._id || sub.id} value={sub._id || sub.id}>
                         {sub.name || sub.code || "Unnamed Subject"}
                       </option>
@@ -9378,7 +9426,13 @@ export default function App() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                   >
                     <option value="">All Students</option>
-                    {Array.isArray(userDirectory) && userDirectory.filter((u: any) => u && u.role === "student").map((student: any) => (
+                    {Array.isArray(userDirectory) && userDirectory.filter((u: any) => {
+                      if (!u || u.role !== "student") return false;
+                      if (targetOrgNormalized) {
+                        return normalizeOrgId(u.organization_id) === targetOrgNormalized;
+                      }
+                      return true;
+                    }).map((student: any) => (
                       <option key={student._id || student.id} value={student._id || student.id}>
                         {student.name} ({student.username})
                       </option>
@@ -9596,7 +9650,13 @@ export default function App() {
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                       >
                         <option value="">-- Choose class section --</option>
-                        {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                        {Array.isArray(classSectionsList) && classSectionsList.filter((cs: any) => {
+                          if (!cs) return false;
+                          if (targetOrgNormalized) {
+                            return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
+                          }
+                          return true;
+                        }).map((cs: any) => (
                           <option key={cs._id || cs.id} value={cs._id || cs.id}>
                             {cs.grade} - {cs.__section || cs.section || ""}
                           </option>
@@ -9617,7 +9677,13 @@ export default function App() {
                       >
                         <option value="">-- Choose student --</option>
                         {(() => {
-                          const allStudents = Array.isArray(userDirectory) ? userDirectory.filter((u: any) => u && u.role === "student") : [];
+                          const allStudents = Array.isArray(userDirectory) ? userDirectory.filter((u: any) => {
+                            if (!u || u.role !== "student") return false;
+                            if (targetOrgNormalized) {
+                              return normalizeOrgId(u.organization_id) === targetOrgNormalized;
+                            }
+                            return true;
+                          }) : [];
                           const filtered = allStudents.filter((student: any) => {
                             if (!marksFormClassId) return true; // Show all if no class is selected yet
                             return (studentClassRelations || []).some((rel: any) => 
@@ -9644,7 +9710,13 @@ export default function App() {
                           className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                         >
                           <option value="">-- Choose subject --</option>
-                          {Array.isArray(subjectsList) && subjectsList.filter(Boolean).map((sub: any) => (
+                          {Array.isArray(subjectsList) && subjectsList.filter((sub: any) => {
+                            if (!sub) return false;
+                            if (targetOrgNormalized && sub.organization_id) {
+                              return normalizeOrgId(sub.organization_id) === targetOrgNormalized;
+                            }
+                            return true;
+                          }).map((sub: any) => (
                             <option key={sub._id || sub.id} value={sub._id || sub.id}>
                               {sub.name || sub.code || "Unnamed Subject"}
                             </option>
