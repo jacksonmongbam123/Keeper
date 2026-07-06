@@ -2889,6 +2889,51 @@ export default function App() {
     fetchAdminOrganization();
   }, [loginResult]);
 
+  const getFilteredClassSections = () => {
+    const normalizeOrgIdLocal = (id: any): string => {
+      if (!id) return "";
+      if (typeof id === 'object') {
+        id = id._id || id.id || id;
+      }
+      const idStr = String(id).trim().toLowerCase();
+      if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+        return "6a48a06fde9f134ee6c3d763";
+      }
+      return idStr;
+    };
+    const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+    const targetOrgNormalized = normalizeOrgIdLocal(currentOrgId);
+    
+    const ourOrgUserIds = new Set(
+      (filteredUserDirectory || [])
+        .filter((u: any) => u && normalizeOrgIdLocal(u.organization_id) === targetOrgNormalized)
+        .map((u: any) => u._id || u.id)
+    );
+    
+    const classIdsInOrg = new Set<string>();
+    if (Array.isArray(studentClassRelations)) {
+      studentClassRelations.forEach((rel: any) => {
+        if (rel && rel.class_id && (ourOrgUserIds.has(rel.student_id) || ourOrgUserIds.has(String(rel.student_id)))) {
+          classIdsInOrg.add(rel.class_id);
+        }
+      });
+    }
+    if (Array.isArray(teacherSubjectClasses)) {
+      teacherSubjectClasses.forEach((tsc: any) => {
+        if (tsc && tsc.class_id && (ourOrgUserIds.has(tsc.teacher_id) || ourOrgUserIds.has(String(tsc.teacher_id)))) {
+          classIdsInOrg.add(tsc.class_id);
+        }
+      });
+    }
+
+    return (classSectionsList || []).filter(Boolean).filter((cs: any) => {
+      if (cs.organization_id) {
+        return normalizeOrgIdLocal(cs.organization_id) === targetOrgNormalized;
+      }
+      return classIdsInOrg.has(cs._id || cs.id);
+    });
+  };
+
   const refreshClassSections = async () => {
     try {
       const res = await fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
@@ -4170,6 +4215,8 @@ export default function App() {
                 userDirectory={userDirectory}
                 currentUserId={currentUserId}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+                studentClassRelations={studentClassRelations}
+                teacherSubjectClasses={teacherSubjectClasses}
               />
             </div>
           );
@@ -5938,14 +5985,14 @@ export default function App() {
                             onChange={(e) => {
                               const val = e.target.value;
                               setSelectedClass(val);
-                              const matched = classSectionsList.find(cs => cs._id === val);
-                              setSelectedSection(matched ? (matched.__section || "") : "");
+                              const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
+                              setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
                             }}
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           >
                             <option value="">Select Class Section</option>
-                            {classSectionsList.map((cs: any) => (
-                              <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
+                            {getFilteredClassSections().map((cs: any) => (
+                              <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
                             ))}
                           </select>
                         </div>
@@ -6712,15 +6759,15 @@ export default function App() {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setSelectedClass(val);
-                                  const matched = classSectionsList.find(cs => cs._id === val);
-                                  setSelectedSection(matched ? (matched.__section || "") : "");
+                                  const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
+                                  setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
                                 }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
                                 <option value="">Select Class Section</option>
-                                {classSectionsList.map((cs: any) => (
-                                  <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
+                                {getFilteredClassSections().map((cs: any) => (
+                                  <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
                                 ))}
                               </select>
                             </div>
@@ -6818,15 +6865,15 @@ export default function App() {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setSelectedClass(val);
-                                  const matched = classSectionsList.find(cs => cs._id === val);
-                                  setSelectedSection(matched ? (matched.__section || "") : "");
+                                  const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
+                                  setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
                                 }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
                                 <option value="">Select Class Section</option>
-                                {classSectionsList.map((cs: any) => (
-                                  <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
+                                {getFilteredClassSections().map((cs: any) => (
+                                  <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
                                 ))}
                               </select>
                             </div>
@@ -6898,14 +6945,14 @@ export default function App() {
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     setParentFilterGrade(val);
-                                    const matched = classSectionsList.find(cs => cs._id === val);
-                                    setParentFilterSection(matched ? (matched.__section || "") : "");
+                                    const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
+                                    setParentFilterSection(matched ? (matched.__section || matched.section || "") : "");
                                   }}
                                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
                                 >
                                   <option value="">All Class Sections</option>
-                                  {classSectionsList.map((cs: any) => (
-                                    <option key={cs._id} value={cs._id}>{cs.grade} - {cs.__section}</option>
+                                  {getFilteredClassSections().map((cs: any) => (
+                                    <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
                                   ))}
                                 </select>
                               </div>
@@ -8406,6 +8453,8 @@ export default function App() {
               subjectsList={subjectsList}
               userDirectory={filteredUserDirectory}
               organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+              studentClassRelations={studentClassRelations}
+              teacherSubjectClasses={teacherSubjectClasses}
             />
           </div>
         );
@@ -8869,7 +8918,50 @@ export default function App() {
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                     >
                       <option value="">All Class Sections</option>
-                      {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                      {(() => {
+                        const normalizeOrgIdLocal = (id: any): string => {
+                          if (!id) return "";
+                          if (typeof id === 'object') {
+                            id = id._id || id.id || id;
+                          }
+                          const idStr = String(id).trim().toLowerCase();
+                          if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+                            return "6a48a06fde9f134ee6c3d763";
+                          }
+                          return idStr;
+                        };
+                        const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+                        const targetOrgNormalized = normalizeOrgIdLocal(currentOrgId);
+                        
+                        const ourOrgUserIds = new Set(
+                          (userDirectory || [])
+                            .filter((u: any) => u && normalizeOrgIdLocal(u.organization_id) === targetOrgNormalized)
+                            .map((u: any) => u._id || u.id)
+                        );
+                        
+                        const classIdsInOrg = new Set<string>();
+                        if (Array.isArray(studentClassRelations)) {
+                          studentClassRelations.forEach((rel: any) => {
+                            if (rel && rel.class_id && (ourOrgUserIds.has(rel.student_id) || ourOrgUserIds.has(String(rel.student_id)))) {
+                              classIdsInOrg.add(rel.class_id);
+                            }
+                          });
+                        }
+                        if (Array.isArray(teacherSubjectClasses)) {
+                          teacherSubjectClasses.forEach((tsc: any) => {
+                            if (tsc && tsc.class_id && (ourOrgUserIds.has(tsc.teacher_id) || ourOrgUserIds.has(String(tsc.teacher_id)))) {
+                              classIdsInOrg.add(tsc.class_id);
+                            }
+                          });
+                        }
+
+                        return (classSectionsList || []).filter(Boolean).filter((cs: any) => {
+                          if (cs.organization_id) {
+                            return normalizeOrgIdLocal(cs.organization_id) === targetOrgNormalized;
+                          }
+                          return classIdsInOrg.has(cs._id || cs.id);
+                        });
+                      })().map((cs: any) => (
                         <option key={cs._id || cs.id} value={cs._id || cs.id}>
                           {cs.grade} - {cs.__section || cs.section || ""}
                         </option>
@@ -9192,7 +9284,50 @@ export default function App() {
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                     >
                       <option value="">All Class Sections</option>
-                      {Array.isArray(classSectionsList) && classSectionsList.filter(Boolean).map((cs: any) => (
+                      {(() => {
+                        const normalizeOrgIdLocal = (id: any): string => {
+                          if (!id) return "";
+                          if (typeof id === 'object') {
+                            id = id._id || id.id || id;
+                          }
+                          const idStr = String(id).trim().toLowerCase();
+                          if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+                            return "6a48a06fde9f134ee6c3d763";
+                          }
+                          return idStr;
+                        };
+                        const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+                        const targetOrgNormalized = normalizeOrgIdLocal(currentOrgId);
+                        
+                        const ourOrgUserIds = new Set(
+                          (userDirectory || [])
+                            .filter((u: any) => u && normalizeOrgIdLocal(u.organization_id) === targetOrgNormalized)
+                            .map((u: any) => u._id || u.id)
+                        );
+                        
+                        const classIdsInOrg = new Set<string>();
+                        if (Array.isArray(studentClassRelations)) {
+                          studentClassRelations.forEach((rel: any) => {
+                            if (rel && rel.class_id && (ourOrgUserIds.has(rel.student_id) || ourOrgUserIds.has(String(rel.student_id)))) {
+                              classIdsInOrg.add(rel.class_id);
+                            }
+                          });
+                        }
+                        if (Array.isArray(teacherSubjectClasses)) {
+                          teacherSubjectClasses.forEach((tsc: any) => {
+                            if (tsc && tsc.class_id && (ourOrgUserIds.has(tsc.teacher_id) || ourOrgUserIds.has(String(tsc.teacher_id)))) {
+                              classIdsInOrg.add(tsc.class_id);
+                            }
+                          });
+                        }
+
+                        return (classSectionsList || []).filter(Boolean).filter((cs: any) => {
+                          if (cs.organization_id) {
+                            return normalizeOrgIdLocal(cs.organization_id) === targetOrgNormalized;
+                          }
+                          return classIdsInOrg.has(cs._id || cs.id);
+                        });
+                      })().map((cs: any) => (
                         <option key={cs._id || cs.id} value={cs._id || cs.id}>
                           {cs.grade} - {cs.__section || cs.section || ""}
                         </option>

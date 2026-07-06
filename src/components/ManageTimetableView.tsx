@@ -22,6 +22,8 @@ interface ManageTimetableViewProps {
   subjectsList: any[];
   userDirectory: any[];
   organizationId?: string;
+  studentClassRelations?: any[];
+  teacherSubjectClasses?: any[];
 }
 
 const DAYS_OF_WEEK = [
@@ -38,7 +40,9 @@ export default function ManageTimetableView({
   classSectionsList = [],
   subjectsList = [],
   userDirectory = [],
-  organizationId
+  organizationId,
+  studentClassRelations = [],
+  teacherSubjectClasses = []
 }: ManageTimetableViewProps) {
   // Filters and Selectors
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -57,9 +61,12 @@ export default function ManageTimetableView({
   const [formRoom, setFormRoom] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Staging ID normalization helper
+  // Staging ID normalization helper supporting string/object format safely
   const normalizeOrgId = (id: any): string => {
     if (!id) return "";
+    if (typeof id === 'object') {
+      id = id._id || id.id || id;
+    }
     const idStr = String(id).trim().toLowerCase();
     if (idStr === "6a489ad4de9f134ee6c3b5ef") {
       return "6a48a06fde9f134ee6c3d763";
@@ -67,13 +74,41 @@ export default function ManageTimetableView({
     return idStr;
   };
 
+  const targetOrgNormalized = normalizeOrgId(organizationId);
+
+  // Get our organization's user IDs
+  const ourOrgUserIds = new Set(
+    userDirectory
+      .filter((u: any) => u && normalizeOrgId(u.organization_id) === targetOrgNormalized)
+      .map((u: any) => u._id || u.id)
+  );
+
+  // Dynamically resolve all class sections that have active students or teachers in our organization's user directory
+  const classIdsInOrg = new Set<string>();
+
+  if (Array.isArray(studentClassRelations)) {
+    studentClassRelations.forEach((rel: any) => {
+      if (rel && rel.class_id && (ourOrgUserIds.has(rel.student_id) || ourOrgUserIds.has(String(rel.student_id)))) {
+        classIdsInOrg.add(rel.class_id);
+      }
+    });
+  }
+
+  if (Array.isArray(teacherSubjectClasses)) {
+    teacherSubjectClasses.forEach((tsc: any) => {
+      if (tsc && tsc.class_id && (ourOrgUserIds.has(tsc.teacher_id) || ourOrgUserIds.has(String(tsc.teacher_id)))) {
+        classIdsInOrg.add(tsc.class_id);
+      }
+    });
+  }
+
   // Filter class sections to the admin's organization scope with support for m_class_sections records lacking organization_id
   const filteredClassSections = classSectionsList.filter((cs: any) => {
     if (!cs) return false;
-    if (cs.organization_id && organizationId) {
-      return normalizeOrgId(cs.organization_id) === normalizeOrgId(organizationId);
+    if (cs.organization_id) {
+      return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
     }
-    return true;
+    return classIdsInOrg.has(cs._id || cs.id);
   });
 
   const allowedClassIds = new Set(filteredClassSections.map((cs: any) => cs._id || cs.id));
