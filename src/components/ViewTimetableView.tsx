@@ -77,11 +77,17 @@ export default function ViewTimetableView({
 
   const targetOrgNormalized = normalizeOrgId(organizationId);
 
-  // Get our organization's user IDs
+  // Get our organization's user IDs, strictly filtering out any null/undefined or empty keys
   const ourOrgUserIds = new Set(
-    userDirectory
-      .filter((u: any) => u && normalizeOrgId(u.organization_id) === targetOrgNormalized)
-      .map((u: any) => u._id || u.id)
+    (userDirectory || [])
+      .filter((u: any) => {
+        if (!u) return false;
+        const userId = u._id || u.id;
+        if (!userId) return false;
+        const orgId = normalizeOrgId(u.organization_id);
+        return orgId === targetOrgNormalized && targetOrgNormalized !== "";
+      })
+      .map((u: any) => String(u._id || u.id).trim())
   );
 
   // Dynamically resolve all class sections that have active students or teachers in our organization's user directory
@@ -89,16 +95,22 @@ export default function ViewTimetableView({
 
   if (Array.isArray(studentClassRelations)) {
     studentClassRelations.forEach((rel: any) => {
-      if (rel && rel.class_id && (ourOrgUserIds.has(rel.student_id) || ourOrgUserIds.has(String(rel.student_id)))) {
-        classIdsInOrg.add(rel.class_id);
+      if (rel && rel.class_id) {
+        const studentIdStr = rel.student_id ? String(rel.student_id).trim() : "";
+        if (studentIdStr && ourOrgUserIds.has(studentIdStr)) {
+          classIdsInOrg.add(rel.class_id);
+        }
       }
     });
   }
 
   if (Array.isArray(teacherSubjectClasses)) {
     teacherSubjectClasses.forEach((tsc: any) => {
-      if (tsc && tsc.class_id && (ourOrgUserIds.has(tsc.teacher_id) || ourOrgUserIds.has(String(tsc.teacher_id)))) {
-        classIdsInOrg.add(tsc.class_id);
+      if (tsc && tsc.class_id) {
+        const teacherIdStr = tsc.teacher_id ? String(tsc.teacher_id).trim() : "";
+        if (teacherIdStr && ourOrgUserIds.has(teacherIdStr)) {
+          classIdsInOrg.add(tsc.class_id);
+        }
       }
     });
   }
@@ -146,8 +158,24 @@ export default function ViewTimetableView({
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          // Strict organization boundaries enforcement: only allow slots for classes belonging to our organization
-          let filtered = data.filter((slot: any) => slot && allowedClassIds.has(slot.class_id));
+          // Strict organization boundaries enforcement: only allow slots for classes belonging to our organization,
+          // AND whose teacher (if assigned) strictly belongs to our organization.
+          let filtered = data.filter((slot: any) => {
+            if (!slot) return false;
+            
+            // 1. The class must belong to our organization's allowed class sections
+            if (!allowedClassIds.has(slot.class_id)) return false;
+            
+            // 2. If a teacher is assigned, the teacher must belong to our organization (ourOrgUserIds)
+            if (slot.teacher_id) {
+              const teacherIdStr = String(slot.teacher_id).trim();
+              if (teacherIdStr && !ourOrgUserIds.has(teacherIdStr)) {
+                return false;
+              }
+            }
+            
+            return true;
+          });
           
           if (filterType === "mine") {
             // Filter where teacher_id matches currently logged in teacher

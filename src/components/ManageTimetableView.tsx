@@ -76,11 +76,17 @@ export default function ManageTimetableView({
 
   const targetOrgNormalized = normalizeOrgId(organizationId);
 
-  // Get our organization's user IDs
+  // Get our organization's user IDs, strictly filtering out any null/undefined or empty keys
   const ourOrgUserIds = new Set(
-    userDirectory
-      .filter((u: any) => u && normalizeOrgId(u.organization_id) === targetOrgNormalized)
-      .map((u: any) => u._id || u.id)
+    (userDirectory || [])
+      .filter((u: any) => {
+        if (!u) return false;
+        const userId = u._id || u.id;
+        if (!userId) return false;
+        const orgId = normalizeOrgId(u.organization_id);
+        return orgId === targetOrgNormalized && targetOrgNormalized !== "";
+      })
+      .map((u: any) => String(u._id || u.id).trim())
   );
 
   // Dynamically resolve all class sections that have active students or teachers in our organization's user directory
@@ -88,16 +94,22 @@ export default function ManageTimetableView({
 
   if (Array.isArray(studentClassRelations)) {
     studentClassRelations.forEach((rel: any) => {
-      if (rel && rel.class_id && (ourOrgUserIds.has(rel.student_id) || ourOrgUserIds.has(String(rel.student_id)))) {
-        classIdsInOrg.add(rel.class_id);
+      if (rel && rel.class_id) {
+        const studentIdStr = rel.student_id ? String(rel.student_id).trim() : "";
+        if (studentIdStr && ourOrgUserIds.has(studentIdStr)) {
+          classIdsInOrg.add(rel.class_id);
+        }
       }
     });
   }
 
   if (Array.isArray(teacherSubjectClasses)) {
     teacherSubjectClasses.forEach((tsc: any) => {
-      if (tsc && tsc.class_id && (ourOrgUserIds.has(tsc.teacher_id) || ourOrgUserIds.has(String(tsc.teacher_id)))) {
-        classIdsInOrg.add(tsc.class_id);
+      if (tsc && tsc.class_id) {
+        const teacherIdStr = tsc.teacher_id ? String(tsc.teacher_id).trim() : "";
+        if (teacherIdStr && ourOrgUserIds.has(teacherIdStr)) {
+          classIdsInOrg.add(tsc.class_id);
+        }
       }
     });
   }
@@ -159,7 +171,22 @@ export default function ManageTimetableView({
         if (Array.isArray(data)) {
           // Sort chronologically by start time and filter out any items from other organizations
           const sorted = data
-            .filter((slot: any) => slot && allowedClassIds.has(slot.class_id))
+            .filter((slot: any) => {
+              if (!slot) return false;
+              
+              // 1. Must belong to our allowed class sections
+              if (!allowedClassIds.has(slot.class_id)) return false;
+              
+              // 2. If a teacher is assigned, they must belong to our organization
+              if (slot.teacher_id) {
+                const teacherIdStr = String(slot.teacher_id).trim();
+                if (teacherIdStr && !ourOrgUserIds.has(teacherIdStr)) {
+                  return false;
+                }
+              }
+              
+              return true;
+            })
             .sort((a: any, b: any) => {
               return (a.start_time || "").localeCompare(b.start_time || "");
             });
