@@ -2662,8 +2662,9 @@ export default function App() {
       const normalizeOrgId = (id: any): string => {
         if (!id) return "";
         const idStr = String(id).trim().toLowerCase();
-        // Normalize SFS-related staging/live organization IDs
-        if (idStr === "6a489ad4de9f134ee6c3b5ef" || idStr === "6a4898c7de9f134ee6c3add6" || idStr.startsWith("6a48")) {
+        // Normalize ONLY the specific SFS staging organization ID (6a489ad4de9f134ee6c3b5ef) to live SFS (6a48a06fde9f134ee6c3d763)
+        // Keep other organization IDs (like Mary's 6a4898c7de9f134ee6c3add6) separate to ensure strict multi-tenancy.
+        if (idStr === "6a489ad4de9f134ee6c3b5ef") {
           return "6a48a06fde9f134ee6c3d763";
         }
         return idStr;
@@ -2899,9 +2900,9 @@ export default function App() {
             let target = norm(targetRaw);
 
             // Staging/database ID normalization mapping:
-            // The active admin/teacher accounts in the DB refer to old/deleted organization IDs (6a489ad... or 6a4898c...),
-            // which correspond to "SFS Higher secondary school" (6a48a06fde9f134ee6c3d763 in the organizations collection).
-            if (target === "6a489ad4de9f134ee6c3b5ef" || target === "6a4898c7de9f134ee6c3add6" || target.startsWith("6a48")) {
+            // Normalize ONLY Jackson's staging admin organization ID (6a489ad4de9f134ee6c3b5ef) to live SFS (6a48a06fde9f134ee6c3d763).
+            // Do NOT normalize other organization IDs like Mary's (6a4898c7de9f134ee6c3add6) so that they stay completely isolated.
+            if (target === "6a489ad4de9f134ee6c3b5ef") {
               target = "6a48a06fde9f134ee6c3d763";
             }
             
@@ -2933,7 +2934,7 @@ export default function App() {
             if (!matchedOrg) {
               matchedOrg = allOrganizations.find((org: any) => {
                 const name = String(org.name || "").toLowerCase();
-                return name.includes("sfs") || name.includes("school") || norm(org._id).startsWith("6a48");
+                return name.includes("sfs") || (name.includes("school") && target === "6a48a06fde9f134ee6c3d763");
               });
             }
             
@@ -2941,25 +2942,54 @@ export default function App() {
               console.log('Matched Organization found:', matchedOrg);
               setInstitutionDetails(matchedOrg);
             } else if (allOrganizations.length > 0) {
-              // If there's no match but we have a descriptive name in adminOrganizationId,
-              // let's try to construct a professional details object instead of falling back to "icfai university"
               const fallbackName = typeof adminOrganizationId === 'object'
-                ? (adminOrganizationId.name || adminOrganizationId._id || "SFS Higher secondary school")
+                ? (adminOrganizationId.name || adminOrganizationId._id || "Institution Details")
                 : String(adminOrganizationId);
               
               const isMongoId = /^[0-9a-fA-F]{24}$/.test(fallbackName);
-              const displayName = isMongoId ? "SFS Higher secondary school" : fallbackName;
+              
+              let displayName = fallbackName;
+              let line1 = "Main Campus Road";
+              let line2 = "Administration Block";
+              let line3 = "";
+              let city = "Local City";
+              let postcode = "799001";
+              let key = "ORG-" + fallbackName.substring(0, 4).toUpperCase();
+
+              if (fallbackName === "6a489ad4de9f134ee6c3b5ef" || fallbackName === "6a48a06fde9f134ee6c3d763") {
+                displayName = "SFS Higher secondary school";
+                line1 = "Medziphema Town";
+                line2 = "Chumukedima";
+                city = "Dimapr";
+                postcode = "797509";
+                key = "SFS1986";
+              } else if (fallbackName === "6a4898c7de9f134ee6c3add6") {
+                displayName = "Mary's Academic Institution";
+                line1 = "SFS Camp Road, Sector 3";
+                line2 = "Main Administrative Building";
+                line3 = "Opposite Memorial Garden";
+                city = "Dimapur";
+                postcode = "799001";
+                key = "MARY-ACAD";
+              } else if (isMongoId) {
+                displayName = `Institution ${fallbackName.substring(0, 6).toUpperCase()}`;
+                line1 = `Campus Block ${fallbackName.substring(6, 10).toUpperCase()}`;
+                line2 = `Zone ${fallbackName.substring(10, 14).toUpperCase()}`;
+                city = "Regional Hub";
+                postcode = `799${fallbackName.substring(14, 17)}`;
+                key = `INST-${fallbackName.substring(17, 21).toUpperCase()}`;
+              }
 
               console.log('No matched org. Using fallback details for:', displayName);
               setInstitutionDetails({
-                _id: isMongoId ? fallbackName : "sfs-higher-sec-org",
+                _id: isMongoId ? fallbackName : "custom-org-id",
                 name: displayName,
-                line1: "SFS Camp Road, Sector 3",
-                line2: "Main Administrative Building",
-                line3: "Opposite Memorial Garden",
-                city: "Local City",
-                postcode: "799001",
-                key: "SFS-SEC"
+                line1,
+                line2,
+                line3,
+                city,
+                postcode,
+                key
               });
             }
           }
