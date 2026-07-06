@@ -51,6 +51,7 @@ import AssignHomeworkView from "./components/AssignHomeworkView";
 import ManageTimetableView from "./components/ManageTimetableView";
 import ViewTimetableView from "./components/ViewTimetableView";
 import TeacherNotificationsView from "./components/TeacherNotificationsView";
+import HeaderNotificationsDropdown from "./components/HeaderNotificationsDropdown";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2956,8 +2957,7 @@ export default function App() {
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
       { id: "attendance-history", label: "Attendance History", icon: Calendar },
       { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
-      { id: "view-timetable", label: "View Timetable", icon: Calendar },
-      { id: "notifications", label: "Notifications", icon: Bell }
+      { id: "view-timetable", label: "View Timetable", icon: Calendar }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -9669,6 +9669,19 @@ export default function App() {
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 Live Session
               </div>
+
+              {(() => {
+                const headerToken = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+                const headerUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+                return headerToken ? (
+                  <HeaderNotificationsDropdown
+                    token={headerToken}
+                    classSectionsList={classSectionsList || []}
+                    userDirectory={userDirectory || []}
+                    currentUserId={headerUserId}
+                  />
+                ) : null;
+              })()}
 
               <div className="h-6 w-[1px] bg-slate-200" />
 
