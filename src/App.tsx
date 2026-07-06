@@ -22,6 +22,7 @@ import {
   Calendar,
   Layers,
   Camera,
+  Info,
   Upload,
   Image as ImageIcon,
   Trash2,
@@ -1634,9 +1635,9 @@ export default function App() {
     }
   }, [activeTab, loginResult, selectedRole]);
 
-  // Fetch real database users and merge them on successful administrator login or navigating to users tab
+  // Fetch real database users and merge them on successful administrator/instructor login or navigating to tabs
   useEffect(() => {
-    if (loginResult?.success && selectedRole === "administrator") {
+    if (loginResult?.success && (selectedRole === "administrator" || selectedRole === "instructor")) {
       const fetchAllUsers = async () => {
         const token = loginResult?.data?.token || "";
         const headers: Record<string, string> = {
@@ -2959,6 +2960,7 @@ export default function App() {
       { id: "schedule", label: "Weekly Schedule", icon: Calendar },
       { id: "settings", label: "Portal Settings", icon: Settings }
     ] : selectedRole === "instructor" ? [
+      { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "roster", label: "Student Rosters", icon: Users },
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
       { id: "attendance-history", label: "Attendance History", icon: Calendar },
@@ -3234,6 +3236,192 @@ export default function App() {
 
       // Instructor views
       if (selectedRole === "instructor") {
+        if (activeTab === "overview") {
+          const studentCount = userDirectory.filter(u => u.role === "student").length;
+          const teacherCount = userDirectory.filter(u => u.role === "instructor").length;
+          const parentCount = userDirectory.filter(u => u.role === "parents").length;
+          const activeClassesCount = (classSectionsList || []).length;
+          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          
+          // Count leaves for the logged-in teacher
+          const localLeavesStr = localStorage.getItem("abms_rel_teacher_leaves");
+          const localLeaves = localLeavesStr ? JSON.parse(localLeavesStr) : [];
+          const myLeavesCount = localLeaves.filter((l: any) => l && l.teacher_id === currentUserId).length;
+          const pendingLeavesCount = localLeaves.filter((l: any) => l && l.teacher_id === currentUserId && l.status === "Pending").length;
+
+          return (
+            <div className="space-y-6">
+              {/* Top Navigation Tabs */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm flex flex-wrap gap-2 items-center justify-between">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-2 hidden md:inline">Quick Workflows:</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: "roster", label: "Student Roster", icon: Users },
+                    { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
+                    { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
+                    { id: "view-timetable", label: "My Timetable", icon: Calendar },
+                    { id: "request-leave", label: "Request Leave", icon: FileText },
+                    { id: "my-activities", label: "My Activities", icon: Briefcase }
+                  ].map((tabItem) => {
+                    const TabIcon = tabItem.icon;
+                    return (
+                      <button
+                        key={tabItem.id}
+                        onClick={() => { setActiveTab(tabItem.id); setSearchQuery(""); }}
+                        className="px-3.5 py-2 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer flex items-center gap-1.5 active:scale-[0.98]"
+                      >
+                        <TabIcon className="w-3.5 h-3.5 shrink-0" />
+                        <span>{tabItem.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Institutional Welcome banner */}
+              <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 rounded-2xl p-5 text-white shadow-md border border-emerald-200/10 relative overflow-hidden">
+                <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-48 h-48 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="absolute left-1/3 bottom-0 w-36 h-36 bg-emerald-400/10 rounded-full blur-xl pointer-events-none" />
+                
+                <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-white/10 backdrop-blur-md rounded-full text-[9px] font-black tracking-wider uppercase">
+                      <Sparkles className="w-3 h-3 text-cyan-200 animate-pulse" />
+                      Academic Instruction Center
+                    </div>
+                    <h2 className="text-lg font-extrabold tracking-tight font-sans">
+                      Welcome Back, {displayName}!
+                    </h2>
+                    <p className="text-[11px] text-emerald-100 max-w-xl font-medium leading-relaxed">
+                      You are in the Teacher Portal. Track your student progress, manage attendance registry logs, create assignment modules, and request administrative leaves.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setActiveTab("attendance")}
+                      className="px-4 py-2 bg-white text-emerald-700 hover:bg-cyan-50 text-[11px] font-bold rounded-lg shadow-sm transition-all duration-200 cursor-pointer flex items-center gap-1.5 font-sans"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Mark Attendance
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("assign-homework")}
+                      className="px-4 py-2 bg-emerald-500/30 hover:bg-emerald-500/40 text-white text-[11px] font-bold rounded-lg border border-white/10 backdrop-blur-md transition-all duration-200 cursor-pointer flex items-center gap-1.5 font-sans"
+                    >
+                      <FileCode2 className="w-3.5 h-3.5" />
+                      Assign Homework
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Bento Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                {[
+                  { label: "Overall Students", val: studentCount, desc: "Total enrolled students", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50 border-cyan-100/70", tab: "roster" },
+                  { label: "Faculty Instructors", val: teacherCount, desc: "Assigned course teachers", icon: Users, color: "text-emerald-600 bg-emerald-50 border-emerald-100/70", tab: "roster" },
+                  { label: "Registered Parents", val: parentCount, desc: "Active linked parents", icon: Users, color: "text-violet-600 bg-violet-50 border-violet-100/70", tab: "roster" },
+                  { label: "Class Cohorts", val: activeClassesCount, desc: "Configured study batches", icon: ClipboardList, color: "text-amber-600 bg-amber-50 border-amber-100/70", tab: "view-timetable" },
+                  { label: "My Leaves Filed", val: myLeavesCount, desc: `${pendingLeavesCount} awaiting approval`, icon: FileText, color: "text-pink-600 bg-pink-50 border-pink-100/70", tab: "request-leave" }
+                ].map((item, idx) => {
+                  const StatIcon = item.icon;
+                  return (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        setActiveTab(item.tab);
+                      }}
+                      className="bg-white border border-slate-200 hover:border-slate-300 rounded-xl p-3.5 shadow-sm hover:shadow transition-all duration-200 cursor-pointer group flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex justify-between items-start">
+                          <span className="text-[8px] uppercase font-black text-slate-400 tracking-wider block font-sans">{item.label}</span>
+                          <span className={`p-1.5 rounded-lg border ${item.color} group-hover:scale-110 transition-transform duration-200`}>
+                            <StatIcon className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                        <h4 className="text-xl font-bold tracking-tight text-slate-800 font-mono mt-2">{item.val}</h4>
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-semibold mt-1 truncate">{item.desc}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Active Cohort Summary / Class Timetable Card */}
+                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-emerald-600" />
+                      Class Timetable Quick View
+                    </h3>
+                    <button onClick={() => setActiveTab("view-timetable")} className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer">
+                      Full Schedule &rarr;
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2 text-xs">
+                    <p className="text-slate-500 text-[11px]">Below are some sample schedule periods. Use the full schedule tab for a comprehensive view.</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {[
+                        { day: "Monday", time: "08:30 AM - 10:00 AM", subj: "Mathematics", grade: "Grade 10 - A" },
+                        { day: "Tuesday", time: "10:30 AM - 12:00 PM", subj: "Physics Practice", grade: "Grade 11 - B" },
+                        { day: "Wednesday", time: "01:00 PM - 02:30 PM", subj: "Computer Networks", grade: "Grade 12 - A" },
+                        { day: "Thursday", time: "09:00 AM - 10:30 AM", subj: "English Writing", grade: "Grade 9 - C" }
+                      ].map((period, index) => (
+                        <div key={index} className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-1 hover:border-slate-300 transition-all">
+                          <div className="flex justify-between font-bold text-slate-800">
+                            <span>{period.subj}</span>
+                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded uppercase font-sans">{period.grade}</span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-medium font-mono flex justify-between">
+                            <span>{period.day}</span>
+                            <span>{period.time}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notifications Panel */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <Search className="w-4 h-4 text-emerald-600" />
+                        Roster Quick Search
+                      </h3>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <p className="text-slate-500 text-[11px]">Instantly query the directory for a student's status, parent details, and active logs.</p>
+                      <button
+                        onClick={() => setActiveTab("roster")}
+                        className="w-full bg-slate-50 border border-slate-200 hover:border-emerald-200 rounded-xl px-4 py-3 text-left text-xs font-semibold text-slate-500 hover:text-emerald-700 hover:bg-emerald-50/20 transition-all flex items-center justify-between group cursor-pointer"
+                      >
+                        <span>Search registered student names...</span>
+                        <Search className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-emerald-50/50 border border-emerald-150 p-3.5 rounded-xl text-[11px] text-emerald-800 font-semibold space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs text-emerald-900 font-bold uppercase tracking-wider">
+                      <Info className="w-4 h-4 text-emerald-700" />
+                      Leave Entitlement
+                    </div>
+                    <p className="font-medium text-[11px] leading-relaxed text-emerald-700">
+                      You have casual and medical leave quotas remaining for the current term. Submissions are processed by administrators.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
         if (activeTab === "roster") {
           const filtered = userDirectory.filter(u => u.role === "student" && (u.name.toLowerCase().includes(lowerQuery) || u.username.toLowerCase().includes(lowerQuery)));
           return (
