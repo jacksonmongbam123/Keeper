@@ -142,7 +142,18 @@ export default function ViewTimetableView({
         const data = await res.json();
         if (Array.isArray(data)) {
           // Strict organization boundaries enforcement: only allow slots for classes belonging to our organization
-          let filtered = data.filter((slot: any) => slot && allowedClassIds.has(slot.class_id));
+          // and assigned to teachers belonging to our organization to prevent cross-tenant leakage.
+          let filtered = data.filter((slot: any) => {
+            if (!slot) return false;
+            if (!allowedClassIds.has(slot.class_id)) return false;
+            
+            // If the slot is assigned to a teacher, that teacher MUST belong to our organization's user directory
+            if (slot.teacher_id) {
+              const teacherExists = userDirectory.some((u: any) => u && (u._id === slot.teacher_id || u.id === slot.teacher_id));
+              if (!teacherExists) return false;
+            }
+            return true;
+          });
           
           if (filterType === "mine") {
             // Filter where teacher_id matches currently logged in teacher

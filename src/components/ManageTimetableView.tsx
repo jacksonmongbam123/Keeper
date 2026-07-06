@@ -154,7 +154,17 @@ export default function ManageTimetableView({
         if (Array.isArray(data)) {
           // Sort chronologically by start time and filter out any items from other organizations
           const sorted = data
-            .filter((slot: any) => slot && allowedClassIds.has(slot.class_id))
+            .filter((slot: any) => {
+              if (!slot) return false;
+              if (!allowedClassIds.has(slot.class_id)) return false;
+              
+              // If the slot is assigned to a teacher, that teacher MUST belong to our organization's user directory
+              if (slot.teacher_id) {
+                const teacherExists = userDirectory.some((u: any) => u && (u._id === slot.teacher_id || u.id === slot.teacher_id));
+                if (!teacherExists) return false;
+              }
+              return true;
+            })
             .sort((a: any, b: any) => {
               return (a.start_time || "").localeCompare(b.start_time || "");
             });
