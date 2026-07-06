@@ -217,6 +217,8 @@ export default function App() {
   const [parentStudentRelations, setParentStudentRelations] = useState<any[]>([]);
   const [occupationsList, setOccupationsList] = useState<any[]>([]);
   const [absencesList, setAbsencesList] = useState<any[]>([]);
+  const [verifiedAbsences, setVerifiedAbsences] = useState<any[]>([]);
+  const [isVerifyingAbsences, setIsVerifyingAbsences] = useState<boolean>(false);
   const [teacherSubjectClasses, setTeacherSubjectClasses] = useState<any[]>([]);
   const [teacherQualifications, setTeacherQualifications] = useState<any[]>([]);
   const [edQualifications, setEdQualifications] = useState<any[]>([]);
@@ -1981,6 +1983,110 @@ export default function App() {
       setAttExistingDate(null);
     }
   }, [attStudentID, attDate, loginResult]);
+
+  // Verify and deduplicate selected student's absences against lookup to filter out stale ones
+  useEffect(() => {
+    if (!searchStudentSelectedId || !filteredUserDirectory || filteredUserDirectory.length === 0) {
+      setVerifiedAbsences([]);
+      return;
+    }
+
+    const studentObj = filteredUserDirectory.find((u: any) => u && (u._id === searchStudentSelectedId || u.id === searchStudentSelectedId));
+    if (!studentObj || String(studentObj.role).toLowerCase() !== "student") {
+      setVerifiedAbsences([]);
+      return;
+    }
+
+    const sUsername = studentObj.username || "";
+    const sId = studentObj._id || studentObj.id || "";
+    
+    // Filter raw absences for this student from the global list
+    // (making sure to handle cases where studentID is stored as username/NIC or database ID)
+    const rawAbs = absencesList.filter((a: any) => a && (
+      String(a.studentID).toLowerCase() === String(sUsername).toLowerCase() ||
+      String(a.studentID).toLowerCase() === String(sId).toLowerCase()
+    ));
+
+    // Deduplicate by date
+    const uniqueAbsMap = new Map<string, any>();
+    rawAbs.forEach((abs: any) => {
+      if (!abs || !abs.date) return;
+      try {
+        const dStr = new Date(abs.date).toISOString().split("T")[0];
+        uniqueAbsMap.set(dStr, abs);
+      } catch {
+        uniqueAbsMap.set(String(abs.date), abs);
+      }
+    });
+
+    const uniqueAbsArray = Array.from(uniqueAbsMap.values());
+    if (uniqueAbsArray.length === 0) {
+      setVerifiedAbsences([]);
+      return;
+    }
+
+    // Set initial deduplicated absences first so something renders instantly
+    setVerifiedAbsences(uniqueAbsArray);
+
+    // Verify each date against /class/attendance/lookup to ensure no newer "Present" record has overridden it
+    setIsVerifyingAbsences(true);
+    const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+    if (!token) {
+      setIsVerifyingAbsences(false);
+      return;
+    }
+
+    const verifyPromises = uniqueAbsArray.map(async (abs: any) => {
+      try {
+        let dateStr = "";
+        try {
+          dateStr = new Date(abs.date).toISOString().split("T")[0];
+        } catch {
+          dateStr = String(abs.date);
+        }
+
+        const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/lookup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            studentID: sUsername,
+            date: dateStr
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            // Get the latest record (backend always returns in insertion order)
+            const latestRecord = data[data.length - 1];
+            if (latestRecord && latestRecord.attended) {
+              // Student is marked PRESENT now! This is a stale/overridden absence!
+              return null;
+            }
+          }
+        }
+        return abs;
+      } catch (err) {
+        console.error("Error verifying absence date:", err);
+        return abs;
+      }
+    });
+
+    Promise.all(verifyPromises)
+      .then(results => {
+        setVerifiedAbsences(results.filter(Boolean));
+      })
+      .catch(err => {
+        console.error("Error running verification promises:", err);
+      })
+      .finally(() => {
+        setIsVerifyingAbsences(false);
+      });
+
+  }, [searchStudentSelectedId, filteredUserDirectory, absencesList, loginResult]);
 
   const handleSaveAttendance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -6481,19 +6587,8 @@ export default function App() {
             }
           }
 
-          // Absences (Deduplicated by date to prevent multiple submissions of the same date counting multiple times)
-          const rawAbs = absencesList.filter(a => a && a.studentID === sId);
-          const uniqueAbsMap = new Map<string, any>();
-          rawAbs.forEach(abs => {
-            if (!abs || !abs.date) return;
-            try {
-              const dStr = new Date(abs.date).toISOString().split("T")[0];
-              uniqueAbsMap.set(dStr, abs);
-            } catch {
-              uniqueAbsMap.set(String(abs.date), abs);
-            }
-          });
-          studentAbsences = Array.from(uniqueAbsMap.values());
+          // Absences (Deduplicated and verified against lookup in real-time)
+          studentAbsences = verifiedAbsences;
 
           // Marks
           studentMarks = (marksList || []).filter(m => m && m.student_id === sId);
@@ -6825,6 +6920,11 @@ export default function App() {
                         <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-rose-500" />
                           Attendance Absence Tracker
+                          {isVerifyingAbsences && (
+                            <span className="text-[9px] text-slate-400 font-normal animate-pulse normal-case ml-1">
+                              (verifying...)
+                            </span>
+                          )}
                         </h4>
                         <div className="space-y-3">
                           <div className="flex items-center justify-between p-3.5 bg-rose-50/50 border border-rose-100/50 rounded-xl">
