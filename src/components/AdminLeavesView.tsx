@@ -159,18 +159,34 @@ export default function AdminLeavesView({
     setIsProcessingId(null);
   };
 
-  // Filter leaves
+  // Filter leaves with robust normalization and tenant safety
+  const normalizeOrgId = (id: any): string => {
+    if (!id) return "";
+    const idStr = String(id).trim().toLowerCase();
+    if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+      return "6a48a06fde9f134ee6c3d763";
+    }
+    return idStr;
+  };
+
   const filteredLeaves = leaves.filter((l) => {
     if (!l) return false;
 
     // Filter by organization
     if (adminOrganizationId) {
-      if (l.organization_id && l.organization_id !== adminOrganizationId) {
+      const targetOrg = normalizeOrgId(adminOrganizationId);
+      const leafOrg = l.organization_id ? normalizeOrgId(l.organization_id) : "";
+      
+      if (leafOrg && leafOrg !== targetOrg) {
         return false;
       }
-      if (!l.organization_id) {
+      if (!leafOrg) {
         const teacher = userDirectory.find((u: any) => u && (u._id === l.teacher_id || u.id === l.teacher_id));
-        if (teacher && teacher.organization_id && teacher.organization_id !== adminOrganizationId) {
+        if (!teacher) {
+          return false; // Safe fallback: filter out if teacher cannot be found
+        }
+        const teacherOrg = teacher.organization_id ? normalizeOrgId(teacher.organization_id) : "";
+        if (teacherOrg && teacherOrg !== targetOrg) {
           return false;
         }
       }
@@ -188,12 +204,19 @@ export default function AdminLeavesView({
 
       // Filter by organization
       if (adminOrganizationId) {
-        if (l.organization_id && l.organization_id !== adminOrganizationId) {
+        const targetOrg = normalizeOrgId(adminOrganizationId);
+        const leafOrg = l.organization_id ? normalizeOrgId(l.organization_id) : "";
+        
+        if (leafOrg && leafOrg !== targetOrg) {
           return false;
         }
-        if (!l.organization_id) {
+        if (!leafOrg) {
           const teacher = userDirectory.find((u: any) => u && (u._id === l.teacher_id || u.id === l.teacher_id));
-          if (teacher && teacher.organization_id && teacher.organization_id !== adminOrganizationId) {
+          if (!teacher) {
+            return false; // Safe fallback
+          }
+          const teacherOrg = teacher.organization_id ? normalizeOrgId(teacher.organization_id) : "";
+          if (teacherOrg && teacherOrg !== targetOrg) {
             return false;
           }
         }

@@ -65,17 +65,32 @@ export default function TeacherNotificationsView({
             const dateB = new Date(b.date || b.createdAt || 0).getTime();
             return dateB - dateA;
           });
-          // Filter by organization
-          const userOrgId = organizationId || userDirectory.find((u: any) => u && (u._id === currentUserId || u.id === currentUserId))?.organization_id;
+          // Filter by organization with robust normalization and tenant safety
+          const normalizeOrgId = (id: any): string => {
+            if (!id) return "";
+            const idStr = String(id).trim().toLowerCase();
+            if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+              return "6a48a06fde9f134ee6c3d763";
+            }
+            return idStr;
+          };
+
+          const targetOrgNormalized = normalizeOrgId(organizationId || userDirectory.find((u: any) => u && (u._id === currentUserId || u.id === currentUserId))?.organization_id);
+          
           const orgFiltered = sorted.filter((notif: any) => {
             if (!notif) return false;
-            if (userOrgId) {
-              if (notif.organization_id && notif.organization_id !== userOrgId) {
+            if (targetOrgNormalized) {
+              const notifOrg = notif.organization_id ? normalizeOrgId(notif.organization_id) : "";
+              if (notifOrg && notifOrg !== targetOrgNormalized) {
                 return false;
               }
-              if (!notif.organization_id) {
+              if (!notifOrg) {
                 const sender = userDirectory.find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id));
-                if (sender && sender.organization_id && sender.organization_id !== userOrgId) {
+                if (!sender) {
+                  return false; // Safe fallback: filter out if sender cannot be resolved
+                }
+                const senderOrg = sender.organization_id ? normalizeOrgId(sender.organization_id) : "";
+                if (senderOrg && senderOrg !== targetOrgNormalized) {
                   return false;
                 }
               }

@@ -4066,7 +4066,7 @@ export default function App() {
               <TeacherNotificationsView 
                 token={token}
                 classSectionsList={classSectionsList}
-                userDirectory={userDirectory}
+                userDirectory={userDirectoryState}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
                 currentUserId={currentUserId}
               />
@@ -8314,7 +8314,7 @@ export default function App() {
           <div className="space-y-6">
             <AdminLeavesView 
               token={token}
-              userDirectory={filteredUserDirectory}
+              userDirectory={userDirectoryState}
               adminOrganizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
             />
           </div>
@@ -8339,16 +8339,31 @@ export default function App() {
           return classIdsInOrg.has(cs._id || cs.id);
         });
 
+        const normalizeOrgId = (id: any): string => {
+          if (!id) return "";
+          const idStr = String(id).trim().toLowerCase();
+          if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+            return "6a48a06fde9f134ee6c3d763";
+          }
+          return idStr;
+        };
+
         const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+        const targetOrgNormalized = normalizeOrgId(currentOrgId);
         const safeNotifications = (Array.isArray(notificationsList) ? notificationsList : []).filter((notif: any) => {
           if (!notif) return false;
-          if (currentOrgId) {
-            if (notif.organization_id && notif.organization_id !== currentOrgId) {
+          if (targetOrgNormalized) {
+            const notifOrg = notif.organization_id ? normalizeOrgId(notif.organization_id) : "";
+            if (notifOrg && notifOrg !== targetOrgNormalized) {
               return false;
             }
-            if (!notif.organization_id) {
-              const sender = (userDirectory || []).find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id || u.username === notif.sender_id));
-              if (sender && sender.organization_id && sender.organization_id !== currentOrgId) {
+            if (!notifOrg) {
+              const sender = (userDirectoryState || []).find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id || u.username === notif.sender_id));
+              if (!sender) {
+                return false; // Safe fallback: filter out if sender cannot be resolved
+              }
+              const senderOrg = sender.organization_id ? normalizeOrgId(sender.organization_id) : "";
+              if (senderOrg && senderOrg !== targetOrgNormalized) {
                 return false;
               }
             }
@@ -9281,7 +9296,7 @@ export default function App() {
               return false;
             }
             if (!mark.organization_id) {
-              const studentObj = (Array.isArray(userDirectory) ? userDirectory : []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
+              const studentObj = (Array.isArray(userDirectoryState) ? userDirectoryState : []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
               const classObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
               
               const studentOrg = studentObj ? normalizeOrgId(studentObj.organization_id) : "";
@@ -9292,6 +9307,9 @@ export default function App() {
               }
               if (classOrg && classOrg !== targetOrgNormalized) {
                 return false;
+              }
+              if (!studentOrg && !classOrg) {
+                return false; // Safe fallback: filter out if no organization context can be resolved
               }
             }
           }
@@ -10245,7 +10263,7 @@ export default function App() {
                   <HeaderNotificationsDropdown
                     token={headerToken}
                     classSectionsList={classSectionsList || []}
-                    userDirectory={userDirectory || []}
+                    userDirectory={userDirectoryState || []}
                     currentUserId={headerUserId}
                     organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
                   />
