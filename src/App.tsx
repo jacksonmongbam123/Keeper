@@ -2668,7 +2668,7 @@ export default function App() {
     }
   }, [userDirectoryState, adminOrganizationId]);
 
-  // Fetch logged-in admin's organization details
+  // Fetch logged-in admin or teacher's organization details
   useEffect(() => {
     const fetchAdminOrganization = async () => {
       try {
@@ -2682,24 +2682,32 @@ export default function App() {
         }
 
         let admin = null;
+        let teacher = null;
         
         // 1. Check if we have active user in loginResult
         if (loginResult?.success && loginResult?.data?.user) {
           const u = loginResult.data.user;
           if (u.role === "administrator" || u.role === "admin" || u.user_type === "admin" || u.user_type === "administrator") {
             admin = u;
+          } else if (u.role === "instructor" || u.role === "teacher" || u.user_type === "teacher" || u.user_type === "instructor") {
+            teacher = u;
           }
         }
         
         // 2. If not, fallback to localStorage
-        if (!admin) {
+        if (!admin && !teacher) {
           const adminData = localStorage.getItem('keeper_admin_info');
           if (adminData) {
-            admin = JSON.parse(adminData);
+            const parsedData = JSON.parse(adminData);
+            if (parsedData.role === "administrator" || parsedData.role === "admin" || parsedData.user_type === "admin" || parsedData.user_type === "administrator") {
+              admin = parsedData;
+            } else if (parsedData.role === "instructor" || parsedData.role === "teacher" || parsedData.user_type === "teacher" || parsedData.user_type === "instructor") {
+              teacher = parsedData;
+            }
           }
         }
         
-        console.log('Detected Admin User Object:', admin);
+        console.log('Detected User Object - Admin:', admin, 'Teacher:', teacher);
         
         if (admin) {
           const adminNIC = admin.nic || admin.phone || admin.username || admin.reg_no;
@@ -2727,13 +2735,41 @@ export default function App() {
               setAdminAccessLevel(admin.access_level_id);
             }
           }
+        } else if (teacher) {
+          const teacherId = teacher._id || teacher.id;
+          console.log('Attempting to fetch teacher by ID:', teacherId);
+          if (teacherId) {
+            const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+            const res = await fetch(`https://abms-lkw9.onrender.com/m/teacher/retrieve/${teacherId}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              }
+            });
+            if (res.ok) {
+              const teacherDetails = await res.json();
+              console.log('Fetched live Teacher Details:', teacherDetails);
+              if (teacherDetails && teacherDetails.organization_id) {
+                setAdminOrganizationId(teacherDetails.organization_id);
+                return;
+              }
+            } else {
+              console.warn('Live teacher fetch failed status:', res.status);
+            }
+          }
+          
+          if (teacher.organization_id) {
+            console.log('Falling back to teacher.organization_id:', teacher.organization_id);
+            setAdminOrganizationId(teacher.organization_id);
+          }
         } else {
           setAdminOrganizationId(null);
           setAdminAccessLevel(null);
           setInstitutionDetails(null);
         }
       } catch (err) {
-        console.warn('Could not fetch admin organization:', err);
+        console.warn('Could not fetch user organization:', err);
       }
     };
     fetchAdminOrganization();
@@ -3997,6 +4033,118 @@ export default function App() {
                 token={token}
                 currentUserId={currentUserId}
               />
+            </div>
+          );
+        }
+
+        if (activeTab === "institutions") {
+          return (
+            <div className="space-y-6 max-w-4xl animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-teal-50 flex items-center gap-3">
+                  <Building className="h-6 w-6 text-emerald-600" />
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Institute Details</h2>
+                    <p className="text-xs text-slate-500 mt-1">Organization information and address details</p>
+                  </div>
+                </div>
+
+                {isLoadingInstitution ? (
+                  <div className="p-8 flex items-center justify-center">
+                    <div className="text-center space-y-2">
+                      <div className="inline-block animate-spin">
+                        <Clock className="h-6 w-6 text-emerald-600" />
+                      </div>
+                      <p className="text-sm text-slate-500">Loading institution details...</p>
+                    </div>
+                  </div>
+                ) : institutionDetails ? (
+                  <div className="p-6 space-y-6">
+                    {/* Name */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Institution Name</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-semibold text-slate-900">
+                        {institutionDetails.name || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* Address Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Line 1 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Street Address</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line1 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* Line 2 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Building / Suite</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line2 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* Line 3 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Additional Info</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line3 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* City */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">City</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.city || "Not provided"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Postcode */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Postal Code</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                        {institutionDetails.postcode || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* Key */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Organization Key</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-mono text-slate-700">
+                        {institutionDetails.key || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Database ID</label>
+                      <div className="bg-slate-900 text-slate-300 rounded-lg px-4 py-3 text-xs font-mono">
+                        {institutionDetails._id || "Not available"}
+                      </div>
+                    </div>
+
+                    {/* Summary Card */}
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-bold text-emerald-900">📍 Location Summary</p>
+                      <p className="text-sm text-emerald-800">
+                        {[institutionDetails.line1, institutionDetails.line2, institutionDetails.line3, institutionDetails.city, institutionDetails.postcode]
+                          .filter(Boolean)
+                          .join(", ") || "No address information available"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center space-y-3">
+                    <Building className="h-12 w-12 text-slate-300 mx-auto" />
+                    <p className="text-sm text-slate-500">No institution details available</p>
+                    <p className="text-xs text-slate-400">Organization details from m_organization collection not found</p>
+                  </div>
+                )}
+              </div>
             </div>
           );
         }

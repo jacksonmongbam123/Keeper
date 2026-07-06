@@ -1,6 +1,6 @@
 {
-  "name": "Academic Board Management System",
-  "description": "A comprehensive portal for students, instructors, parents, and administrators to manage curriculum, assignments, grades, schedules, user directories, and institute details.",
+  "name": "School Management Portal",
+  "description": "Comprehensive student, instructor, and administrator management portal with dynamic institution and fee tracking.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
