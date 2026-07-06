@@ -49,6 +49,7 @@ import {
 import * as XLSX from "xlsx";
 import AssignHomeworkView from "./components/AssignHomeworkView";
 import ManageTimetableView from "./components/ManageTimetableView";
+import ViewTimetableView from "./components/ViewTimetableView";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2953,7 +2954,8 @@ export default function App() {
       { id: "roster", label: "Student Rosters", icon: Users },
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
       { id: "attendance-history", label: "Attendance History", icon: Calendar },
-      { id: "assign-homework", label: "Assign Homework", icon: FileCode2 }
+      { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
+      { id: "view-timetable", label: "View Timetable", icon: Calendar }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -3736,6 +3738,22 @@ export default function App() {
                 token={token}
                 classSectionsList={classSectionsList}
                 subjectsList={subjectsList}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "view-timetable") {
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          return (
+            <div className="space-y-6">
+              <ViewTimetableView 
+                token={token}
+                classSectionsList={classSectionsList}
+                subjectsList={subjectsList}
+                userDirectory={userDirectory}
+                currentUserId={currentUserId}
               />
             </div>
           );
