@@ -1922,6 +1922,7 @@ export default function App() {
   const [attStatusLookup, setAttStatusLookup] = useState<string | null>(null);
   const [attCheckingStatus, setAttCheckingStatus] = useState(false);
   const [attExistingId, setAttExistingId] = useState<string | null>(null);
+  const [attExistingDate, setAttExistingDate] = useState<string | null>(null);
 
   // Auto-check attendance status when student or date changes
   const checkExistingAttendance = async (studentId: string, dateStr: string) => {
@@ -1929,6 +1930,7 @@ export default function App() {
     setAttCheckingStatus(true);
     setAttStatusLookup(null);
     setAttExistingId(null);
+    setAttExistingDate(null);
     try {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
@@ -1946,21 +1948,25 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          const record = data[0];
+          const record = data[data.length - 1];
           setAttStatusLookup(record.attended ? "present" : "absent");
           setAttExistingId(record._id || record.id || null);
+          setAttExistingDate(record.date || null);
         } else {
           setAttStatusLookup("none");
           setAttExistingId(null);
+          setAttExistingDate(null);
         }
       } else {
         setAttStatusLookup("error");
         setAttExistingId(null);
+        setAttExistingDate(null);
       }
     } catch (err) {
       console.error("Error checking attendance status:", err);
       setAttStatusLookup("error");
       setAttExistingId(null);
+      setAttExistingDate(null);
     } finally {
       setAttCheckingStatus(false);
     }
@@ -1972,6 +1978,7 @@ export default function App() {
     } else {
       setAttStatusLookup(null);
       setAttExistingId(null);
+      setAttExistingDate(null);
     }
   }, [attStudentID, attDate, loginResult]);
 
@@ -1998,7 +2005,7 @@ export default function App() {
 
       const payload: any = {
         studentID: attStudentID.trim(),
-        date: attDate,
+        date: attExistingDate ? attExistingDate : attDate,
         attended: attAttended
       };
 
@@ -2026,6 +2033,9 @@ export default function App() {
       setAttStatusLookup(attAttended ? "present" : "absent");
       if (data && (data._id || data.id)) {
         setAttExistingId(data._id || data.id);
+        if (data.date) {
+          setAttExistingDate(data.date);
+        }
       }
 
       // Sync the global absences state as well
@@ -2091,13 +2101,15 @@ export default function App() {
           if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
+              const record = data[data.length - 1];
               return {
                 studentID: student.username,
                 name: student.name,
                 phone: student.phone || "N/A",
-                attended: data[0].attended,
+                attended: record.attended,
                 marked: true,
-                _id: data[0]._id
+                _id: record._id || record.id || undefined,
+                date: record.date || undefined
               };
             }
           }
@@ -2114,12 +2126,22 @@ export default function App() {
           });
 
           if (isAbsentInGlobalList) {
+            const matchingAbs = absencesList.find(abs => {
+              if (!abs || !abs.date || abs.studentID !== student.username) return false;
+              try {
+                return new Date(abs.date).toISOString().split("T")[0] === dateStr;
+              } catch {
+                return false;
+              }
+            });
             return {
               studentID: student.username,
               name: student.name,
               phone: student.phone || "N/A",
               attended: false,
-              marked: true
+              marked: true,
+              _id: matchingAbs?._id || matchingAbs?.id || undefined,
+              date: matchingAbs?.date || undefined
             };
           }
 
@@ -2164,9 +2186,10 @@ export default function App() {
       if (!token) return;
 
       const existingRecord = historyRecords.find(r => r.studentID === studentID);
+      const finalDate = (existingRecord && existingRecord.date) ? existingRecord.date : historyDate;
       const payload: any = {
         studentID: studentID,
-        date: historyDate,
+        date: finalDate,
         attended: attended
       };
 
@@ -6458,8 +6481,19 @@ export default function App() {
             }
           }
 
-          // Absences
-          studentAbsences = absencesList.filter(a => a && a.studentID === sId);
+          // Absences (Deduplicated by date to prevent multiple submissions of the same date counting multiple times)
+          const rawAbs = absencesList.filter(a => a && a.studentID === sId);
+          const uniqueAbsMap = new Map<string, any>();
+          rawAbs.forEach(abs => {
+            if (!abs || !abs.date) return;
+            try {
+              const dStr = new Date(abs.date).toISOString().split("T")[0];
+              uniqueAbsMap.set(dStr, abs);
+            } catch {
+              uniqueAbsMap.set(String(abs.date), abs);
+            }
+          });
+          studentAbsences = Array.from(uniqueAbsMap.values());
 
           // Marks
           studentMarks = (marksList || []).filter(m => m && m.student_id === sId);
