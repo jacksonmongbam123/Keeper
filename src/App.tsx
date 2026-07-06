@@ -2957,7 +2957,7 @@ export default function App() {
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
       { id: "attendance-history", label: "Attendance History", icon: Calendar },
       { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
-      { id: "view-timetable", label: "View Timetable", icon: Calendar }
+      { id: "view-timetable", label: "My Class Timetable", icon: Calendar }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },

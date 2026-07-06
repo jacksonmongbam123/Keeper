@@ -123,17 +123,38 @@ export default function ViewTimetableView({
     fetchTimetables();
   }, [selectedClassId, filterType]);
 
+  // Stats calculations
+  const totalSlots = timetableEntries.length;
+  const uniqueCohorts = Array.from(new Set(timetableEntries.map(s => s.class_id))).filter(Boolean);
+  const cohortsCount = uniqueCohorts.length;
+
+  const dayCounts: Record<string, number> = {};
+  timetableEntries.forEach(s => {
+    if (s.day) {
+      const d = String(s.day).trim();
+      dayCounts[d] = (dayCounts[d] || 0) + 1;
+    }
+  });
+  let busiestDay = "None";
+  let maxSlots = 0;
+  Object.entries(dayCounts).forEach(([day, count]) => {
+    if (count > maxSlots) {
+      maxSlots = count;
+      busiestDay = day;
+    }
+  });
+
   return (
     <div className="space-y-6">
       {/* Header & Controls Panel */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div>
           <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2.5">
-            <Calendar className="w-5 h-5 text-cyan-600" />
-            Academic Schedule & Timetable
+            <Calendar className="w-5 h-5 text-cyan-600 animate-pulse" />
+            My Class Timetable & Schedule
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Browse class timetables, assigned slots, lecture periods, and location rooms.
+            Browse your assigned lecture slots, timings, classroom locations, and weekly teaching schedule.
           </p>
         </div>
 
@@ -193,6 +214,46 @@ export default function ViewTimetableView({
           )}
         </div>
       </div>
+
+      {/* Schedule Stats Summary Bento Cards */}
+      {!isLoading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Weekly Lectures</span>
+            <div className="flex items-baseline gap-1.5 mt-2">
+              <span className="text-2xl font-black text-slate-800">{totalSlots}</span>
+              <span className="text-[10px] text-slate-400 font-medium">periods assigned</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Active Cohorts</span>
+            <div className="flex items-baseline gap-1.5 mt-2">
+              <span className="text-2xl font-black text-cyan-700">{filterType === "mine" ? cohortsCount : classSectionsList.length}</span>
+              <span className="text-[10px] text-slate-400 font-medium">different classes</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Busiest Teaching Day</span>
+            <div className="flex items-baseline gap-1.5 mt-2">
+              <span className="text-base font-extrabold text-slate-800 truncate block max-w-full">{busiestDay}</span>
+              {maxSlots > 0 && (
+                <span className="text-[10px] text-slate-400 font-medium shrink-0">({maxSlots} slots)</span>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">View Mode Filter</span>
+            <div className="flex items-baseline gap-1.5 mt-2">
+              <span className="text-sm font-extrabold text-indigo-700">
+                {filterType === "mine" ? "My Custom Schedule" : "Whole Class View"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Message Banner */}
       {errorMsg && (
