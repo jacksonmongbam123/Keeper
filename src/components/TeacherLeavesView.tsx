@@ -17,6 +17,7 @@ interface TeacherLeavesViewProps {
   token: string;
   currentUserId: string;
   teacherName?: string;
+  organizationId?: string;
 }
 
 export interface LeaveRequest {
@@ -24,6 +25,7 @@ export interface LeaveRequest {
   id?: string;
   teacher_id: string;
   teacher_name?: string;
+  organization_id?: string;
   leave_date: string;
   end_date: string;
   leave_type: string;
@@ -35,7 +37,8 @@ export interface LeaveRequest {
 export default function TeacherLeavesView({
   token,
   currentUserId,
-  teacherName
+  teacherName,
+  organizationId
 }: TeacherLeavesViewProps) {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -119,6 +122,7 @@ export default function TeacherLeavesView({
     const payload: LeaveRequest = {
       teacher_id: currentUserId,
       teacher_name: teacherName || "Instructor",
+      organization_id: organizationId,
       leave_date: leaveDate,
       end_date: endDate,
       leave_type: leaveType,

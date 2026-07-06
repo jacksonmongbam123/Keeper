@@ -451,7 +451,8 @@ export default function App() {
         target_type: notifTargetType,
         target_class_id: notifTargetType === "class_section" ? notifTargetClassSection : undefined,
         target_student_id: notifTargetType === "parents_of_student" ? notifTargetStudentId : undefined,
-        sender_id: loginResult?.data?.user?._id || loginResult?.data?.user?.id || "Admin"
+        sender_id: loginResult?.data?.user?._id || loginResult?.data?.user?.id || "Admin",
+        organization_id: adminOrganizationId || loginResult?.data?.user?.organization_id || undefined
       };
 
       const res = await fetch("https://abms-lkw9.onrender.com/m/notification/add", {
@@ -4056,12 +4057,15 @@ export default function App() {
 
         if (activeTab === "notifications") {
           const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
           return (
             <div className="space-y-6">
               <TeacherNotificationsView 
                 token={token}
                 classSectionsList={classSectionsList}
                 userDirectory={userDirectory}
+                organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+                currentUserId={currentUserId}
               />
             </div>
           );
@@ -4077,6 +4081,7 @@ export default function App() {
                 token={token}
                 currentUserId={currentUserId}
                 teacherName={teacherName}
+                organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
               />
             </div>
           );
@@ -8306,6 +8311,7 @@ export default function App() {
             <AdminLeavesView 
               token={token}
               userDirectory={filteredUserDirectory}
+              adminOrganizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
             />
           </div>
         );
@@ -8314,8 +8320,37 @@ export default function App() {
       // Notifications Portal Tab
       if (activeTab === "notifications") {
         const studentsList = (userDirectory || []).filter((u: any) => u && u.role === "student");
-        const safeClassSections = Array.isArray(classSectionsList) ? classSectionsList : [];
-        const safeNotifications = Array.isArray(notificationsList) ? notificationsList : [];
+        const studentIds = new Set(studentsList.map((s: any) => s._id || s.id));
+        const classIdsInOrg = new Set(
+          (studentClassRelations || [])
+            .filter((rel: any) => rel && studentIds.has(rel.student_id))
+            .map((rel: any) => rel.class_id)
+        );
+        const safeClassSections = (Array.isArray(classSectionsList) ? classSectionsList : []).filter((cs: any) => {
+          if (!cs) return false;
+          const currentOrg = adminOrganizationId || loginResult?.data?.user?.organization_id;
+          if (cs.organization_id && currentOrg) {
+            return cs.organization_id === currentOrg;
+          }
+          return classIdsInOrg.has(cs._id || cs.id);
+        });
+
+        const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+        const safeNotifications = (Array.isArray(notificationsList) ? notificationsList : []).filter((notif: any) => {
+          if (!notif) return false;
+          if (currentOrgId) {
+            if (notif.organization_id && notif.organization_id !== currentOrgId) {
+              return false;
+            }
+            if (!notif.organization_id) {
+              const sender = (userDirectory || []).find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id || u.username === notif.sender_id));
+              if (sender && sender.organization_id && sender.organization_id !== currentOrgId) {
+                return false;
+              }
+            }
+          }
+          return true;
+        });
 
         return (
           <div className="space-y-6 max-w-6xl animate-in fade-in duration-300">
@@ -10138,6 +10173,7 @@ export default function App() {
                     classSectionsList={classSectionsList || []}
                     userDirectory={userDirectory || []}
                     currentUserId={headerUserId}
+                    organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
                   />
                 ) : null;
               })()}

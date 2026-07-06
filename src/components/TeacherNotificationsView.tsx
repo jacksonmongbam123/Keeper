@@ -21,12 +21,16 @@ interface TeacherNotificationsViewProps {
   token: string;
   classSectionsList: any[];
   userDirectory: any[];
+  organizationId?: string;
+  currentUserId?: string;
 }
 
 export default function TeacherNotificationsView({
   token,
   classSectionsList = [],
-  userDirectory = []
+  userDirectory = [],
+  organizationId,
+  currentUserId = ""
 }: TeacherNotificationsViewProps) {
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,7 +65,24 @@ export default function TeacherNotificationsView({
             const dateB = new Date(b.date || b.createdAt || 0).getTime();
             return dateB - dateA;
           });
-          setNotificationsList(sorted);
+          // Filter by organization
+          const userOrgId = organizationId || userDirectory.find((u: any) => u && (u._id === currentUserId || u.id === currentUserId))?.organization_id;
+          const orgFiltered = sorted.filter((notif: any) => {
+            if (!notif) return false;
+            if (userOrgId) {
+              if (notif.organization_id && notif.organization_id !== userOrgId) {
+                return false;
+              }
+              if (!notif.organization_id) {
+                const sender = userDirectory.find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id));
+                if (sender && sender.organization_id && sender.organization_id !== userOrgId) {
+                  return false;
+                }
+              }
+            }
+            return true;
+          });
+          setNotificationsList(orgFiltered);
         } else {
           setNotificationsList([]);
         }

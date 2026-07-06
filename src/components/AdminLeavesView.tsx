@@ -18,11 +18,13 @@ import { LeaveRequest } from "./TeacherLeavesView";
 interface AdminLeavesViewProps {
   token: string;
   userDirectory: any[];
+  adminOrganizationId?: string;
 }
 
 export default function AdminLeavesView({
   token,
-  userDirectory = []
+  userDirectory = [],
+  adminOrganizationId
 }: AdminLeavesViewProps) {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -160,13 +162,44 @@ export default function AdminLeavesView({
   // Filter leaves
   const filteredLeaves = leaves.filter((l) => {
     if (!l) return false;
+
+    // Filter by organization
+    if (adminOrganizationId) {
+      if (l.organization_id && l.organization_id !== adminOrganizationId) {
+        return false;
+      }
+      if (!l.organization_id) {
+        const teacher = userDirectory.find((u: any) => u && (u._id === l.teacher_id || u.id === l.teacher_id));
+        if (teacher && teacher.organization_id && teacher.organization_id !== adminOrganizationId) {
+          return false;
+        }
+      }
+    }
+
     if (statusFilter === "All") return true;
     return l.status === statusFilter;
   });
 
   // Count items
   const countByStatus = (status: string) => {
-    return leaves.filter((l) => l && l.status === status).length;
+    return leaves.filter((l) => {
+      if (!l) return false;
+      if (l.status !== status) return false;
+
+      // Filter by organization
+      if (adminOrganizationId) {
+        if (l.organization_id && l.organization_id !== adminOrganizationId) {
+          return false;
+        }
+        if (!l.organization_id) {
+          const teacher = userDirectory.find((u: any) => u && (u._id === l.teacher_id || u.id === l.teacher_id));
+          if (teacher && teacher.organization_id && teacher.organization_id !== adminOrganizationId) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }).length;
   };
 
   return (

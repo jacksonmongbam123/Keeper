@@ -18,13 +18,15 @@ interface HeaderNotificationsDropdownProps {
   classSectionsList: any[];
   userDirectory: any[];
   currentUserId: string;
+  organizationId?: string;
 }
 
 export default function HeaderNotificationsDropdown({
   token,
   classSectionsList = [],
   userDirectory = [],
-  currentUserId = ""
+  currentUserId = "",
+  organizationId
 }: HeaderNotificationsDropdownProps) {
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -68,10 +70,28 @@ export default function HeaderNotificationsDropdown({
             const dateB = new Date(b.date || b.createdAt || 0).getTime();
             return dateB - dateA;
           });
-          setNotificationsList(sorted);
+          // Filter by organization
+          const userOrgId = organizationId || userDirectory.find((u: any) => u && (u._id === currentUserId || u.id === currentUserId))?.organization_id;
+          const orgFiltered = sorted.filter((notif: any) => {
+            if (!notif) return false;
+            if (userOrgId) {
+              if (notif.organization_id && notif.organization_id !== userOrgId) {
+                return false;
+              }
+              if (!notif.organization_id) {
+                const sender = userDirectory.find((u: any) => u && (u._id === notif.sender_id || u.id === notif.sender_id));
+                if (sender && sender.organization_id && sender.organization_id !== userOrgId) {
+                  return false;
+                }
+              }
+            }
+            return true;
+          });
+
+          setNotificationsList(orgFiltered);
 
           // Check if there are notifications not yet seen
-          const unseen = sorted.some((notif: any) => notif._id && !seenIds.includes(notif._id));
+          const unseen = orgFiltered.some((notif: any) => notif._id && !seenIds.includes(notif._id));
           setHasNewNotifications(unseen);
         } else {
           setNotificationsList([]);
