@@ -3251,7 +3251,7 @@ export default function App() {
           const teacherCount = userDirectory.filter(u => u.role === "instructor").length;
           const parentCount = userDirectory.filter(u => u.role === "parents").length;
           const activeClassesCount = (classSectionsList || []).length;
-          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
           
           // Count leaves for the logged-in teacher
           const localLeavesStr = localStorage.getItem("abms_rel_teacher_leaves");
@@ -3946,7 +3946,7 @@ export default function App() {
 
         if (activeTab === "view-timetable") {
           const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
-          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
           return (
             <div className="space-y-6">
               <ViewTimetableView 
@@ -3975,12 +3975,14 @@ export default function App() {
 
         if (activeTab === "request-leave") {
           const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
-          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const teacherName = loginResult?.data?.user ? `${loginResult.data.user.first_name || ""} ${loginResult.data.user.last_name || ""}`.trim() || loginResult.data.user.username || "" : "";
           return (
             <div className="space-y-6">
               <TeacherLeavesView 
                 token={token}
                 currentUserId={currentUserId}
+                teacherName={teacherName}
               />
             </div>
           );
@@ -3988,7 +3990,7 @@ export default function App() {
 
         if (activeTab === "my-activities") {
           const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
-          const currentUserId = loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
           return (
             <div className="space-y-6">
               <TeacherAssignedActivitiesView 

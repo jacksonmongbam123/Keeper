@@ -16,12 +16,14 @@ import {
 interface TeacherLeavesViewProps {
   token: string;
   currentUserId: string;
+  teacherName?: string;
 }
 
 export interface LeaveRequest {
   _id?: string;
   id?: string;
   teacher_id: string;
+  teacher_name?: string;
   leave_date: string;
   end_date: string;
   leave_type: string;
@@ -32,7 +34,8 @@ export interface LeaveRequest {
 
 export default function TeacherLeavesView({
   token,
-  currentUserId
+  currentUserId,
+  teacherName
 }: TeacherLeavesViewProps) {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,12 +107,18 @@ export default function TeacherLeavesView({
       return;
     }
 
+    if (!currentUserId) {
+      setErrorMsg("Error: Your Teacher User ID is missing or could not be identified. Please try logging out and logging back in.");
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
 
     const payload: LeaveRequest = {
       teacher_id: currentUserId,
+      teacher_name: teacherName || "Instructor",
       leave_date: leaveDate,
       end_date: endDate,
       leave_type: leaveType,
@@ -117,6 +126,9 @@ export default function TeacherLeavesView({
       status: "Pending",
       created_at: new Date().toISOString()
     };
+
+    let apiSucceeded = false;
+    let apiErrorMsg = "";
 
     try {
       const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherLeave/add", {
@@ -127,20 +139,33 @@ export default function TeacherLeavesView({
         },
         body: JSON.stringify(payload)
       });
+      
       if (res.ok) {
-        setSuccessMsg("Your leave request has been submitted successfully!");
+        setSuccessMsg("Your leave request has been submitted and stored in MongoDB database successfully!");
         setReason("");
         setLeaveDate("");
         setEndDate("");
         await fetchLeaves();
         setIsSubmitting(false);
         return;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        apiErrorMsg = errData.message || errData.error || `Server responded with status ${res.status}`;
       }
-    } catch (err) {
-      console.warn("API leaf submission failed, fallback to local cache:", err);
+    } catch (err: any) {
+      console.warn("API leaf submission failed, falling back to local cache:", err);
+      apiErrorMsg = err.message || "Network connection failure";
     }
 
-    // Fallback Local Storage Save
+    // If API returned a failure (e.g. status 400 or 500) rather than a network disconnect,
+    // let's show the actual error instead of silently using local storage fallback.
+    if (apiErrorMsg && apiErrorMsg !== "Failed to fetch" && !apiErrorMsg.includes("Network")) {
+      setErrorMsg(`API Submission Failed: ${apiErrorMsg}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Fallback Local Storage Save (only on offline network failures)
     const local = localStorage.getItem("abms_rel_teacher_leaves");
     const currentList: LeaveRequest[] = local ? JSON.parse(local) : [];
     
@@ -153,7 +178,7 @@ export default function TeacherLeavesView({
     const updated = [newRecord, ...currentList];
     localStorage.setItem("abms_rel_teacher_leaves", JSON.stringify(updated));
     
-    setSuccessMsg("Your leave request has been successfully submitted!");
+    setSuccessMsg("Your leave request has been successfully submitted (Offline fallback mode: Saved locally in browser cache)!");
     setReason("");
     setLeaveDate("");
     setEndDate("");

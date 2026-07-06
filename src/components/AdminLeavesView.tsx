@@ -95,6 +95,9 @@ export default function AdminLeavesView({
     setErrorMsg("");
     setSuccessMsg("");
 
+    let apiSucceeded = false;
+    let apiErrorMsg = "";
+
     try {
       const res = await fetch(`https://abms-lkw9.onrender.com/rel/teacherLeave/update/${leafId}`, {
         method: "POST", // or PUT depending on design, POST is safe for generic endpoint update
@@ -105,16 +108,28 @@ export default function AdminLeavesView({
         body: JSON.stringify({ status: newStatus })
       });
       if (res.ok) {
-        setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()}!`);
+        setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} and saved in MongoDB Atlas!`);
         await fetchLeaves();
         setIsProcessingId(null);
         return;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        apiErrorMsg = errData.message || errData.error || `Server responded with status ${res.status}`;
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn("API leave status update failed, fallback to local caching:", err);
+      apiErrorMsg = err.message || "Network connection failure";
     }
 
-    // Local Storage Fallback Update
+    // If API returned a failure (e.g. status 400 or 500) rather than a network disconnect,
+    // let's show the actual error instead of silently using local storage fallback.
+    if (apiErrorMsg && apiErrorMsg !== "Failed to fetch" && !apiErrorMsg.includes("Network")) {
+      setErrorMsg(`API Status Update Failed: ${apiErrorMsg}`);
+      setIsProcessingId(null);
+      return;
+    }
+
+    // Local Storage Fallback Update (only on offline network failures)
     const local = localStorage.getItem("abms_rel_teacher_leaves");
     if (local) {
       const currentList: LeaveRequest[] = JSON.parse(local);
@@ -126,7 +141,7 @@ export default function AdminLeavesView({
       });
       localStorage.setItem("abms_rel_teacher_leaves", JSON.stringify(updated));
       setLeaves(updated);
-      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()}!`);
+      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} (Offline fallback mode: Saved locally in browser cache)!`);
     } else {
       // If none existed but they updated some UI array
       const updated = leaves.map((item: LeaveRequest) => {
@@ -137,7 +152,7 @@ export default function AdminLeavesView({
       });
       setLeaves(updated);
       localStorage.setItem("abms_rel_teacher_leaves", JSON.stringify(updated));
-      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()}!`);
+      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} (Offline fallback mode: Saved locally in browser cache)!`);
     }
     setIsProcessingId(null);
   };
