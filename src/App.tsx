@@ -52,6 +52,7 @@ import ManageTimetableView from "./components/ManageTimetableView";
 import ViewTimetableView from "./components/ViewTimetableView";
 import TeacherNotificationsView from "./components/TeacherNotificationsView";
 import HeaderNotificationsDropdown from "./components/HeaderNotificationsDropdown";
+import AssignExtraActivitiesView from "./components/AssignExtraActivitiesView";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2945,7 +2946,8 @@ export default function App() {
       { id: "notifications", label: "Notifications Portal", icon: Bell },
       { id: "institutions", label: "Institute Details", icon: Building },
       { id: "fees", label: "Fees Management", icon: CreditCard },
-      { id: "timetable", label: "Manage Timetable", icon: Calendar }
+      { id: "timetable", label: "Manage Timetable", icon: Calendar },
+      { id: "assign-activities", label: "Assign Extra Activities", icon: Briefcase }
     ] : selectedRole === "student" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "courses", label: "My Curriculum", icon: BookOpen },
@@ -7846,6 +7848,19 @@ export default function App() {
               token={token}
               classSectionsList={classSectionsList}
               subjectsList={subjectsList}
+              userDirectory={filteredUserDirectory}
+            />
+          </div>
+        );
+      }
+
+      // Assign Extra Activities Tab
+      if (activeTab === "assign-activities") {
+        const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+        return (
+          <div className="space-y-6">
+            <AssignExtraActivitiesView 
+              token={token}
               userDirectory={filteredUserDirectory}
             />
           </div>
