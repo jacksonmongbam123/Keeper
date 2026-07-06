@@ -146,73 +146,15 @@ export default function ViewTimetableView({
 
   return (
     <div className="space-y-6">
-      {/* Header & Controls Panel */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-        <div>
-          <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2.5">
-            <Calendar className="w-5 h-5 text-cyan-600 animate-pulse" />
-            My Class Timetable & Schedule
-          </h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Browse your assigned lecture slots, timings, classroom locations, and weekly teaching schedule.
-          </p>
-        </div>
-
-        {/* View Toggle and Selector */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Toggle buttons: My Schedule vs Class Wise */}
-          <div className="bg-slate-100 p-1 rounded-xl border border-slate-200/60 flex items-center gap-1">
-            <button
-              onClick={() => {
-                setFilterType("mine");
-                setSelectedClassId("");
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                filterType === "mine"
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              My Schedule
-            </button>
-            <button
-              onClick={() => {
-                setFilterType("all");
-                // Default to first class if none selected
-                if (!selectedClassId && classSectionsList.length > 0) {
-                  setSelectedClassId(classSectionsList[0]._id || classSectionsList[0].id);
-                }
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                filterType === "all"
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              Class Timetable
-            </button>
-          </div>
-
-          {/* Conditional Class Dropdown Selector */}
-          {filterType === "all" && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
-              <select
-                value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
-              >
-                {classSectionsList.map((cs: any) => (
-                  <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                    {cs.grade} - {cs.__section || cs.section || "N/A"}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
+      {/* Header Panel */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+        <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2.5">
+          <Calendar className="w-5 h-5 text-cyan-600 animate-pulse" />
+          My Class Timetable & Schedule
+        </h2>
+        <p className="text-xs text-slate-500 mt-1">
+          Browse your assigned lecture slots, timings, classroom locations, and weekly teaching schedule.
+        </p>
       </div>
 
       {/* Schedule Stats Summary Bento Cards */}
@@ -387,6 +329,62 @@ export default function ViewTimetableView({
           })}
         </div>
       )}
+
+      {/* Bottom Controls Panel (Right-aligned) */}
+      <div className="flex justify-end items-center gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        {/* Toggle buttons: My Schedule vs Class Wise */}
+        <div className="bg-slate-100 p-1 rounded-xl border border-slate-200/60 flex items-center gap-1">
+          <button
+            onClick={() => {
+              setFilterType("mine");
+              setSelectedClassId("");
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              filterType === "mine"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            My Schedule
+          </button>
+          <button
+            onClick={() => {
+              setFilterType("all");
+              // Default to first class if none selected
+              if (!selectedClassId && classSectionsList.length > 0) {
+                setSelectedClassId(classSectionsList[0]._id || classSectionsList[0].id);
+              }
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              filterType === "all"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            Class Timetable
+          </button>
+        </div>
+
+        {/* Conditional Class Dropdown Selector */}
+        {filterType === "all" && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
+            <select
+              value={selectedClassId}
+              onChange={(e) => setSelectedClassId(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+            >
+              {classSectionsList.map((cs: any) => (
+                <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                  {cs.grade} - {cs.__section || cs.section || "N/A"}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
