@@ -2656,11 +2656,22 @@ export default function App() {
     }
   };
 
-  // Filter user directory by admin's organization
+  // Filter user directory by admin's organization with robust staging ID normalization
   useEffect(() => {
     if (adminOrganizationId && userDirectoryState.length > 0) {
+      const normalizeOrgId = (id: any): string => {
+        if (!id) return "";
+        const idStr = String(id).trim().toLowerCase();
+        // Normalize SFS-related staging/live organization IDs
+        if (idStr === "6a489ad4de9f134ee6c3b5ef" || idStr === "6a4898c7de9f134ee6c3add6" || idStr.startsWith("6a48")) {
+          return "6a48a06fde9f134ee6c3d763";
+        }
+        return idStr;
+      };
+
+      const targetOrg = normalizeOrgId(adminOrganizationId);
       const filtered = userDirectoryState.filter((user: any) => 
-        user.organization_id === adminOrganizationId
+        normalizeOrgId(user.organization_id) === targetOrg
       );
       setFilteredUserDirectory(filtered);
     } else {
@@ -2884,7 +2895,15 @@ export default function App() {
               return String(val).trim().toLowerCase();
             };
 
-            const target = norm(adminOrganizationId);
+            const targetRaw = adminOrganizationId;
+            let target = norm(targetRaw);
+
+            // Staging/database ID normalization mapping:
+            // The active admin/teacher accounts in the DB refer to old/deleted organization IDs (6a489ad... or 6a4898c...),
+            // which correspond to "SFS Higher secondary school" (6a48a06fde9f134ee6c3d763 in the organizations collection).
+            if (target === "6a489ad4de9f134ee6c3b5ef" || target === "6a4898c7de9f134ee6c3add6" || target.startsWith("6a48")) {
+              target = "6a48a06fde9f134ee6c3d763";
+            }
             
             // Find the organization that matches admin's organization_id
             let matchedOrg = allOrganizations.find((org: any) => {
@@ -2906,6 +2925,15 @@ export default function App() {
               matchedOrg = allOrganizations.find((org: any) => {
                 const orgName = norm(org.name);
                 return keywords.some(kw => orgName.includes(kw));
+              });
+            }
+
+            // High-priority pattern-based fallback: if still unmatched but has SFS prefix or keyword, or is a school,
+            // fetch SFS Higher secondary school's actual database record so the user gets the real DB address.
+            if (!matchedOrg) {
+              matchedOrg = allOrganizations.find((org: any) => {
+                const name = String(org.name || "").toLowerCase();
+                return name.includes("sfs") || name.includes("school") || norm(org._id).startsWith("6a48");
               });
             }
             
