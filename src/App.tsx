@@ -3350,38 +3350,30 @@ export default function App() {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Active Cohort Summary / Class Timetable Card */}
-                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-emerald-600" />
-                      Class Timetable Quick View
-                    </h3>
-                    <button onClick={() => setActiveTab("view-timetable")} className="text-[10px] text-emerald-600 font-bold hover:underline cursor-pointer">
-                      Full Schedule &rarr;
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-2 text-xs">
-                    <p className="text-slate-500 text-[11px]">Below are some sample schedule periods. Use the full schedule tab for a comprehensive view.</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                      {[
-                        { day: "Monday", time: "08:30 AM - 10:00 AM", subj: "Mathematics", grade: "Grade 10 - A" },
-                        { day: "Tuesday", time: "10:30 AM - 12:00 PM", subj: "Physics Practice", grade: "Grade 11 - B" },
-                        { day: "Wednesday", time: "01:00 PM - 02:30 PM", subj: "Computer Networks", grade: "Grade 12 - A" },
-                        { day: "Thursday", time: "09:00 AM - 10:30 AM", subj: "English Writing", grade: "Grade 9 - C" }
-                      ].map((period, index) => (
-                        <div key={index} className="p-3 bg-slate-50 border border-slate-150 rounded-xl space-y-1 hover:border-slate-300 transition-all">
-                          <div className="flex justify-between font-bold text-slate-800">
-                            <span>{period.subj}</span>
-                            <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded uppercase font-sans">{period.grade}</span>
-                          </div>
-                          <div className="text-[10px] text-slate-400 font-medium font-mono flex justify-between">
-                            <span>{period.day}</span>
-                            <span>{period.time}</span>
-                          </div>
-                        </div>
-                      ))}
+                <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-emerald-600" />
+                        Class Timetable Quick View
+                      </h3>
                     </div>
+                    
+                    <div className="space-y-2 text-xs">
+                      <p className="text-slate-500 text-[11px]">
+                        Your complete weekly schedule listing periods, classes, subjects, and study timings is fully configured.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setActiveTab("view-timetable")}
+                      className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/50 hover:border-emerald-200 rounded-xl py-3 px-4 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Open Full Interactive Class Timetable &rarr;
+                    </button>
                   </div>
                 </div>
 
