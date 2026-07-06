@@ -2672,6 +2672,15 @@ export default function App() {
   useEffect(() => {
     const fetchAdminOrganization = async () => {
       try {
+        // If any user is logged in and has an organization_id, prioritize it directly
+        if (loginResult?.success && loginResult?.data?.user?.organization_id) {
+          setAdminOrganizationId(loginResult.data.user.organization_id);
+          if (loginResult.data.user.access_level_id) {
+            setAdminAccessLevel(loginResult.data.user.access_level_id);
+          }
+          return;
+        }
+
         let admin = null;
         
         // 1. Check if we have active user in loginResult
@@ -2967,7 +2976,8 @@ export default function App() {
       { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
       { id: "view-timetable", label: "My Class Timetable", icon: Calendar },
       { id: "request-leave", label: "Request Leave", icon: FileText },
-      { id: "my-activities", label: "My Extra Activities", icon: Briefcase }
+      { id: "my-activities", label: "My Extra Activities", icon: Briefcase },
+      { id: "institutions", label: "Institute Details", icon: Building }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -3261,7 +3271,8 @@ export default function App() {
                     { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
                     { id: "view-timetable", label: "My Timetable", icon: Calendar },
                     { id: "request-leave", label: "Request Leave", icon: FileText },
-                    { id: "my-activities", label: "My Activities", icon: Briefcase }
+                    { id: "my-activities", label: "My Activities", icon: Briefcase },
+                    { id: "institutions", label: "Institute Details", icon: Building }
                   ].map((tabItem) => {
                     const TabIcon = tabItem.icon;
                     return (
