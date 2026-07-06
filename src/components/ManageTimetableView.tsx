@@ -217,43 +217,6 @@ export default function ManageTimetableView({
             Design and organize course lecture hours, subjects, room assignments, and faculty mentors for each group cohort.
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Class Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
-            <select
-              value={selectedClassId}
-              onChange={(e) => {
-                setSelectedClassId(e.target.value);
-                setErrorMsg("");
-                setSuccessMsg("");
-              }}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
-            >
-              <option value="">-- Choose Class Section --</option>
-              {classSectionsList.map((cs: any) => (
-                <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                  {cs.grade} - {cs.__section || cs.section || "N/A"}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {selectedClassId && (
-            <button
-              onClick={() => {
-                setErrorMsg("");
-                setSuccessMsg("");
-                setIsAdding(true);
-              }}
-              className="bg-slate-950 hover:bg-slate-900 text-white font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              Add Slot
-            </button>
-          )}
-        </div>
       </div>
 
       {/* Messages */}
@@ -288,7 +251,7 @@ export default function ManageTimetableView({
           <div>
             <h3 className="text-sm font-bold text-slate-700">No Cohort Group Selected</h3>
             <p className="text-xs text-slate-400 mt-1 max-w-sm">
-              Please choose a class section from the dropdown selector above to build, preview, or manage its weekly academic timetable.
+              Please choose a class section from the dropdown selector below to build, preview, or manage its weekly academic timetable.
             </p>
           </div>
         </div>
@@ -398,6 +361,44 @@ export default function ManageTimetableView({
           })}
         </div>
       )}
+
+      {/* Bottom Controls Panel */}
+      <div className="flex justify-end items-center gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+        {/* Class Selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
+          <select
+            value={selectedClassId}
+            onChange={(e) => {
+              setSelectedClassId(e.target.value);
+              setErrorMsg("");
+              setSuccessMsg("");
+            }}
+            className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+          >
+            <option value="">-- Choose Class Section --</option>
+            {classSectionsList.map((cs: any) => (
+              <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                {cs.grade} - {cs.__section || cs.section || "N/A"}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedClassId && (
+          <button
+            onClick={() => {
+              setErrorMsg("");
+              setSuccessMsg("");
+              setIsAdding(true);
+            }}
+            className="bg-slate-950 hover:bg-slate-900 text-white font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Add Slot
+          </button>
+        )}
+      </div>
 
       {/* Add Entry Modal Overlay */}
       <AnimatePresence>
