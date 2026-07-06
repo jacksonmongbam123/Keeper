@@ -242,162 +242,167 @@ export default function ManageTimetableView({
         </motion.div>
       )}
 
-      {/* Main Timetable Board */}
-      {!selectedClassId ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center text-slate-400 flex flex-col items-center justify-center space-y-4">
-          <div className="bg-slate-50 p-4 rounded-full border border-slate-100">
-            <Calendar className="w-10 h-10 text-slate-300" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-700">No Cohort Group Selected</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm">
-              Please choose a class section from the dropdown selector below to build, preview, or manage its weekly academic timetable.
-            </p>
-          </div>
-        </div>
-      ) : isLoading ? (
-        <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-400 flex flex-col items-center justify-center space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
-          <p className="text-xs font-semibold text-slate-500">Compiling class timetable slots...</p>
-        </div>
-      ) : (
-        /* Grid Layout: 6 Columns for days of the week */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
-          {DAYS_OF_WEEK.map((day) => {
-            const slotsForDay = timetableEntries.filter(
-              (slot) => String(slot.day).toLowerCase() === day.toLowerCase()
-            );
-
-            return (
-              <div 
-                key={day} 
-                className="bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm min-h-[350px]"
-              >
-                {/* Day Header */}
-                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/70 rounded-t-2xl flex items-center justify-between shrink-0">
-                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    {day}
-                  </span>
-                  <span className="text-[10px] font-bold bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded-full font-mono">
-                    {slotsForDay.length}
-                  </span>
-                </div>
-
-                {/* Slots List */}
-                <div className="flex-1 p-3 overflow-y-auto space-y-2.5">
-                  {slotsForDay.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-300 border-2 border-dashed border-slate-100 rounded-xl">
-                      <Clock className="w-6 h-6 mb-1 text-slate-200" />
-                      <span className="text-[10px] font-semibold">Free Day</span>
-                    </div>
-                  ) : (
-                    slotsForDay.map((slot, idx) => {
-                      const subjectObj = subjectsList.find(
-                        (s: any) => s && (s._id === slot.subject_id || s.id === slot.subject_id)
-                      );
-                      const subjectName = subjectObj ? (subjectObj.name || subjectObj.subject) : slot.subject_id;
-
-                      return (
-                        <motion.div
-                          initial={{ opacity: 0, y: 5 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: idx * 0.03 }}
-                          key={slot._id || idx}
-                          className="group relative bg-slate-50 border border-slate-200 rounded-xl p-3 hover:border-slate-300 hover:bg-slate-100/50 transition-all flex flex-col gap-1.5"
-                        >
-                          {/* Delete Button (visible on group hover) */}
-                          <button
-                            onClick={() => handleDeleteEntry(slot._id)}
-                            className="absolute top-2.5 right-2.5 p-1 bg-white hover:bg-rose-50 border border-slate-100 hover:border-rose-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm md:opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                            title="Delete slot"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-
-                          {/* Time & Duration */}
-                          <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-cyan-700">
-                            <Clock className="w-3 h-3 text-cyan-600 shrink-0" />
-                            <span>
-                              {slot.start_time} - {slot.end_time}
-                            </span>
-                          </div>
-
-                          {/* Subject */}
-                          <div className="flex items-start gap-1.5">
-                            <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-[11px] font-bold text-slate-800 leading-tight truncate" title={subjectName}>
-                                {subjectName}
-                              </h4>
-                            </div>
-                          </div>
-
-                          {/* Teacher & Room */}
-                          <div className="space-y-1 pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-500">
-                            {slot.teacher_id && (
-                              <div className="flex items-center gap-1.5 truncate">
-                                <User className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span className="truncate" title={getTeacherName(slot.teacher_id)}>
-                                  {getTeacherName(slot.teacher_id)}
-                                </span>
-                              </div>
-                            )}
-                            {slot.room && (
-                              <div className="flex items-center gap-1.5 truncate">
-                                <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                                <span className="truncate font-semibold text-slate-600" title={slot.room}>
-                                  {slot.room}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      );
-                    })
-                  )}
-                </div>
+      {/* Unified Class Timetable & Schedule Builder Container */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+        {/* Content Section (Up) */}
+        <div>
+          {!selectedClassId ? (
+            <div className="text-center text-slate-400 flex flex-col items-center justify-center py-16 space-y-4">
+              <div className="bg-slate-50 p-4 rounded-full border border-slate-100">
+                <Calendar className="w-10 h-10 text-slate-300" />
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div>
+                <h3 className="text-sm font-bold text-slate-700">No Cohort Group Selected</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                  Please choose a class section from the dropdown selector below to build, preview, or manage its weekly academic timetable.
+                </p>
+              </div>
+            </div>
+          ) : isLoading ? (
+            <div className="text-center text-slate-400 flex flex-col items-center justify-center py-20 space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
+              <p className="text-xs font-semibold text-slate-500">Compiling class timetable slots...</p>
+            </div>
+          ) : (
+            /* Grid Layout: 6 Columns for days of the week */
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+              {DAYS_OF_WEEK.map((day) => {
+                const slotsForDay = timetableEntries.filter(
+                  (slot) => String(slot.day).toLowerCase() === day.toLowerCase()
+                );
 
-      {/* Bottom Controls Panel */}
-      <div className="flex justify-end items-center gap-3 bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-        {/* Class Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
-          <select
-            value={selectedClassId}
-            onChange={(e) => {
-              setSelectedClassId(e.target.value);
-              setErrorMsg("");
-              setSuccessMsg("");
-            }}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
-          >
-            <option value="">-- Choose Class Section --</option>
-            {classSectionsList.map((cs: any) => (
-              <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                {cs.grade} - {cs.__section || cs.section || "N/A"}
-              </option>
-            ))}
-          </select>
+                return (
+                  <div 
+                    key={day} 
+                    className="bg-slate-50/50 border border-slate-200/60 rounded-2xl flex flex-col min-h-[350px]"
+                  >
+                    {/* Day Header */}
+                    <div className="px-4 py-3 border-b border-slate-100 bg-white/80 rounded-t-2xl flex items-center justify-between shrink-0">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        {day}
+                      </span>
+                      <span className="text-[10px] font-bold bg-slate-200/60 text-slate-600 px-2 py-0.5 rounded-full font-mono">
+                        {slotsForDay.length}
+                      </span>
+                    </div>
+
+                    {/* Slots List */}
+                    <div className="flex-1 p-3 overflow-y-auto space-y-2.5">
+                      {slotsForDay.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-4 text-slate-300 border-2 border-dashed border-slate-200/50 rounded-xl">
+                          <Clock className="w-6 h-6 mb-1 text-slate-200" />
+                          <span className="text-[10px] font-semibold">Free Day</span>
+                        </div>
+                      ) : (
+                        slotsForDay.map((slot, idx) => {
+                          const subjectObj = subjectsList.find(
+                            (s: any) => s && (s._id === slot.subject_id || s.id === slot.subject_id)
+                          );
+                          const subjectName = subjectObj ? (subjectObj.name || subjectObj.subject) : slot.subject_id;
+
+                          return (
+                            <motion.div
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: idx * 0.03 }}
+                              key={slot._id || idx}
+                              className="group relative bg-white border border-slate-200 rounded-xl p-3 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col gap-1.5"
+                            >
+                              {/* Delete Button (visible on group hover) */}
+                              <button
+                                onClick={() => handleDeleteEntry(slot._id)}
+                                className="absolute top-2.5 right-2.5 p-1 bg-white hover:bg-rose-50 border border-slate-100 hover:border-rose-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm md:opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+                                title="Delete slot"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+
+                              {/* Time & Duration */}
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-cyan-700">
+                                <Clock className="w-3 h-3 text-cyan-600 shrink-0" />
+                                <span>
+                                  {slot.start_time} - {slot.end_time}
+                                </span>
+                              </div>
+
+                              {/* Subject */}
+                              <div className="flex items-start gap-1.5">
+                                <BookOpen className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-[11px] font-bold text-slate-800 leading-tight truncate" title={subjectName}>
+                                    {subjectName}
+                                  </h4>
+                                </div>
+                              </div>
+
+                              {/* Teacher & Room */}
+                              <div className="space-y-1 pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-500">
+                                {slot.teacher_id && (
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <User className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span className="truncate" title={getTeacherName(slot.teacher_id)}>
+                                      {getTeacherName(slot.teacher_id)}
+                                    </span>
+                                  </div>
+                                )}
+                                {slot.room && (
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                                    <span className="truncate font-semibold text-slate-600" title={slot.room}>
+                                      {slot.room}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {selectedClassId && (
-          <button
-            onClick={() => {
-              setErrorMsg("");
-              setSuccessMsg("");
-              setIsAdding(true);
-            }}
-            className="bg-slate-950 hover:bg-slate-900 text-white font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Add Slot
-          </button>
-        )}
+        {/* Buttons / Dropdown Section (Down & Right Aligned) */}
+        <div className="pt-4 border-t border-slate-100 flex justify-end items-center gap-3">
+          {/* Class Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
+            <select
+              value={selectedClassId}
+              onChange={(e) => {
+                setSelectedClassId(e.target.value);
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+            >
+              <option value="">-- Choose Class Section --</option>
+              {classSectionsList.map((cs: any) => (
+                <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                  {cs.grade} - {cs.__section || cs.section || "N/A"}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedClassId && (
+            <button
+              onClick={() => {
+                setErrorMsg("");
+                setSuccessMsg("");
+                setIsAdding(true);
+              }}
+              className="bg-slate-950 hover:bg-slate-900 text-white font-bold py-1.5 px-3.5 rounded-xl text-xs transition-all flex items-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              Add Slot
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Add Entry Modal Overlay */}
