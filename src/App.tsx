@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import AssignHomeworkView from "./components/AssignHomeworkView";
+import ManageTimetableView from "./components/ManageTimetableView";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2940,7 +2941,8 @@ export default function App() {
       { id: "search-students", label: "Comprehensive Search", icon: Search },
       { id: "notifications", label: "Notifications Portal", icon: Bell },
       { id: "institutions", label: "Institute Details", icon: Building },
-      { id: "fees", label: "Fees Management", icon: CreditCard }
+      { id: "fees", label: "Fees Management", icon: CreditCard },
+      { id: "timetable", label: "Manage Timetable", icon: Calendar }
     ] : selectedRole === "student" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "courses", label: "My Curriculum", icon: BookOpen },
@@ -7798,6 +7800,21 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
+        );
+      }
+
+      // Timetable Management Tab
+      if (activeTab === "timetable") {
+        const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+        return (
+          <div className="space-y-6">
+            <ManageTimetableView 
+              token={token}
+              classSectionsList={classSectionsList}
+              subjectsList={subjectsList}
+              userDirectory={filteredUserDirectory}
+            />
           </div>
         );
       }
