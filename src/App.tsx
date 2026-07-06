@@ -39,6 +39,7 @@ import {
   UserCog,
   Pencil,
   UserPlus,
+  Plus,
   Link,
   Building,
   CreditCard,
@@ -317,6 +318,14 @@ export default function App() {
   const [isGradesModalOpen, setIsGradesModalOpen] = useState<boolean>(false);
   const [newGradeName, setNewGradeName] = useState<string>("");
   const [newGradeMin, setNewGradeMin] = useState<string>("");
+
+  // New Class Section Configuration States
+  const [isClassSectionFormOpen, setIsClassSectionFormOpen] = useState<boolean>(false);
+  const [newClassSectionGrade, setNewClassSectionGrade] = useState<string>("");
+  const [newClassSectionName, setNewClassSectionName] = useState<string>("");
+  const [isSubmittingClassSection, setIsSubmittingClassSection] = useState<boolean>(false);
+  const [classSectionError, setClassSectionError] = useState<string>("");
+  const [classSectionSuccess, setClassSectionSuccess] = useState<string>("");
 
   // Bulk Upload States
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = useState<boolean>(false);
@@ -756,6 +765,50 @@ export default function App() {
     const updated = dfMarksGrades.filter(g => (g._id !== id && g.id !== id));
     setDfMarksGrades(updated);
     localStorage.setItem("abms_df_marks_grades", JSON.stringify(updated));
+  };
+
+  const handleCreateClassSection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClassSectionGrade.trim() || !newClassSectionName.trim()) {
+      setClassSectionError("Please fill in both Grade and Section fields.");
+      return;
+    }
+
+    setIsSubmittingClassSection(true);
+    setClassSectionError("");
+    setClassSectionSuccess("");
+
+    try {
+      const orgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+      const response = await fetch("https://abms-lkw9.onrender.com/m/classSection/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          grade: newClassSectionGrade.trim(),
+          __section: newClassSectionName.trim(),
+          section: newClassSectionName.trim(),
+          is_active: true,
+          organization_id: orgId
+        })
+      });
+
+      if (response.ok) {
+        setClassSectionSuccess(`Class Section "${newClassSectionGrade} - ${newClassSectionName}" added successfully!`);
+        setNewClassSectionGrade("");
+        setNewClassSectionName("");
+        await refreshClassSections();
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        setClassSectionError(errData.message || "Failed to add class section. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error adding class section:", err);
+      setClassSectionError("Network or server error. Please try again later.");
+    } finally {
+      setIsSubmittingClassSection(false);
+    }
   };
 
   const handleDownloadBulkTemplate = () => {
@@ -2835,6 +2888,24 @@ export default function App() {
     };
     fetchAdminOrganization();
   }, [loginResult]);
+
+  const refreshClassSections = async () => {
+    try {
+      const res = await fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setClassSectionsList(data.filter(Boolean));
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch class sections:", err);
+    }
+  };
 
   // Fetch grades (as classes), sections, and subjects for mapping, and titles from df/title/all
   useEffect(() => {
@@ -8694,6 +8765,17 @@ export default function App() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    onClick={() => {
+                      setIsClassSectionFormOpen(!isClassSectionFormOpen);
+                      setClassSectionError("");
+                      setClassSectionSuccess("");
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer animate-none"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {isClassSectionFormOpen ? "Hide Form" : "Add Class Section"}
+                  </button>
+                  <button
                     onClick={async () => {
                       setIsLoadingInstitution(true);
                       await Promise.all([
@@ -8711,6 +8793,76 @@ export default function App() {
               </div>
 
               <div className="p-6 space-y-6">
+                {isClassSectionFormOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-indigo-600" />
+                        <h3 className="font-bold text-slate-800 text-sm">Add New Class Section</h3>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsClassSectionFormOpen(false);
+                          setClassSectionError("");
+                          setClassSectionSuccess("");
+                        }}
+                        className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleCreateClassSection} className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Grade (e.g. Grade 10, Grade 11)</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Grade 10"
+                          value={newClassSectionGrade}
+                          onChange={(e) => setNewClassSectionGrade(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Section (e.g. A, B, C)</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. A"
+                          value={newClassSectionName}
+                          onChange={(e) => setNewClassSectionName(e.target.value)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                        <div>
+                          {classSectionError && (
+                            <p className="text-xs font-semibold text-rose-600">{classSectionError}</p>
+                          )}
+                          {classSectionSuccess && (
+                            <p className="text-xs font-semibold text-emerald-600">{classSectionSuccess}</p>
+                          )}
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={isSubmittingClassSection}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
+                        >
+                          {isSubmittingClassSection ? "Adding..." : "Save Class Section"}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                )}
+
                 {/* Filter Selector Row */}
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <div className="space-y-1.5 max-w-md">
