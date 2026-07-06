@@ -22,6 +22,8 @@ interface ManageTimetableViewProps {
   subjectsList: any[];
   userDirectory: any[];
   organizationId?: string;
+  studentClassRelations?: any[];
+  teacherSubjectClasses?: any[];
 }
 
 const DAYS_OF_WEEK = [
@@ -38,7 +40,9 @@ export default function ManageTimetableView({
   classSectionsList = [],
   subjectsList = [],
   userDirectory = [],
-  organizationId
+  organizationId,
+  studentClassRelations = [],
+  teacherSubjectClasses = []
 }: ManageTimetableViewProps) {
   // Filters and Selectors
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -67,13 +71,39 @@ export default function ManageTimetableView({
     return idStr;
   };
 
+  // Dynamically resolve all class sections that have active students or teachers in our organization's userDirectory
+  const classIdsInOrg = new Set<string>();
+
+  const studentsList = userDirectory.filter((u: any) => u && String(u.role).toLowerCase() === "student");
+  const studentIds = new Set(studentsList.map((s: any) => s._id || s.id));
+  if (Array.isArray(studentClassRelations)) {
+    studentClassRelations.forEach((rel: any) => {
+      if (rel && rel.class_id && (studentIds.has(rel.student_id) || studentIds.has(String(rel.student_id)))) {
+        classIdsInOrg.add(rel.class_id);
+      }
+    });
+  }
+
+  const teachersInOrg = new Set(
+    userDirectory
+      .filter((u: any) => u && (String(u.role).toLowerCase() === "instructor" || String(u.role).toLowerCase() === "teacher"))
+      .map((t: any) => t._id || t.id)
+  );
+  if (Array.isArray(teacherSubjectClasses)) {
+    teacherSubjectClasses.forEach((tsc: any) => {
+      if (tsc && tsc.class_id && (teachersInOrg.has(tsc.teacher_id) || teachersInOrg.has(String(tsc.teacher_id)))) {
+        classIdsInOrg.add(tsc.class_id);
+      }
+    });
+  }
+
   // Filter class sections to the admin's organization scope with support for m_class_sections records lacking organization_id
   const filteredClassSections = classSectionsList.filter((cs: any) => {
     if (!cs) return false;
     if (cs.organization_id && organizationId) {
       return normalizeOrgId(cs.organization_id) === normalizeOrgId(organizationId);
     }
-    return true;
+    return classIdsInOrg.has(cs._id || cs.id);
   });
 
   const allowedClassIds = new Set(filteredClassSections.map((cs: any) => cs._id || cs.id));

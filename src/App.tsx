@@ -4099,6 +4099,8 @@ export default function App() {
                 userDirectory={userDirectory}
                 currentUserId={currentUserId}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+                studentClassRelations={studentClassRelations}
+                teacherSubjectClasses={teacherSubjectClasses}
               />
             </div>
           );
@@ -8335,6 +8337,8 @@ export default function App() {
               subjectsList={subjectsList}
               userDirectory={filteredUserDirectory}
               organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+              studentClassRelations={studentClassRelations}
+              teacherSubjectClasses={teacherSubjectClasses}
             />
           </div>
         );
