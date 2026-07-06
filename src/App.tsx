@@ -9382,7 +9382,7 @@ export default function App() {
                     <option value="">All Classes & Sections</option>
                     {Array.isArray(classSectionsList) && classSectionsList.filter((cs: any) => {
                       if (!cs) return false;
-                      if (targetOrgNormalized) {
+                      if (cs.organization_id && targetOrgNormalized) {
                         return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
                       }
                       return true;
@@ -9652,7 +9652,7 @@ export default function App() {
                         <option value="">-- Choose class section --</option>
                         {Array.isArray(classSectionsList) && classSectionsList.filter((cs: any) => {
                           if (!cs) return false;
-                          if (targetOrgNormalized) {
+                          if (cs.organization_id && targetOrgNormalized) {
                             return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
                           }
                           return true;
