@@ -50,6 +50,7 @@ import * as XLSX from "xlsx";
 import AssignHomeworkView from "./components/AssignHomeworkView";
 import ManageTimetableView from "./components/ManageTimetableView";
 import ViewTimetableView from "./components/ViewTimetableView";
+import TeacherNotificationsView from "./components/TeacherNotificationsView";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2955,7 +2956,8 @@ export default function App() {
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
       { id: "attendance-history", label: "Attendance History", icon: Calendar },
       { id: "assign-homework", label: "Assign Homework", icon: FileCode2 },
-      { id: "view-timetable", label: "View Timetable", icon: Calendar }
+      { id: "view-timetable", label: "View Timetable", icon: Calendar },
+      { id: "notifications", label: "Notifications", icon: Bell }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -3754,6 +3756,19 @@ export default function App() {
                 subjectsList={subjectsList}
                 userDirectory={userDirectory}
                 currentUserId={currentUserId}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "notifications") {
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          return (
+            <div className="space-y-6">
+              <TeacherNotificationsView 
+                token={token}
+                classSectionsList={classSectionsList}
+                userDirectory={userDirectory}
               />
             </div>
           );
