@@ -68,10 +68,10 @@ export default function ViewTimetableView({
     return idStr;
   };
 
-  // Filter class sections to the teacher's organization scope
+  // Filter class sections to the teacher's organization scope with support for m_class_sections records lacking organization_id
   const filteredClassSections = classSectionsList.filter((cs: any) => {
     if (!cs) return false;
-    if (organizationId) {
+    if (cs.organization_id && organizationId) {
       return normalizeOrgId(cs.organization_id) === normalizeOrgId(organizationId);
     }
     return true;
