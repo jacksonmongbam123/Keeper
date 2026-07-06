@@ -43,9 +43,11 @@ import {
   CreditCard,
   ClipboardList,
   Award,
-  Briefcase
+  Briefcase,
+  FileCode2
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import AssignHomeworkView from "./components/AssignHomeworkView";
 
 type RoleType = "administrator" | "student" | "instructor" | "parents";
 
@@ -2948,7 +2950,8 @@ export default function App() {
     ] : selectedRole === "instructor" ? [
       { id: "roster", label: "Student Rosters", icon: Users },
       { id: "attendance", label: "Mark Attendance", icon: CheckCircle2 },
-      { id: "attendance-history", label: "Attendance History", icon: Calendar }
+      { id: "attendance-history", label: "Attendance History", icon: Calendar },
+      { id: "assign-homework", label: "Assign Homework", icon: FileCode2 }
     ] : [ // parents
       { id: "overview", label: "Parent Dashboard", icon: Home },
       { id: "progress", label: "Academic Progress", icon: Activity },
@@ -3719,6 +3722,19 @@ export default function App() {
                   )}
                 </div>
               </div>
+            </div>
+          );
+        }
+
+        if (activeTab === "assign-homework") {
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          return (
+            <div className="space-y-6">
+              <AssignHomeworkView 
+                token={token}
+                classSectionsList={classSectionsList}
+                subjectsList={subjectsList}
+              />
             </div>
           );
         }
