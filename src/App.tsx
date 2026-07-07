@@ -164,6 +164,18 @@ const ROLE_CONFIGS: Record<
 
 const DEFAULT_PRESET_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
+const normalizeOrgIdLocalGlobal = (id: any): string => {
+  if (!id) return "";
+  if (typeof id === 'object') {
+    id = id._id || id.id || id;
+  }
+  const idStr = String(id).trim().toLowerCase();
+  if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+    return "6a48a06fde9f134ee6c3d763";
+  }
+  return idStr;
+};
+
 export default function App() {
   const [selectedRole, setSelectedRole] = useState<RoleType>("student");
   const [username, setUsername] = useState("");
@@ -2943,23 +2955,12 @@ export default function App() {
   }, [loginResult]);
 
   const getFilteredClassSections = () => {
-    const normalizeOrgIdLocal = (id: any): string => {
-      if (!id) return "";
-      if (typeof id === 'object') {
-        id = id._id || id.id || id;
-      }
-      const idStr = String(id).trim().toLowerCase();
-      if (idStr === "6a489ad4de9f134ee6c3b5ef") {
-        return "6a48a06fde9f134ee6c3d763";
-      }
-      return idStr;
-    };
     const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
-    const targetOrgNormalized = normalizeOrgIdLocal(currentOrgId);
+    const targetOrgNormalized = normalizeOrgIdLocalGlobal(currentOrgId);
     
     const ourOrgUserIds = new Set(
       (filteredUserDirectory || [])
-        .filter((u: any) => u && normalizeOrgIdLocal(u.organization_id) === targetOrgNormalized)
+        .filter((u: any) => u && normalizeOrgIdLocalGlobal(u.organization_id) === targetOrgNormalized)
         .map((u: any) => u._id || u.id)
     );
     
@@ -2983,7 +2984,7 @@ export default function App() {
     const mClassesInOurOrg = new Set<string>();
     if (Array.isArray(mClassesList)) {
       mClassesList.forEach((c: any) => {
-        if (c && c.organization_id && normalizeOrgIdLocal(c.organization_id) === targetOrgNormalized) {
+        if (c && c.organization_id && normalizeOrgIdLocalGlobal(c.organization_id) === targetOrgNormalized) {
           if (c.class_section_id) {
             mClassesInOurOrg.add(String(c.class_section_id));
           }
@@ -2996,7 +2997,7 @@ export default function App() {
       
       // 1. If class section itself has organization_id, enforce strictly
       if (cs.organization_id) {
-        return normalizeOrgIdLocal(cs.organization_id) === targetOrgNormalized;
+        return normalizeOrgIdLocalGlobal(cs.organization_id) === targetOrgNormalized;
       }
       
       // 2. Or if its associated m_class belongs to our organization
@@ -3010,19 +3011,8 @@ export default function App() {
   };
 
   const getFilteredMClasses = () => {
-    const normalizeOrgIdLocal = (id: any): string => {
-      if (!id) return "";
-      if (typeof id === 'object') {
-        id = id._id || id.id || id;
-      }
-      const idStr = String(id).trim().toLowerCase();
-      if (idStr === "6a489ad4de9f134ee6c3b5ef") {
-        return "6a48a06fde9f134ee6c3d763";
-      }
-      return idStr;
-    };
     const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
-    const targetOrgNormalized = normalizeOrgIdLocal(currentOrgId);
+    const targetOrgNormalized = normalizeOrgIdLocalGlobal(currentOrgId);
 
     const allowedSectionIds = new Set(
       getFilteredClassSections().map((cs: any) => String(cs._id || cs.id))
@@ -3032,7 +3022,7 @@ export default function App() {
       
       // Filter strictly by organization_id if set
       if (c.organization_id) {
-        return normalizeOrgIdLocal(c.organization_id) === targetOrgNormalized;
+        return normalizeOrgIdLocalGlobal(c.organization_id) === targetOrgNormalized;
       }
       
       // Fallback: make sure the associated class section is allowed
@@ -6168,7 +6158,12 @@ export default function App() {
                           <label className="block text-sm font-semibold text-slate-700 mb-2">Select Students</label>
                           <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3">
                             {filteredUserDirectory
-                              .filter((u: any) => u.role === "student" && u.organization_id === adminOrganizationId)
+                              .filter((u: any) => {
+                                if (u.role !== "student") return false;
+                                const uOrg = normalizeOrgIdLocalGlobal(u.organization_id);
+                                const adminOrg = normalizeOrgIdLocalGlobal(adminOrganizationId || loginResult?.data?.user?.organization_id);
+                                return uOrg === adminOrg;
+                              })
                               .map((student: any) => (
                                 <label key={student._id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
                                   <input
@@ -6221,7 +6216,9 @@ export default function App() {
       if (activeTab === "add-user") {
         const parentFilteredStudents = (userDirectory || []).filter((u: any) => {
           if (!u || u.role !== "student") return false;
-          if (u.organization_id !== adminOrganizationId) return false;
+          const uOrg = normalizeOrgIdLocalGlobal(u.organization_id);
+          const adminOrg = normalizeOrgIdLocalGlobal(adminOrganizationId || loginResult?.data?.user?.organization_id);
+          if (uOrg !== adminOrg) return false;
           if (parentFilterGrade) {
             return (studentClassRelations || []).some((rel: any) => {
               if (!rel) return false;
