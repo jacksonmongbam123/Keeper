@@ -2710,13 +2710,64 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          teacher_id: selectedUserForMapping._id,
+          teacher_id: selectedUserForMapping._id || selectedUserForMapping.id,
           class_id: selectedClass,
           section_id: selectedSection,
           subject_id: selectedSubject
         })
       });
       if (res.ok) {
+        // Also post data to rel_teacher_classes / rel/teacherClass/add
+        await fetch("https://abms-lkw9.onrender.com/rel/teacherClass/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teacher_id: selectedUserForMapping._id || selectedUserForMapping.id,
+            class_id: selectedClass,
+            start_date: new Date().toISOString()
+          })
+        }).catch(e => console.warn(e));
+
+        await fetch("https://abms-lkw9.onrender.com/rel_teacher_classes/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teacher_id: selectedUserForMapping._id || selectedUserForMapping.id,
+            class_id: selectedClass,
+            section_id: selectedSection,
+            subject_id: selectedSubject,
+            start_date: new Date().toISOString(),
+            reg_date: new Date().toISOString()
+          })
+        }).catch(e => console.warn(e));
+
+        // Also post to rel_teacher_subject_classrs and rel_teacher_subject_classes
+        await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classrs/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teacher_id: selectedUserForMapping._id || selectedUserForMapping.id,
+            class_id: selectedClass,
+            section_id: selectedSection,
+            subject_id: selectedSubject,
+            start_date: new Date().toISOString(),
+            reg_date: new Date().toISOString()
+          })
+        }).catch(e => console.warn(e));
+
+        await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classes/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teacher_id: selectedUserForMapping._id || selectedUserForMapping.id,
+            class_id: selectedClass,
+            section_id: selectedSection,
+            subject_id: selectedSubject,
+            start_date: new Date().toISOString(),
+            reg_date: new Date().toISOString()
+          })
+        }).catch(e => console.warn(e));
+
         alert("Teacher assigned to class section and subject successfully!");
         setIsMappingModalOpen(false);
       } else {
@@ -3102,6 +3153,7 @@ export default function App() {
           const data = await mClassRes.json();
           if (Array.isArray(data)) setMClassesList(data.filter(Boolean));
         }
+        fetchSearchDetails();
         if (titleRes && titleRes.ok) {
           const data = await titleRes.json();
           if (Array.isArray(data)) {
@@ -6067,14 +6119,29 @@ export default function App() {
                             onChange={(e) => {
                               const val = e.target.value;
                               setSelectedClass(val);
-                              const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
-                              setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
+                              if (mappingType === "teacher") {
+                                const matchedMClass = getFilteredMClasses().find(c => (c._id || c.id) === val);
+                                if (matchedMClass) {
+                                  const matchedCs = getFilteredClassSections().find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+                                  setSelectedSection(matchedCs ? (matchedCs.__section || matchedCs.section || "") : "");
+                                } else {
+                                  setSelectedSection("");
+                                }
+                              } else {
+                                const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
+                                setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
+                              }
                             }}
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           >
                             <option value="">Select Class</option>
                             {getFilteredMClasses().map((c: any) => (
-                              <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
+                              <option 
+                                key={c._id || c.id} 
+                                value={mappingType === "teacher" ? (c._id || c.id) : c.class_section_id}
+                              >
+                                {c.class_name}
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -6393,6 +6460,47 @@ export default function App() {
                     start_date: new Date().toISOString()
                   })
                 });
+
+                // Also post to rel_teacher_classes / rel_teacher_classes/add
+                await fetch("https://abms-lkw9.onrender.com/rel_teacher_classes/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    teacher_id: newUserId,
+                    class_id: selectedClass,
+                    section_id: selectedSection,
+                    subject_id: selectedSubject,
+                    start_date: new Date().toISOString(),
+                    reg_date: new Date().toISOString()
+                  })
+                }).catch(e => console.warn(e));
+
+                // Also post to rel_teacher_subject_classrs and rel_teacher_subject_classes
+                await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classrs/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    teacher_id: newUserId,
+                    class_id: selectedClass,
+                    section_id: selectedSection,
+                    subject_id: selectedSubject,
+                    start_date: new Date().toISOString(),
+                    reg_date: new Date().toISOString()
+                  })
+                }).catch(e => console.warn(e));
+
+                await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classes/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    teacher_id: newUserId,
+                    class_id: selectedClass,
+                    section_id: selectedSection,
+                    subject_id: selectedSubject,
+                    start_date: new Date().toISOString(),
+                    reg_date: new Date().toISOString()
+                  })
+                }).catch(e => console.warn(e));
               } catch (err) {
                 console.error("Teacher mapping error:", err);
               }
@@ -6947,15 +7055,20 @@ export default function App() {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setSelectedClass(val);
-                                  const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
-                                  setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
+                                  const matchedMClass = getFilteredMClasses().find(c => (c._id || c.id) === val);
+                                  if (matchedMClass) {
+                                    const matchedCs = getFilteredClassSections().find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+                                    setSelectedSection(matchedCs ? (matchedCs.__section || matchedCs.section || "") : "");
+                                  } else {
+                                    setSelectedSection("");
+                                  }
                                 }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
                                 <option value="">Select Class</option>
                                 {getFilteredMClasses().map((c: any) => (
-                                  <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
+                                  <option key={c._id || c.id} value={c._id || c.id}>{c.class_name}</option>
                                 ))}
                               </select>
                             </div>
