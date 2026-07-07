@@ -1975,6 +1975,7 @@ export default function App() {
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [classesList, setClassesList] = useState<any[]>([]);
+  const [mClassesList, setMClassesList] = useState<any[]>([]);
   const [sectionsList, setSectionsList] = useState<any[]>([]);
   const [subjectsList, setSubjectsList] = useState<any[]>([]);
   const [classSectionsList, setClassSectionsList] = useState<any[]>([]);
@@ -2934,6 +2935,16 @@ export default function App() {
     });
   };
 
+  const getFilteredMClasses = () => {
+    const allowedSectionIds = new Set(
+      getFilteredClassSections().map((cs: any) => String(cs._id || cs.id))
+    );
+    return (mClassesList || []).filter((c: any) => {
+      if (!c) return false;
+      return allowedSectionIds.has(String(c.class_section_id));
+    });
+  };
+
   const refreshClassSections = async () => {
     try {
       const res = await fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
@@ -2952,11 +2963,29 @@ export default function App() {
     }
   };
 
+  const refreshMClasses = async () => {
+    try {
+      const res = await fetch("https://abms-lkw9.onrender.com/m/class/retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setMClassesList(data.filter(Boolean));
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch m_classes:", err);
+    }
+  };
+
   // Fetch grades (as classes), sections, and subjects for mapping, and titles from df/title/all
   useEffect(() => {
     const fetchMappingData = async () => {
       try {
-        const [gradeRes, sectionRes, subjectRes, titleRes, classSectionRes] = await Promise.all([
+        const [gradeRes, sectionRes, subjectRes, titleRes, classSectionRes, mClassRes] = await Promise.all([
           fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", {
@@ -2966,6 +2995,11 @@ export default function App() {
           }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null),
           fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({})
+          }).catch(() => null),
+          fetch("https://abms-lkw9.onrender.com/m/class/retrieve", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({})
@@ -3019,6 +3053,10 @@ export default function App() {
         if (classSectionRes && classSectionRes.ok) {
           const data = await classSectionRes.json();
           if (Array.isArray(data)) setClassSectionsList(data.filter(Boolean));
+        }
+        if (mClassRes && mClassRes.ok) {
+          const data = await mClassRes.json();
+          if (Array.isArray(data)) setMClassesList(data.filter(Boolean));
         }
         if (titleRes && titleRes.ok) {
           const data = await titleRes.json();
@@ -5979,7 +6017,7 @@ export default function App() {
 
                       {(mappingType === "student" || mappingType === "teacher") && (
                         <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Class Section</label>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Class</label>
                           <select
                             value={selectedClass}
                             onChange={(e) => {
@@ -5990,9 +6028,9 @@ export default function App() {
                             }}
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           >
-                            <option value="">Select Class Section</option>
-                            {getFilteredClassSections().map((cs: any) => (
-                              <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
+                            <option value="">Select Class</option>
+                            {getFilteredMClasses().map((c: any) => (
+                              <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
                             ))}
                           </select>
                         </div>
@@ -6753,7 +6791,7 @@ export default function App() {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1.5 col-span-2">
-                              <label className="text-xs font-bold text-slate-700">Class Section <span className="text-red-500">*</span></label>
+                              <label className="text-xs font-bold text-slate-700">Class <span className="text-red-500">*</span></label>
                               <select
                                 value={selectedClass}
                                 onChange={(e) => {
@@ -6765,9 +6803,9 @@ export default function App() {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
-                                <option value="">Select Class Section</option>
-                                {getFilteredClassSections().map((cs: any) => (
-                                  <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
+                                <option value="">Select Class</option>
+                                {getFilteredMClasses().map((c: any) => (
+                                  <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
                                 ))}
                               </select>
                             </div>
@@ -6859,7 +6897,7 @@ export default function App() {
 
                           <div className="border-t border-slate-100 pt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1.5 col-span-2">
-                              <label className="text-xs font-bold text-slate-700">Teaching Class Section <span className="text-red-500">*</span></label>
+                              <label className="text-xs font-bold text-slate-700">Teaching Class <span className="text-red-500">*</span></label>
                               <select
                                 value={selectedClass}
                                 onChange={(e) => {
@@ -6871,9 +6909,9 @@ export default function App() {
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
-                                <option value="">Select Class Section</option>
-                                {getFilteredClassSections().map((cs: any) => (
-                                  <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
+                                <option value="">Select Class</option>
+                                {getFilteredMClasses().map((c: any) => (
+                                  <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
                                 ))}
                               </select>
                             </div>
@@ -6935,11 +6973,11 @@ export default function App() {
                           {/* Student Selection filter */}
                           <div className="border-t border-slate-100 pt-3 space-y-3">
                             <h5 className="text-xs font-bold text-slate-800">Filter & Map Student Accounts</h5>
-                            <p className="text-[11px] text-slate-500">Select Class Section below to filter and choose this parent's child(ren).</p>
+                            <p className="text-[11px] text-slate-500">Select Class below to filter and choose this parent's child(ren).</p>
                             
                             <div className="grid grid-cols-1 gap-4">
                               <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Class Section</label>
+                                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Filter Class</label>
                                 <select
                                   value={parentFilterGrade}
                                   onChange={(e) => {
@@ -6950,9 +6988,9 @@ export default function App() {
                                   }}
                                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
                                 >
-                                  <option value="">All Class Sections</option>
-                                  {getFilteredClassSections().map((cs: any) => (
-                                    <option key={cs._id || cs.id} value={cs._id || cs.id}>{cs.grade} - {cs.__section || cs.section || ""}</option>
+                                  <option value="">All Classes</option>
+                                  {getFilteredMClasses().map((c: any) => (
+                                    <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
                                   ))}
                                 </select>
                               </div>
