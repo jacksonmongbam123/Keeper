@@ -196,6 +196,7 @@ export default function App() {
         return JSON.parse(saved);
       } catch (e) {
         console.error("Failed to parse saved user directory:", e);
+        return [];
       }
     }
     return [];
@@ -6108,19 +6109,19 @@ export default function App() {
 
       // Register Profile Tab (Add User Tab)
       if (activeTab === "add-user") {
-        const parentFilteredStudents = userDirectory.filter((u: any) => {
-          if (u.role !== "student") return false;
+        const parentFilteredStudents = (userDirectory || []).filter((u: any) => {
+          if (!u || u.role !== "student") return false;
           if (u.organization_id !== adminOrganizationId) return false;
           if (parentFilterGrade) {
             return (studentClassRelations || []).some((rel: any) => {
               if (!rel) return false;
               if (rel.student_id !== u._id && rel.student_id !== u.id) return false;
               
-              const matchedCs = classSectionsList.find(cs => cs._id === parentFilterGrade);
+              const matchedCs = (classSectionsList || []).find(cs => cs && cs._id === parentFilterGrade);
               const classMatch = rel.class_id === parentFilterGrade || 
                                  (matchedCs && (rel.class_id === matchedCs.grade || rel.class_id === matchedCs.name)) ||
-                                 (classesList.find(c => c._id === parentFilterGrade)?.grade === rel.class_id) || 
-                                 (classesList.find(c => c._id === parentFilterGrade)?.name === rel.class_id);
+                                 ((classesList || []).find(c => c && c._id === parentFilterGrade)?.grade === rel.class_id) || 
+                                 ((classesList || []).find(c => c && c._id === parentFilterGrade)?.name === rel.class_id);
               const secMatch = !parentFilterSection || rel.section_id === parentFilterSection || (matchedCs && rel.section_id === matchedCs.__section);
               return classMatch && secMatch;
             });
@@ -11077,7 +11078,8 @@ export default function App() {
                         </span>
                         {isSelected && (
                           <motion.div
-                            layoutId="activeRoleDot"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
                             className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 rounded-t-full bg-gradient-to-r ${conf.colorClass}`}
                           />
                         )}
