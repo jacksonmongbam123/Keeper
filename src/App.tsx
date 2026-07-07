@@ -2928,20 +2928,63 @@ export default function App() {
       });
     }
 
+    // Include class sections that are associated with any of our organization's m_classes
+    const mClassesInOurOrg = new Set<string>();
+    if (Array.isArray(mClassesList)) {
+      mClassesList.forEach((c: any) => {
+        if (c && c.organization_id && normalizeOrgIdLocal(c.organization_id) === targetOrgNormalized) {
+          if (c.class_section_id) {
+            mClassesInOurOrg.add(String(c.class_section_id));
+          }
+        }
+      });
+    }
+
     return (classSectionsList || []).filter(Boolean).filter((cs: any) => {
+      const csIdStr = String(cs._id || cs.id);
+      
+      // 1. If class section itself has organization_id, enforce strictly
       if (cs.organization_id) {
         return normalizeOrgIdLocal(cs.organization_id) === targetOrgNormalized;
       }
+      
+      // 2. Or if its associated m_class belongs to our organization
+      if (mClassesInOurOrg.has(csIdStr)) {
+        return true;
+      }
+      
+      // 3. Or fallback to checking user relationships
       return classIdsInOrg.has(cs._id || cs.id);
     });
   };
 
   const getFilteredMClasses = () => {
+    const normalizeOrgIdLocal = (id: any): string => {
+      if (!id) return "";
+      if (typeof id === 'object') {
+        id = id._id || id.id || id;
+      }
+      const idStr = String(id).trim().toLowerCase();
+      if (idStr === "6a489ad4de9f134ee6c3b5ef") {
+        return "6a48a06fde9f134ee6c3d763";
+      }
+      return idStr;
+    };
+    const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+    const targetOrgNormalized = normalizeOrgIdLocal(currentOrgId);
+
     const allowedSectionIds = new Set(
       getFilteredClassSections().map((cs: any) => String(cs._id || cs.id))
     );
     return (mClassesList || []).filter((c: any) => {
       if (!c) return false;
+      
+      // Filter strictly by organization_id if set
+      if (c.organization_id) {
+        return normalizeOrgIdLocal(c.organization_id) === targetOrgNormalized;
+      }
+      
+      // Fallback: make sure the associated class section is allowed
       return allowedSectionIds.has(String(c.class_section_id));
     });
   };
@@ -3548,7 +3591,7 @@ export default function App() {
           const studentCount = userDirectory.filter(u => u.role === "student").length;
           const teacherCount = userDirectory.filter(u => u.role === "instructor").length;
           const parentCount = userDirectory.filter(u => u.role === "parents").length;
-          const activeClassesCount = (classSectionsList || []).length;
+          const activeClassesCount = getFilteredClassSections().length;
           const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
           
           // Count leaves for the logged-in teacher
@@ -4235,7 +4278,7 @@ export default function App() {
             <div className="space-y-6">
               <AssignHomeworkView 
                 token={token}
-                classSectionsList={classSectionsList}
+                classSectionsList={getFilteredClassSections()}
                 subjectsList={subjectsList}
               />
             </div>
@@ -4249,7 +4292,7 @@ export default function App() {
             <div className="space-y-6">
               <ViewTimetableView 
                 token={token}
-                classSectionsList={classSectionsList}
+                classSectionsList={getFilteredClassSections()}
                 subjectsList={subjectsList}
                 userDirectory={userDirectory}
                 currentUserId={currentUserId}
@@ -4268,7 +4311,7 @@ export default function App() {
             <div className="space-y-6">
               <TeacherNotificationsView 
                 token={token}
-                classSectionsList={classSectionsList}
+                classSectionsList={getFilteredClassSections()}
                 userDirectory={userDirectoryState}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
                 currentUserId={currentUserId}
@@ -4591,7 +4634,7 @@ export default function App() {
           const teacherCount = userDirectory.filter(u => u.role === "instructor").length;
           const parentCount = userDirectory.filter(u => u.role === "parents").length;
           const totalUsers = userDirectory.length;
-          const activeClassesCount = (classSectionsList || []).length;
+          const activeClassesCount = getFilteredClassSections().length;
 
           const orgName = institutionDetails?.name || adminOrganizationId || "SFS School";
 
@@ -8488,7 +8531,7 @@ export default function App() {
           <div className="space-y-6">
             <ManageTimetableView 
               token={token}
-              classSectionsList={classSectionsList}
+              classSectionsList={getFilteredClassSections()}
               subjectsList={subjectsList}
               userDirectory={filteredUserDirectory}
               organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
@@ -10633,7 +10676,7 @@ export default function App() {
                 return headerToken ? (
                   <HeaderNotificationsDropdown
                     token={headerToken}
-                    classSectionsList={classSectionsList || []}
+                    classSectionsList={getFilteredClassSections()}
                     userDirectory={userDirectoryState || []}
                     currentUserId={headerUserId}
                     organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
