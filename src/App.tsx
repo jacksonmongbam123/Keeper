@@ -9063,25 +9063,52 @@ export default function App() {
         // Find matching relations based on selection using robust matching on m_classes IDs
         const isStudentInSelectedClass = (student: any) => {
           if (!selectedDfClassSection) return true;
-          const sId = String(student._id || "").trim().toLowerCase();
-          const sIdAlt = String(student.id || "").trim().toLowerCase();
+          const sId = String(student._id || student.id || "").trim().toLowerCase();
           const sName = String(student.name || "").trim().toLowerCase();
           const sUsername = String(student.username || "").trim().toLowerCase();
           const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
           const sNic = String(student.nic || "").trim().toLowerCase();
 
+          // Find the selected mClass object and its class_section_id
+          const selectedMClass = (mClassesList || []).find(c => c && (String(c._id || c.id).toLowerCase() === String(selectedDfClassSection).toLowerCase()));
+          const selectedClassSectionId = selectedMClass ? String(selectedMClass.class_section_id || "").toLowerCase() : "";
+
           return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some(rel => {
             if (!rel) return false;
-            if (String(rel.class_id) !== String(selectedDfClassSection)) return false;
             
-            const rId = String(rel.student_id || "").trim().toLowerCase();
+            // Extract class_id (handles populated objects or raw strings)
+            const relClassId = rel.class_id && typeof rel.class_id === "object"
+              ? String(rel.class_id._id || rel.class_id.id || "").trim().toLowerCase()
+              : String(rel.class_id || "").trim().toLowerCase();
+
+            const relSectionId = rel.section_id && typeof rel.section_id === "object"
+              ? String(rel.section_id._id || rel.section_id.id || "").trim().toLowerCase()
+              : String(rel.section_id || "").trim().toLowerCase();
+
+            const filterClassId = String(selectedDfClassSection).trim().toLowerCase();
+
+            const isClassMatch = 
+              relClassId === filterClassId ||
+              (selectedClassSectionId && relClassId === selectedClassSectionId) ||
+              (selectedClassSectionId && relSectionId === selectedClassSectionId);
+
+            if (!isClassMatch) return false;
+            
+            // Extract student_id (handles populated objects or raw strings)
+            const rId = rel.student_id && typeof rel.student_id === "object"
+              ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
+              : String(rel.student_id || "").trim().toLowerCase();
+
+            if (!rId) return false;
+
             return (
               rId === sId ||
-              rId === sIdAlt ||
               rId === sName ||
               rId === sUsername ||
               rId === sRegNo ||
-              rId === sNic
+              rId === sNic ||
+              sId.includes(rId) ||
+              rId.includes(sId)
             );
           });
         };
@@ -9096,27 +9123,37 @@ export default function App() {
 
         // Helper to find mapped grade/section names for a student
         const getStudentMappingText = (studentId: string) => {
-          const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
+          const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => {
+            if (!r) return false;
+            const rStudentId = r.student_id && typeof r.student_id === "object"
+              ? String(r.student_id._id || r.student_id.id || "").trim().toLowerCase()
+              : String(r.student_id || "").trim().toLowerCase();
+            return rStudentId === String(studentId).trim().toLowerCase();
+          });
           if (!rel) return "Unassigned";
 
-          const matchedMClass = (mClassesList || []).find(c => c && (c._id === rel.class_id || c.id === rel.class_id));
+          const relClassId = rel.class_id && typeof rel.class_id === "object"
+            ? String(rel.class_id._id || rel.class_id.id || "")
+            : String(rel.class_id || "");
+
+          const matchedMClass = (mClassesList || []).find(c => c && (c._id === relClassId || c.id === relClassId));
           if (matchedMClass) {
             const matchedCs = (classSectionsList || []).find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
             const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
             return `${matchedMClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
           }
 
-          const csObj = classSectionsList.find(cs => cs._id === rel.class_id);
+          const csObj = classSectionsList.find(cs => cs._id === relClassId);
           if (csObj) {
             return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
           }
 
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
-          const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id || g.name === rel.class_id));
+          const gradeObj = gradesList.find(g => g && (g._id === relClassId || g.id === relClassId || g.grade === relClassId || g.name === relClassId));
           const sectionsList = Array.isArray(dfSections) ? dfSections : [];
           const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
 
-          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown Grade");
+          const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (relClassId || "Unknown Grade");
           const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : (rel.section_id || "Unknown Section");
 
           return `${gradeName} - ${sectionName}`;
@@ -9260,25 +9297,52 @@ export default function App() {
         // Find matching relations based on selection using robust matching on m_classes IDs
         const isStudentInSelectedClass = (student: any) => {
           if (!feeViewerClassSection) return true;
-          const sId = String(student._id || "").trim().toLowerCase();
-          const sIdAlt = String(student.id || "").trim().toLowerCase();
+          const sId = String(student._id || student.id || "").trim().toLowerCase();
           const sName = String(student.name || "").trim().toLowerCase();
           const sUsername = String(student.username || "").trim().toLowerCase();
           const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
           const sNic = String(student.nic || "").trim().toLowerCase();
 
+          // Find the selected mClass object and its class_section_id
+          const selectedMClass = (mClassesList || []).find(c => c && (String(c._id || c.id).toLowerCase() === String(feeViewerClassSection).toLowerCase()));
+          const selectedClassSectionId = selectedMClass ? String(selectedMClass.class_section_id || "").toLowerCase() : "";
+
           return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some(rel => {
             if (!rel) return false;
-            if (String(rel.class_id) !== String(feeViewerClassSection)) return false;
             
-            const rId = String(rel.student_id || "").trim().toLowerCase();
+            // Extract class_id (handles populated objects or raw strings)
+            const relClassId = rel.class_id && typeof rel.class_id === "object"
+              ? String(rel.class_id._id || rel.class_id.id || "").trim().toLowerCase()
+              : String(rel.class_id || "").trim().toLowerCase();
+
+            const relSectionId = rel.section_id && typeof rel.section_id === "object"
+              ? String(rel.section_id._id || rel.section_id.id || "").trim().toLowerCase()
+              : String(rel.section_id || "").trim().toLowerCase();
+
+            const filterClassId = String(feeViewerClassSection).trim().toLowerCase();
+
+            const isClassMatch = 
+              relClassId === filterClassId ||
+              (selectedClassSectionId && relClassId === selectedClassSectionId) ||
+              (selectedClassSectionId && relSectionId === selectedClassSectionId);
+
+            if (!isClassMatch) return false;
+            
+            // Extract student_id (handles populated objects or raw strings)
+            const rId = rel.student_id && typeof rel.student_id === "object"
+              ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
+              : String(rel.student_id || "").trim().toLowerCase();
+
+            if (!rId) return false;
+
             return (
               rId === sId ||
-              rId === sIdAlt ||
               rId === sName ||
               rId === sUsername ||
               rId === sRegNo ||
-              rId === sNic
+              rId === sNic ||
+              sId.includes(rId) ||
+              rId.includes(sId)
             );
           });
         };
