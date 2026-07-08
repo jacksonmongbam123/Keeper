@@ -6121,14 +6121,18 @@ export default function App() {
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           >
                             <option value="">Select Class</option>
-                            {getFilteredMClasses().map((c: any) => (
-                              <option 
-                                key={c._id || c.id} 
-                                value={c._id || c.id}
-                              >
-                                {c.class_name}
-                              </option>
-                            ))}
+                            {getFilteredMClasses().map((c: any) => {
+                              const matchedCs = getFilteredClassSections().find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                              const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                              return (
+                                <option 
+                                  key={c._id || c.id} 
+                                  value={c._id || c.id}
+                                >
+                                  {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                                </option>
+                              );
+                            })}
                           </select>
                         </div>
                       )}
@@ -6957,9 +6961,15 @@ export default function App() {
                                 required
                               >
                                 <option value="">Select Class</option>
-                                {getFilteredMClasses().map((c: any) => (
-                                  <option key={c._id || c.id} value={c._id || c.id}>{c.class_name}</option>
-                                ))}
+                                {getFilteredMClasses().map((c: any) => {
+                                  const matchedCs = getFilteredClassSections().find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                                  const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                                  return (
+                                    <option key={c._id || c.id} value={c._id || c.id}>
+                                      {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                                    </option>
+                                  );
+                                })}
                               </select>
                             </div>
 
@@ -7068,9 +7078,15 @@ export default function App() {
                                 required
                               >
                                 <option value="">Select Class</option>
-                                {getFilteredMClasses().map((c: any) => (
-                                  <option key={c._id || c.id} value={c._id || c.id}>{c.class_name}</option>
-                                ))}
+                                {getFilteredMClasses().map((c: any) => {
+                                  const matchedCs = getFilteredClassSections().find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                                  const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                                  return (
+                                    <option key={c._id || c.id} value={c._id || c.id}>
+                                      {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                                    </option>
+                                  );
+                                })}
                               </select>
                             </div>
 
@@ -7152,9 +7168,15 @@ export default function App() {
                                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
                                 >
                                   <option value="">All Classes</option>
-                                  {getFilteredMClasses().map((c: any) => (
-                                    <option key={c._id || c.id} value={c._id || c.id}>{c.class_name}</option>
-                                  ))}
+                                  {getFilteredMClasses().map((c: any) => {
+                                    const matchedCs = getFilteredClassSections().find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                                    const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                                    return (
+                                      <option key={c._id || c.id} value={c._id || c.id}>
+                                        {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                               </div>
                             </div>
