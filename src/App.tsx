@@ -1466,7 +1466,7 @@ export default function App() {
         }
 
         if (requestSuccess) {
-          const newUserId = resData._id || resData.id || resData.data?._id || resData.createdParent?._id || resData.createdParent?.id || `user_${Date.now()}`;
+          const newUserId = resData._id || resData.id || resData.data?._id || resData.createdParent?._id || resData.createdParent?.id || resData.createdStudent?._id || resData.createdStudent?.id || resData.createdTeacher?._id || resData.createdTeacher?.id || resData.createdUser?._id || resData.createdUser?.id || `user_${Date.now()}`;
 
           // Relational Student-Class mapping
           try {
@@ -6475,7 +6475,7 @@ export default function App() {
               }
             }
 
-            const newUserId = resData._id || resData.id || resData.data?._id || resData.createdParent?._id || resData.createdParent?.id || `user_${Date.now()}`;
+            const newUserId = resData._id || resData.id || resData.data?._id || resData.createdParent?._id || resData.createdParent?.id || resData.createdStudent?._id || resData.createdStudent?.id || resData.createdTeacher?._id || resData.createdTeacher?.id || resData.createdUser?._id || resData.createdUser?.id || `user_${Date.now()}`;
 
             if (formRole === "instructor" || formRole === "teacher") {
               try {
