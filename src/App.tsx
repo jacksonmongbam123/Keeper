@@ -2729,6 +2729,36 @@ export default function App() {
         })
       });
       if (res.ok) {
+        // Also post to rel_teacher_qualifications schema / rel/teacherQualification/add
+        const qualPayload = {
+          teacher_id: selectedUserForMapping._id || selectedUserForMapping.id,
+          ed_qualification_id: formQualification || "None",
+          qualification_id: formQualification || "None",
+          qualification: formQualification || "None",
+          ed_speciality_id: formSpecialization || "None",
+          speciality_id: formSpecialization || "None",
+          specialization_id: formSpecialization || "None",
+          speciality: formSpecialization || "None",
+          institute: "N/A",
+          reference_no: "N/A",
+          reference: "N/A",
+          started_date: new Date().toISOString(),
+          finished_date: new Date().toISOString(),
+          completed: true
+        };
+
+        await fetch("https://abms-lkw9.onrender.com/rel/teacherQualification/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(qualPayload)
+        }).catch(e => console.warn("Failed to post to /rel/teacherQualification/add:", e));
+
+        await fetch("https://abms-lkw9.onrender.com/rel_teacher_qualifications/add", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(qualPayload)
+        }).catch(e => console.warn("Failed to post to /rel_teacher_qualifications/add:", e));
+
         // Also post data to rel_teacher_classes / rel/teacherClass/add
         await fetch("https://abms-lkw9.onrender.com/rel/teacherClass/add", {
           method: "POST",
@@ -6435,6 +6465,41 @@ export default function App() {
             }
 
             const newUserId = resData._id || resData.id || resData.data?._id || `user_${Date.now()}`;
+
+            if (formRole === "instructor" || formRole === "teacher") {
+              try {
+                const qualPayload = {
+                  teacher_id: newUserId,
+                  ed_qualification_id: formQualification || "None",
+                  qualification_id: formQualification || "None",
+                  qualification: formQualification || "None",
+                  ed_speciality_id: formSpecialization || "None",
+                  speciality_id: formSpecialization || "None",
+                  specialization_id: formSpecialization || "None",
+                  speciality: formSpecialization || "None",
+                  institute: "N/A",
+                  reference_no: "N/A",
+                  reference: "N/A",
+                  started_date: new Date().toISOString(),
+                  finished_date: new Date().toISOString(),
+                  completed: true
+                };
+
+                await fetch("https://abms-lkw9.onrender.com/rel/teacherQualification/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(qualPayload)
+                }).catch(e => console.warn("Failed to post to /rel/teacherQualification/add:", e));
+
+                await fetch("https://abms-lkw9.onrender.com/rel_teacher_qualifications/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(qualPayload)
+                }).catch(e => console.warn("Failed to post to /rel_teacher_qualifications/add:", e));
+              } catch (qualErr) {
+                console.error("Error saving teacher qualification:", qualErr);
+              }
+            }
 
             // Handle mappings
             if (formRole === "student" && selectedClass) {
