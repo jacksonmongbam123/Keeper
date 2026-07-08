@@ -1466,7 +1466,7 @@ export default function App() {
         }
 
         if (requestSuccess) {
-          const newUserId = resData._id || resData.id || resData.data?._id || `user_${Date.now()}`;
+          const newUserId = resData._id || resData.id || resData.data?._id || resData.createdParent?._id || resData.createdParent?.id || `user_${Date.now()}`;
 
           // Relational Student-Class mapping
           try {
@@ -3018,13 +3018,23 @@ export default function App() {
     }
 
     // Include class sections that are associated with any of our organization's m_classes
-    const mClassesInOurOrg = new Set<string>();
+    const allowedSectionIds = new Set<string>();
     if (Array.isArray(mClassesList)) {
       mClassesList.forEach((c: any) => {
         if (c && c.organization_id && normalizeOrgIdLocalGlobal(c.organization_id) === targetOrgNormalized) {
           if (c.class_section_id) {
-            mClassesInOurOrg.add(String(c.class_section_id));
+            allowedSectionIds.add(String(c.class_section_id));
           }
+        }
+      });
+    }
+
+    // Also map classIdsInOrg to their corresponding section IDs to allow sections linked via active mappings
+    if (Array.isArray(mClassesList)) {
+      mClassesList.forEach((c: any) => {
+        const cIdStr = String(c._id || c.id);
+        if (classIdsInOrg.has(cIdStr) && c.class_section_id) {
+          allowedSectionIds.add(String(c.class_section_id));
         }
       });
     }
@@ -3037,14 +3047,8 @@ export default function App() {
         return normalizeOrgIdLocalGlobal(cs.organization_id) === targetOrgNormalized;
       }
       
-      // 2. Or if its associated m_class belongs to our organization
-      if (mClassesInOurOrg.has(csIdStr)) {
-        return true;
-      }
-      
-      // 3. If there is no organization_id on the class section (i.e. global/shared class section),
-      // or fallback to checking user relationships
-      return !cs.organization_id || classIdsInOrg.has(cs._id || cs.id);
+      // 2. Or if its associated m_class belongs to our organization or is mapped via user relations
+      return allowedSectionIds.has(csIdStr);
     });
   };
 
@@ -6471,7 +6475,7 @@ export default function App() {
               }
             }
 
-            const newUserId = resData._id || resData.id || resData.data?._id || `user_${Date.now()}`;
+            const newUserId = resData._id || resData.id || resData.data?._id || resData.createdParent?._id || resData.createdParent?.id || `user_${Date.now()}`;
 
             if (formRole === "instructor" || formRole === "teacher") {
               try {
