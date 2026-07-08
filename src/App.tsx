@@ -559,8 +559,8 @@ export default function App() {
         setTeacherSubjectClasses(Array.isArray(data) ? data.filter(Boolean) : []);
       }
 
-      // Fetch teacher qualifications from rel_teacher_qualifications
-      const tqRes = await fetch("/rel_teacher_qualifications/retrieve", {
+      // Fetch teacher qualifications
+      const tqRes = await fetch("/rel/teacherQualification/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
