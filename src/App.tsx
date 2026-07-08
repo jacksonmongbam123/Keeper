@@ -1889,7 +1889,8 @@ export default function App() {
                   sex: s.sex || "",
                   nic: s.nic || "",
                   reg_no: s.reg_no || "",
-                  regNo: s.reg_no || ""
+                  regNo: s.reg_no || "",
+                  organization_id: s.organization_id || orgId
                 });
               });
             }
@@ -1912,7 +1913,8 @@ export default function App() {
                   email: t.email || "",
                   passport: t.passport || "",
                   dob: t.dob || "",
-                  sex: t.sex || ""
+                  sex: t.sex || "",
+                  organization_id: t.organization_id || orgId
                 });
               });
             }
@@ -1935,7 +1937,8 @@ export default function App() {
                   email: p.email || "",
                   passport: p.passport || "",
                   dob: p.dob || "",
-                  sex: p.sex || ""
+                  sex: p.sex || "",
+                  organization_id: p.organization_id || orgId
                 });
               });
             }
@@ -1960,7 +1963,8 @@ export default function App() {
                   passport: a.passport || "",
                   dob: a.dob || "",
                   sex: a.sex || "",
-                  access_level: String(a.access_level_id || a.access_level || "1")
+                  access_level: String(a.access_level_id || a.access_level || "1"),
+                  organization_id: a.organization_id || orgId
                 });
               });
             }
@@ -9143,7 +9147,7 @@ export default function App() {
             return `${matchedMClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
           }
 
-          const csObj = classSectionsList.find(cs => cs._id === relClassId);
+          const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && cs._id === relClassId);
           if (csObj) {
             return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
           }
