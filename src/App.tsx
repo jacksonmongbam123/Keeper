@@ -431,10 +431,13 @@ export default function App() {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
+      const orgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
       const res = await fetch("/m/notification/retrieve", {
         method: "POST",
         headers,
-        body: JSON.stringify({})
+        body: JSON.stringify({
+          organization_id: orgId || undefined
+        })
       });
       if (res.ok) {
         const data = await res.json();
