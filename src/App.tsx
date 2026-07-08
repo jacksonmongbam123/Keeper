@@ -7433,6 +7433,13 @@ export default function App() {
           const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
           if (!rel) return "Unassigned";
 
+          const matchedMClass = (mClassesList || []).find(c => c && (c._id === rel.class_id || c.id === rel.class_id));
+          if (matchedMClass) {
+            const matchedCs = (classSectionsList || []).find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+            const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+            return `${matchedMClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+          }
+
           const csObj = classSectionsList.find(cs => cs._id === rel.class_id);
           if (csObj) {
             return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
@@ -7441,7 +7448,7 @@ export default function App() {
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
           const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id));
           const sectionsList = Array.isArray(dfSections) ? dfSections : [];
-          const sectionObj = sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id));
+          const sectionObj = rel.section_id ? sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id)) : undefined;
 
           const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown");
           const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : (rel.section_id || "Unknown");
