@@ -24,6 +24,7 @@ interface ManageTimetableViewProps {
   organizationId?: string;
   studentClassRelations?: any[];
   teacherSubjectClasses?: any[];
+  mClassesList?: any[];
 }
 
 const DAYS_OF_WEEK = [
@@ -42,7 +43,8 @@ export default function ManageTimetableView({
   userDirectory = [],
   organizationId,
   studentClassRelations = [],
-  teacherSubjectClasses = []
+  teacherSubjectClasses = [],
+  mClassesList = []
 }: ManageTimetableViewProps) {
   // Filters and Selectors
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -123,7 +125,7 @@ export default function ManageTimetableView({
     return classIdsInOrg.has(cs._id || cs.id);
   });
 
-  const allowedClassIds = new Set(filteredClassSections.map((cs: any) => cs._id || cs.id));
+  const allowedClassIds = new Set(mClassesList.map((c: any) => c._id || c.id));
 
   // Filter teachers/instructors from the directory
   const teachersList = userDirectory.filter(
@@ -328,11 +330,15 @@ export default function ManageTimetableView({
               className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
             >
               <option value="">-- Choose Class Section --</option>
-              {filteredClassSections.map((cs: any) => (
-                <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                  {cs.grade} - {cs.__section || cs.section || "N/A"}
-                </option>
-              ))}
+              {mClassesList.map((c: any) => {
+                const matchedCs = classSectionsList.find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                return (
+                  <option key={c._id || c.id} value={c._id || c.id}>
+                    {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
 

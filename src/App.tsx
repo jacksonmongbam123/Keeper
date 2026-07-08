@@ -4342,6 +4342,7 @@ export default function App() {
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
                 studentClassRelations={studentClassRelations}
                 teacherSubjectClasses={teacherSubjectClasses}
+                mClassesList={getFilteredMClasses()}
               />
             </div>
           );
@@ -8678,6 +8679,7 @@ export default function App() {
               organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
               studentClassRelations={studentClassRelations}
               teacherSubjectClasses={teacherSubjectClasses}
+              mClassesList={getFilteredMClasses()}
             />
           </div>
         );
@@ -8980,23 +8982,38 @@ export default function App() {
 
       // Students by Grade & Section Tab
       if (activeTab === "students-by-grade") {
-        // Find matching relations based on selection
-        const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
-          if (!rel) return false;
+        // Find matching relations based on selection using robust matching on m_classes IDs
+        const isStudentInSelectedClass = (student: any) => {
           if (!selectedDfClassSection) return true;
-          // Matches the selected class section ID (_id of classSectionsList)
-          return rel.class_id === selectedDfClassSection;
-        });
+          const sId = String(student._id || "").trim().toLowerCase();
+          const sIdAlt = String(student.id || "").trim().toLowerCase();
+          const sName = String(student.name || "").trim().toLowerCase();
+          const sUsername = String(student.username || "").trim().toLowerCase();
+          const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
+          const sNic = String(student.nic || "").trim().toLowerCase();
 
-        const matchingStudentIds = new Set(matchingRelations.map(rel => rel?.student_id).filter(Boolean));
+          return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some(rel => {
+            if (!rel) return false;
+            if (String(rel.class_id) !== String(selectedDfClassSection)) return false;
+            
+            const rId = String(rel.student_id || "").trim().toLowerCase();
+            return (
+              rId === sId ||
+              rId === sIdAlt ||
+              rId === sName ||
+              rId === sUsername ||
+              rId === sRegNo ||
+              rId === sNic
+            );
+          });
+        };
 
         // Filter the student users from userDirectory
         const filteredStudents = (Array.isArray(userDirectory) ? userDirectory : []).filter(u => {
           if (!u) return false;
           const roleLower = String(u.role || "").toLowerCase();
           if (roleLower !== "student") return false;
-          if (!selectedDfClassSection) return true;
-          return matchingStudentIds.has(u._id) || matchingStudentIds.has(u.id);
+          return isStudentInSelectedClass(u);
         });
 
         // Helper to find mapped grade/section names for a student
@@ -9162,23 +9179,38 @@ export default function App() {
 
       // Grade & Section Fee Viewer Tab for administrators
       if (activeTab === "grade-section-fees") {
-        // Find matching relations based on selection
-        const matchingRelations = (Array.isArray(studentClassRelations) ? studentClassRelations : []).filter(rel => {
-          if (!rel) return false;
+        // Find matching relations based on selection using robust matching on m_classes IDs
+        const isStudentInSelectedClass = (student: any) => {
           if (!feeViewerClassSection) return true;
-          // rel.class_id matches the selected class section ID (_id of classSectionsList)
-          return rel.class_id === feeViewerClassSection;
-        });
+          const sId = String(student._id || "").trim().toLowerCase();
+          const sIdAlt = String(student.id || "").trim().toLowerCase();
+          const sName = String(student.name || "").trim().toLowerCase();
+          const sUsername = String(student.username || "").trim().toLowerCase();
+          const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
+          const sNic = String(student.nic || "").trim().toLowerCase();
 
-        const matchingStudentIds = new Set(matchingRelations.map(rel => rel?.student_id).filter(Boolean));
+          return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some(rel => {
+            if (!rel) return false;
+            if (String(rel.class_id) !== String(feeViewerClassSection)) return false;
+            
+            const rId = String(rel.student_id || "").trim().toLowerCase();
+            return (
+              rId === sId ||
+              rId === sIdAlt ||
+              rId === sName ||
+              rId === sUsername ||
+              rId === sRegNo ||
+              rId === sNic
+            );
+          });
+        };
 
         // Filter the student users from userDirectory
         const baseStudents = (Array.isArray(userDirectory) ? userDirectory : []).filter(u => {
           if (!u) return false;
           const roleLower = String(u.role || "").toLowerCase();
           if (roleLower !== "student") return false;
-          if (!feeViewerClassSection) return true;
-          return matchingStudentIds.has(u._id) || matchingStudentIds.has(u.id);
+          return isStudentInSelectedClass(u);
         });
 
         // Search filtering
@@ -9707,10 +9739,16 @@ export default function App() {
             }
             if (!mark.organization_id) {
               const studentObj = (Array.isArray(userDirectoryState) ? userDirectoryState : []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
-              const classObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
+              const matchedClass = (Array.isArray(mClassesList) ? mClassesList : []).find(c => c && (c._id === mark.class_id || c.id === mark.class_id));
               
               const studentOrg = studentObj ? normalizeOrgId(studentObj.organization_id) : "";
-              const classOrg = classObj ? normalizeOrgId(classObj.organization_id) : "";
+              let classOrg = "";
+              if (matchedClass) {
+                classOrg = matchedClass.organization_id ? normalizeOrgId(matchedClass.organization_id) : "";
+              } else {
+                const classObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
+                classOrg = classObj ? normalizeOrgId(classObj.organization_id) : "";
+              }
               
               if (studentOrg && studentOrg !== targetOrgNormalized) {
                 return false;
@@ -9808,17 +9846,15 @@ export default function App() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                   >
                     <option value="">All Classes & Sections</option>
-                    {Array.isArray(classSectionsList) && classSectionsList.filter((cs: any) => {
-                      if (!cs) return false;
-                      if (cs.organization_id && targetOrgNormalized) {
-                        return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
-                      }
-                      return true;
-                    }).map((cs: any) => (
-                      <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                        {cs.grade} - {cs.__section || cs.section || ""}
-                      </option>
-                    ))}
+                    {getFilteredMClasses().map((c: any) => {
+                      const matchedCs = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === c.class_section_id || cs.id === c.class_section_id));
+                      const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                      return (
+                        <option key={c._id || c.id} value={c._id || c.id}>
+                          {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -9928,8 +9964,18 @@ export default function App() {
                         const studentCode = studentObj ? studentObj.username : mark.student_id;
                         
                         // Class/Section resolution
-                        const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && cs._id === mark.class_id);
-                        const classSectionText = csObj ? `${csObj.grade} - ${csObj.__section || csObj.section || ""}` : mark.class_id || "Unassigned";
+                        const matchedClass = (Array.isArray(mClassesList) ? mClassesList : []).find(c => c && (c._id === mark.class_id || c.id === mark.class_id));
+                        let classSectionText = mark.class_id || "Unassigned";
+                        if (matchedClass) {
+                          const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === matchedClass.class_section_id || cs.id === matchedClass.class_section_id));
+                          const sectionName = csObj ? (csObj.__section || csObj.section || "") : "";
+                          classSectionText = `${matchedClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+                        } else {
+                          const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
+                          if (csObj) {
+                            classSectionText = `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+                          }
+                        }
                         
                         // Subject resolution
                         const subObj = (Array.isArray(subjectsList) ? subjectsList : []).find(s => s && (s._id === mark.subject_id || s.id === mark.subject_id));
@@ -10078,17 +10124,15 @@ export default function App() {
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500"
                       >
                         <option value="">-- Choose class section --</option>
-                        {Array.isArray(classSectionsList) && classSectionsList.filter((cs: any) => {
-                          if (!cs) return false;
-                          if (cs.organization_id && targetOrgNormalized) {
-                            return normalizeOrgId(cs.organization_id) === targetOrgNormalized;
-                          }
-                          return true;
-                        }).map((cs: any) => (
-                          <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                            {cs.grade} - {cs.__section || cs.section || ""}
-                          </option>
-                        ))}
+                        {getFilteredMClasses().map((c: any) => {
+                          const matchedCs = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === c.class_section_id || cs.id === c.class_section_id));
+                          const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                          return (
+                            <option key={c._id || c.id} value={c._id || c.id}>
+                              {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 
@@ -10114,9 +10158,26 @@ export default function App() {
                           }) : [];
                           const filtered = allStudents.filter((student: any) => {
                             if (!marksFormClassId) return true; // Show all if no class is selected yet
-                            return (studentClassRelations || []).some((rel: any) => 
-                              rel && rel.class_id === marksFormClassId && (rel.student_id === student._id || rel.student_id === student.id)
-                            );
+                            const sId = String(student._id || "").trim().toLowerCase();
+                            const sIdAlt = String(student.id || "").trim().toLowerCase();
+                            const sName = String(student.name || "").trim().toLowerCase();
+                            const sUsername = String(student.username || "").trim().toLowerCase();
+                            const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
+                            const sNic = String(student.nic || "").trim().toLowerCase();
+
+                            return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some((rel: any) => {
+                              if (!rel) return false;
+                              if (String(rel.class_id) !== String(marksFormClassId)) return false;
+                              const rId = String(rel.student_id || "").trim().toLowerCase();
+                              return (
+                                rId === sId ||
+                                rId === sIdAlt ||
+                                rId === sName ||
+                                rId === sUsername ||
+                                rId === sRegNo ||
+                                rId === sNic
+                              );
+                            });
                           });
                           return filtered.map((student: any) => (
                             <option key={student._id || student.id} value={student._id || student.id}>
