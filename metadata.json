@@ -1,6 +1,6 @@
 {
-  "name": "School Management Portal",
-  "description": "Comprehensive student, instructor, and administrator management portal with dynamic institution and fee tracking.",
+  "name": "Keeper School Portal",
+  "description": "A comprehensive school management portal for admins, teachers, students, and parents to coordinate schedules, grades, leaves, homework, and more.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

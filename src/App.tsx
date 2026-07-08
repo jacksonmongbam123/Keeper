@@ -3005,8 +3005,9 @@ export default function App() {
         return true;
       }
       
-      // 3. Or fallback to checking user relationships
-      return classIdsInOrg.has(cs._id || cs.id);
+      // 3. If there is no organization_id on the class section (i.e. global/shared class section),
+      // or fallback to checking user relationships
+      return !cs.organization_id || classIdsInOrg.has(cs._id || cs.id);
     });
   };
 
@@ -6109,17 +6110,12 @@ export default function App() {
                             onChange={(e) => {
                               const val = e.target.value;
                               setSelectedClass(val);
-                              if (mappingType === "teacher") {
-                                const matchedMClass = getFilteredMClasses().find(c => (c._id || c.id) === val);
-                                if (matchedMClass) {
-                                  const matchedCs = getFilteredClassSections().find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
-                                  setSelectedSection(matchedCs ? (matchedCs.__section || matchedCs.section || "") : "");
-                                } else {
-                                  setSelectedSection("");
-                                }
+                              const matchedMClass = getFilteredMClasses().find(c => (c._id || c.id) === val);
+                              if (matchedMClass) {
+                                const matchedCs = getFilteredClassSections().find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+                                setSelectedSection(matchedCs ? (matchedCs.__section || matchedCs.section || "") : "");
                               } else {
-                                const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
-                                setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
+                                setSelectedSection("");
                               }
                             }}
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -6128,7 +6124,7 @@ export default function App() {
                             {getFilteredMClasses().map((c: any) => (
                               <option 
                                 key={c._id || c.id} 
-                                value={mappingType === "teacher" ? (c._id || c.id) : c.class_section_id}
+                                value={c._id || c.id}
                               >
                                 {c.class_name}
                               </option>
@@ -6224,8 +6220,11 @@ export default function App() {
               if (!rel) return false;
               if (rel.student_id !== u._id && rel.student_id !== u.id) return false;
               
+              const matchedMClass = (mClassesList || []).find(c => c && (c._id === parentFilterGrade || c.id === parentFilterGrade));
+              const classSectionIdOfMClass = matchedMClass ? matchedMClass.class_section_id : "";
               const matchedCs = (classSectionsList || []).find(cs => cs && cs._id === parentFilterGrade);
               const classMatch = rel.class_id === parentFilterGrade || 
+                                 (classSectionIdOfMClass && rel.class_id === classSectionIdOfMClass) ||
                                  (matchedCs && (rel.class_id === matchedCs.grade || rel.class_id === matchedCs.name)) ||
                                  ((classesList || []).find(c => c && c._id === parentFilterGrade)?.grade === rel.class_id) || 
                                  ((classesList || []).find(c => c && c._id === parentFilterGrade)?.name === rel.class_id);
@@ -6946,15 +6945,20 @@ export default function App() {
                                 onChange={(e) => {
                                   const val = e.target.value;
                                   setSelectedClass(val);
-                                  const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
-                                  setSelectedSection(matched ? (matched.__section || matched.section || "") : "");
+                                  const matchedMClass = getFilteredMClasses().find(c => (c._id || c.id) === val);
+                                  if (matchedMClass) {
+                                    const matchedCs = getFilteredClassSections().find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+                                    setSelectedSection(matchedCs ? (matchedCs.__section || matchedCs.section || "") : "");
+                                  } else {
+                                    setSelectedSection("");
+                                  }
                                 }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
                               >
                                 <option value="">Select Class</option>
                                 {getFilteredMClasses().map((c: any) => (
-                                  <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
+                                  <option key={c._id || c.id} value={c._id || c.id}>{c.class_name}</option>
                                 ))}
                               </select>
                             </div>
@@ -7137,14 +7141,19 @@ export default function App() {
                                   onChange={(e) => {
                                     const val = e.target.value;
                                     setParentFilterGrade(val);
-                                    const matched = getFilteredClassSections().find(cs => cs._id === val || cs.id === val);
-                                    setParentFilterSection(matched ? (matched.__section || matched.section || "") : "");
+                                    const matchedMClass = getFilteredMClasses().find(c => (c._id || c.id) === val);
+                                    if (matchedMClass) {
+                                      const matchedCs = getFilteredClassSections().find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+                                      setParentFilterSection(matchedCs ? (matchedCs.__section || matchedCs.section || "") : "");
+                                    } else {
+                                      setParentFilterSection("");
+                                    }
                                   }}
                                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:border-cyan-500 text-xs font-medium"
                                 >
                                   <option value="">All Classes</option>
                                   {getFilteredMClasses().map((c: any) => (
-                                    <option key={c._id || c.id} value={c.class_section_id}>{c.class_name}</option>
+                                    <option key={c._id || c.id} value={c._id || c.id}>{c.class_name}</option>
                                   ))}
                                 </select>
                               </div>
