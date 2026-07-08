@@ -560,7 +560,7 @@ export default function App() {
       }
 
       // Fetch teacher qualifications
-      const tqRes = await fetch("/rel/teacherQualification/retrieve", {
+      const tqRes = await fetch("/rel_teacher_qualifications/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
