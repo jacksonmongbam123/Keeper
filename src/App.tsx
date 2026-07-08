@@ -3031,6 +3031,19 @@ export default function App() {
     });
   };
 
+  const getFilteredSubjects = () => {
+    const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
+    const targetOrgNormalized = normalizeOrgIdLocalGlobal(currentOrgId);
+
+    return (subjectsList || []).filter(Boolean).filter((sub: any) => {
+      if (!sub) return false;
+      if (sub.organization_id) {
+        return normalizeOrgIdLocalGlobal(sub.organization_id) === targetOrgNormalized;
+      }
+      return true;
+    });
+  };
+
   const refreshClassSections = async () => {
     try {
       const res = await fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
@@ -4322,7 +4335,7 @@ export default function App() {
               <AssignHomeworkView 
                 token={token}
                 classSectionsList={getFilteredClassSections()}
-                subjectsList={subjectsList}
+                subjectsList={getFilteredSubjects()}
               />
             </div>
           );
@@ -4336,7 +4349,7 @@ export default function App() {
               <ViewTimetableView 
                 token={token}
                 classSectionsList={getFilteredClassSections()}
-                subjectsList={subjectsList}
+                subjectsList={getFilteredSubjects()}
                 userDirectory={userDirectory}
                 currentUserId={currentUserId}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
@@ -6147,7 +6160,7 @@ export default function App() {
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                           >
                             <option value="">Select Subject</option>
-                            {subjectsList.map((sub: any) => (
+                            {getFilteredSubjects().map((sub: any) => (
                               <option key={sub._id} value={sub._id}>{sub.name || sub.subject}</option>
                             ))}
                           </select>
@@ -7100,7 +7113,7 @@ export default function App() {
                                 required
                               >
                                 <option value="">Select Subject</option>
-                                {subjectsList.map((sub: any) => (
+                                {getFilteredSubjects().map((sub: any) => (
                                   <option key={sub._id} value={sub._id}>{sub.name || sub.subject}</option>
                                 ))}
                               </select>
@@ -8674,7 +8687,7 @@ export default function App() {
             <ManageTimetableView 
               token={token}
               classSectionsList={getFilteredClassSections()}
-              subjectsList={subjectsList}
+              subjectsList={getFilteredSubjects()}
               userDirectory={filteredUserDirectory}
               organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
               studentClassRelations={studentClassRelations}
