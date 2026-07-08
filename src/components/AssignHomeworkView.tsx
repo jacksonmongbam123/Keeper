@@ -52,7 +52,7 @@ export default function AssignHomeworkView({
     setIsLoadingHistory(true);
     setHistoryError("");
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/homework/getList", {
+      const res = await fetch("/homework/getList", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -159,7 +159,7 @@ export default function AssignHomeworkView({
       formData.append("file", selectedFile);
 
       // Perform POST request
-      const res = await fetch("https://abms-lkw9.onrender.com/homework/upload", {
+      const res = await fetch("/homework/upload", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -192,7 +192,7 @@ export default function AssignHomeworkView({
   // Handle downloading a homework file
   const handleDownloadHomework = async (homework: any) => {
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/homework/download", {
+      const res = await fetch("/homework/download", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,

@@ -57,7 +57,7 @@ export default function AdminLeavesView({
   const fetchLeaves = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherLeave/retrieve", {
+      const res = await fetch("/rel/teacherLeave/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -101,7 +101,7 @@ export default function AdminLeavesView({
     let apiErrorMsg = "";
 
     try {
-      const res = await fetch(`https://abms-lkw9.onrender.com/rel/teacherLeave/update/${leafId}`, {
+      const res = await fetch(`/rel/teacherLeave/update/${leafId}`, {
         method: "POST", // or PUT depending on design, POST is safe for generic endpoint update
         headers: {
           "Content-Type": "application/json",

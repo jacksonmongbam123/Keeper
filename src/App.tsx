@@ -363,7 +363,7 @@ export default function App() {
     try {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
-      const res = await fetch("https://abms-lkw9.onrender.com/class/fee/all", {
+      const res = await fetch("/class/fee/all", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -398,7 +398,7 @@ export default function App() {
         headers["Authorization"] = `Bearer ${token}`;
       }
       const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
-      const res = await fetch("https://abms-lkw9.onrender.com/m/marks/retrieve", {
+      const res = await fetch("/m/marks/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify(currentOrgId ? { organization_id: currentOrgId } : {})
@@ -431,7 +431,7 @@ export default function App() {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      const res = await fetch("https://abms-lkw9.onrender.com/m/notification/retrieve", {
+      const res = await fetch("/m/notification/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -478,7 +478,7 @@ export default function App() {
         organization_id: adminOrganizationId || loginResult?.data?.user?.organization_id || undefined
       };
 
-      const res = await fetch("https://abms-lkw9.onrender.com/m/notification/add", {
+      const res = await fetch("/m/notification/add", {
         method: "POST",
         headers,
         body: JSON.stringify(payload)
@@ -517,7 +517,7 @@ export default function App() {
       }
 
       // Fetch parent student relations
-      const relRes = await fetch("https://abms-lkw9.onrender.com/rel/parentStudent/retrieve", {
+      const relRes = await fetch("/rel/parentStudent/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -528,7 +528,7 @@ export default function App() {
       }
 
       // Fetch occupations
-      const occRes = await fetch("https://abms-lkw9.onrender.com/df/occupation/retrieve", {
+      const occRes = await fetch("/df/occupation/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -539,7 +539,7 @@ export default function App() {
       }
 
       // Fetch absences
-      const absRes = await fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
+      const absRes = await fetch("/class/attendance/absence", {
         method: "GET",
         headers
       });
@@ -549,7 +549,7 @@ export default function App() {
       }
 
       // Fetch teacher subject classes
-      const tscRes = await fetch("https://abms-lkw9.onrender.com/rel/teacherSubjectClass/retrieve", {
+      const tscRes = await fetch("/rel/teacherSubjectClass/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -560,7 +560,7 @@ export default function App() {
       }
 
       // Fetch teacher qualifications
-      const tqRes = await fetch("https://abms-lkw9.onrender.com/rel/teacherQualification/retrieve", {
+      const tqRes = await fetch("/rel/teacherQualification/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -571,7 +571,7 @@ export default function App() {
       }
 
       // Fetch ed qualifications
-      const edqRes = await fetch("https://abms-lkw9.onrender.com/df/edQualification/retrieve", {
+      const edqRes = await fetch("/df/edQualification/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -582,7 +582,7 @@ export default function App() {
       }
 
       // Fetch ed specialities
-      const edsRes = await fetch("https://abms-lkw9.onrender.com/df/edSpeciality/retrieve", {
+      const edsRes = await fetch("/df/edSpeciality/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -593,7 +593,7 @@ export default function App() {
       }
 
       // Fetch marital statuses
-      const maritalRes = await fetch("https://abms-lkw9.onrender.com/df/maritalStatus/retrieve", {
+      const maritalRes = await fetch("/df/maritalStatus/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -604,7 +604,7 @@ export default function App() {
       }
 
       // Fetch teacher grades
-      const gradeRes = await fetch("https://abms-lkw9.onrender.com/df/teacherGrade/retrieve", {
+      const gradeRes = await fetch("/df/teacherGrade/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})
@@ -652,8 +652,8 @@ export default function App() {
       };
 
       const endpoint = marksModalIsNew
-        ? "https://abms-lkw9.onrender.com/m/marks/add"
-        : `https://abms-lkw9.onrender.com/m/marks/update/${selectedMarkId}`;
+        ? "/m/marks/add"
+        : `/m/marks/update/${selectedMarkId}`;
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -696,7 +696,7 @@ export default function App() {
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      const res = await fetch(`https://abms-lkw9.onrender.com/m/marks/delete/${id}`, {
+      const res = await fetch(`/m/marks/delete/${id}`, {
         method: "POST",
         headers
       });
@@ -793,7 +793,7 @@ export default function App() {
 
     try {
       const orgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
-      const response = await fetch("https://abms-lkw9.onrender.com/m/classSection/add", {
+      const response = await fetch("/m/classSection/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -1110,7 +1110,7 @@ export default function App() {
       };
 
       try {
-        const res = await fetch("https://abms-lkw9.onrender.com/m/marks/add", {
+        const res = await fetch("/m/marks/add", {
           method: "POST",
           headers,
           body: JSON.stringify(payload)
@@ -1406,7 +1406,7 @@ export default function App() {
         let requestSuccess = false;
         let resData: any = {};
 
-        const response = await fetch("https://abms-lkw9.onrender.com/m/student/add", {
+        const response = await fetch("/m/student/add", {
           method: "POST",
           headers,
           body: JSON.stringify(payload)
@@ -1442,7 +1442,7 @@ export default function App() {
             organization_id: adminOrganizationId
           };
 
-          const fallbackResponse = await fetch("https://abms-lkw9.onrender.com/df/register/add", {
+          const fallbackResponse = await fetch("/df/register/add", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1467,7 +1467,7 @@ export default function App() {
 
           // Relational Student-Class mapping
           try {
-            await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
+            await fetch("/rel/studentClass/add", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -1534,8 +1534,8 @@ export default function App() {
   const fetchDfGradesAndSections = async () => {
     try {
       const [gradeRes, sectionRes] = await Promise.all([
-        fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }),
-        fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" })
+        fetch("/df/grade/all", { method: "GET" }),
+        fetch("/df/section/all", { method: "GET" })
       ]);
       if (gradeRes.ok) {
         const data = await gradeRes.json();
@@ -1578,7 +1578,7 @@ export default function App() {
   const fetchStudentRelations = async () => {
     setIsLoadingRelations(true);
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/studentClass/retrieve", {
+      const res = await fetch("/rel/studentClass/retrieve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
@@ -1618,7 +1618,7 @@ export default function App() {
         const parsed = JSON.parse(savedSession);
         if (parsed && parsed.success && parsed.data?.token) {
           // Verify session with backend
-          fetch("https://abms-lkw9.onrender.com/login/verify", {
+          fetch("/login/verify", {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
@@ -1730,7 +1730,7 @@ export default function App() {
 
           // If we have org_id, fetch only users from that organization
           if (orgId) {
-            const res = await fetch(`https://abms-lkw9.onrender.com/m/admin/organization/${orgId}/users`, {
+            const res = await fetch(`/m/admin/organization/${orgId}/users`, {
               method: "GET",
               headers
             });
@@ -1810,7 +1810,7 @@ export default function App() {
 
               // Fetch and include administrators belonging to the organization
               try {
-                const adminsRes = await fetch("https://abms-lkw9.onrender.com/m/admin/retrieve/", {
+                const adminsRes = await fetch("/m/admin/retrieve/", {
                   method: "POST",
                   headers,
                   body: JSON.stringify({})
@@ -1861,10 +1861,10 @@ export default function App() {
 
           // Fallback to fetching all users (for backward compatibility)
           const [studentsRes, teachersRes, parentsRes, adminsRes] = await Promise.allSettled([
-            fetch("https://abms-lkw9.onrender.com/m/student/retrieve", { method: "POST", headers }),
-            fetch("https://abms-lkw9.onrender.com/m/teacher/retrieve", { method: "POST", headers }),
-            fetch("https://abms-lkw9.onrender.com/m/parent/retrieve", { method: "POST", headers }),
-            fetch("https://abms-lkw9.onrender.com/m/admin/retrieve/", { method: "POST", headers })
+            fetch("/m/student/retrieve", { method: "POST", headers }),
+            fetch("/m/teacher/retrieve", { method: "POST", headers }),
+            fetch("/m/parent/retrieve", { method: "POST", headers }),
+            fetch("/m/admin/retrieve/", { method: "POST", headers })
           ]);
 
           let fetchedUsers: any[] = [];
@@ -2067,7 +2067,7 @@ export default function App() {
     try {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
-      const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/lookup", {
+      const res = await fetch("/class/attendance/lookup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2176,7 +2176,7 @@ export default function App() {
           dateStr = String(abs.date);
         }
 
-        const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/lookup", {
+        const res = await fetch("/class/attendance/lookup", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -2251,7 +2251,7 @@ export default function App() {
         payload.id = attExistingId;
       }
 
-      const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/add", {
+      const res = await fetch("/class/attendance/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2276,7 +2276,7 @@ export default function App() {
       }
 
       // Sync the global absences state as well
-      fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
+      fetch("/class/attendance/absence", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -2323,7 +2323,7 @@ export default function App() {
       
       const promises = students.map(async (student: any) => {
         try {
-          const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/lookup", {
+          const res = await fetch("/class/attendance/lookup", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -2435,7 +2435,7 @@ export default function App() {
         payload.id = existingRecord._id;
       }
 
-      const res = await fetch("https://abms-lkw9.onrender.com/class/attendance/add", {
+      const res = await fetch("/class/attendance/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2447,7 +2447,7 @@ export default function App() {
       if (res.ok) {
         fetchAttendanceHistory(historyDate);
         
-        fetch("https://abms-lkw9.onrender.com/class/attendance/absence", {
+        fetch("/class/attendance/absence", {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${token}`
@@ -2538,7 +2538,7 @@ export default function App() {
     };
 
     try {
-      const response = await fetch("https://abms-lkw9.onrender.com/login", {
+      const response = await fetch("/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2691,7 +2691,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
+      const res = await fetch("/rel/studentClass/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2722,7 +2722,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherSubjectClass/add", {
+      const res = await fetch("/rel/teacherSubjectClass/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2751,20 +2751,20 @@ export default function App() {
           completed: true
         };
 
-        await fetch("https://abms-lkw9.onrender.com/rel/teacherQualification/add", {
+        await fetch("/rel/teacherQualification/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(qualPayload)
         }).catch(e => console.warn("Failed to post to /rel/teacherQualification/add:", e));
 
-        await fetch("https://abms-lkw9.onrender.com/rel_teacher_qualifications/add", {
+        await fetch("/rel_teacher_qualifications/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(qualPayload)
         }).catch(e => console.warn("Failed to post to /rel_teacher_qualifications/add:", e));
 
         // Also post data to rel_teacher_classes / rel/teacherClass/add
-        await fetch("https://abms-lkw9.onrender.com/rel/teacherClass/add", {
+        await fetch("/rel/teacherClass/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2774,7 +2774,7 @@ export default function App() {
           })
         }).catch(e => console.warn(e));
 
-        await fetch("https://abms-lkw9.onrender.com/rel_teacher_classes/add", {
+        await fetch("/rel_teacher_classes/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2788,7 +2788,7 @@ export default function App() {
         }).catch(e => console.warn(e));
 
         // Also post to rel_teacher_subject_classrs and rel_teacher_subject_classes
-        await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classrs/add", {
+        await fetch("/rel_teacher_subject_classrs/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2801,7 +2801,7 @@ export default function App() {
           })
         }).catch(e => console.warn(e));
 
-        await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classes/add", {
+        await fetch("/rel_teacher_subject_classes/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2834,7 +2834,7 @@ export default function App() {
     }
     try {
       const promises = selectedStudents.map(studentId =>
-        fetch("https://abms-lkw9.onrender.com/rel/parentStudent/add", {
+        fetch("/rel/parentStudent/add", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2926,7 +2926,7 @@ export default function App() {
           const adminNIC = admin.nic || admin.phone || admin.username || admin.reg_no;
           console.log('Attempting to fetch admin by identifier:', adminNIC);
           if (adminNIC) {
-            const res = await fetch(`https://abms-lkw9.onrender.com/m/admin/by-nic/${adminNIC}`);
+            const res = await fetch(`/m/admin/by-nic/${adminNIC}`);
             if (res.ok) {
               const adminDetails = await res.json();
               console.log('Fetched live Admin Details:', adminDetails);
@@ -2953,7 +2953,7 @@ export default function App() {
           console.log('Attempting to fetch teacher by ID:', teacherId);
           if (teacherId) {
             const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
-            const res = await fetch(`https://abms-lkw9.onrender.com/m/teacher/retrieve/${teacherId}`, {
+            const res = await fetch(`/m/teacher/retrieve/${teacherId}`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -3080,7 +3080,7 @@ export default function App() {
 
   const refreshClassSections = async () => {
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
+      const res = await fetch("/m/classSection/retrieve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
@@ -3098,7 +3098,7 @@ export default function App() {
 
   const refreshMClasses = async () => {
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/m/class/retrieve", {
+      const res = await fetch("/m/class/retrieve", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({})
@@ -3119,20 +3119,20 @@ export default function App() {
     const fetchMappingData = async () => {
       try {
         const [gradeRes, sectionRes, subjectRes, titleRes, classSectionRes, mClassRes] = await Promise.all([
-          fetch("https://abms-lkw9.onrender.com/df/grade/all", { method: "GET" }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/df/section/all", { method: "GET" }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/m/subject/retrieve", {
+          fetch("/df/grade/all", { method: "GET" }).catch(() => null),
+          fetch("/df/section/all", { method: "GET" }).catch(() => null),
+          fetch("/m/subject/retrieve", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({})
           }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/df/title/all", { method: "GET" }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/m/classSection/retrieve", {
+          fetch("/df/title/all", { method: "GET" }).catch(() => null),
+          fetch("/m/classSection/retrieve", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({})
           }).catch(() => null),
-          fetch("https://abms-lkw9.onrender.com/m/class/retrieve", {
+          fetch("/m/class/retrieve", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({})
@@ -3215,7 +3215,7 @@ export default function App() {
       
       setIsLoadingInstitution(true);
       try {
-        const res = await fetch("https://abms-lkw9.onrender.com/m/organization/retrieve", {
+        const res = await fetch("/m/organization/retrieve", {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
@@ -5059,16 +5059,16 @@ export default function App() {
                                           }
 
                                           if (u.role === "student") {
-                                            endpoint = `https://abms-lkw9.onrender.com/m/student/delete/${idParam}`;
+                                            endpoint = `/m/student/delete/${idParam}`;
                                             method = "DELETE";
                                           } else if (u.role === "instructor" || u.role === "teacher") {
-                                            endpoint = `https://abms-lkw9.onrender.com/m/teacher/delete/${idParam}`;
+                                            endpoint = `/m/teacher/delete/${idParam}`;
                                             method = "DELETE";
                                           } else if (u.role === "parents" || u.role === "parent") {
-                                            endpoint = `https://abms-lkw9.onrender.com/m/parent/delete/${idParam}`;
+                                            endpoint = `/m/parent/delete/${idParam}`;
                                             method = "POST";
                                           } else if (u.role === "administrator" || u.role === "admin") {
-                                            endpoint = `https://abms-lkw9.onrender.com/m/admin/delete/${idParam}`;
+                                            endpoint = `/m/admin/delete/${idParam}`;
                                             method = "POST";
                                           }
 
@@ -5161,11 +5161,11 @@ export default function App() {
                         const title_id = title_val;
                         const access_level_id = formAccessLevelId || adminAccessLevel || "4";
 
-                        let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
+                        let endpoint = "/df/register/add";
                         let payload: any = {};
 
                         if (formRole === "student") {
-                          endpoint = "https://abms-lkw9.onrender.com/m/student/add";
+                          endpoint = "/m/student/add";
                           payload = {
                             user_type: "student",
                             password: password,
@@ -5188,7 +5188,7 @@ export default function App() {
                             is_active: true
                           };
                         } else if (formRole === "instructor") {
-                          endpoint = "https://abms-lkw9.onrender.com/m/teacher/add";
+                          endpoint = "/m/teacher/add";
                           payload = {
                             user_type: "teacher",
                             password: password,
@@ -5213,7 +5213,7 @@ export default function App() {
                             is_active: true
                           };
                         } else if (formRole === "parents") {
-                          endpoint = "https://abms-lkw9.onrender.com/m/parent/add";
+                          endpoint = "/m/parent/add";
                           payload = {
                             user_type: "parent",
                             password: password,
@@ -5293,7 +5293,7 @@ export default function App() {
                         // we gracefully fallback to the stable, unified /df/register/add endpoint!
                         if (!requestSuccess) {
                           console.log("Gracefully falling back to unified /df/register/add endpoint...");
-                          const fallbackEndpoint = "https://abms-lkw9.onrender.com/df/register/add";
+                          const fallbackEndpoint = "/df/register/add";
                           const fallbackPayload = {
                             user_type_id: formRole === "parents" ? "parent" : (formRole === "instructor" ? "instructor" : "student"),
                             nic: formUsername,
@@ -5790,11 +5790,11 @@ export default function App() {
                         }
 
                         if (formRole === "student") {
-                          endpoint = `https://abms-lkw9.onrender.com/m/student/update/${idParam}`;
+                          endpoint = `/m/student/update/${idParam}`;
                         } else if (formRole === "instructor" || formRole === "teacher") {
-                          endpoint = `https://abms-lkw9.onrender.com/m/teacher/update/${idParam}`;
+                          endpoint = `/m/teacher/update/${idParam}`;
                         } else if (formRole === "parents" || formRole === "parent") {
-                          endpoint = `https://abms-lkw9.onrender.com/m/parent/update/${idParam}`;
+                          endpoint = `/m/parent/update/${idParam}`;
                         }
 
                         if (endpoint) {
@@ -6312,11 +6312,11 @@ export default function App() {
             const title_id = title_val;
             const access_level_id = formAccessLevelId || adminAccessLevel || "4";
 
-            let endpoint = "https://abms-lkw9.onrender.com/df/register/add";
+            let endpoint = "/df/register/add";
             let payload: any = {};
 
             if (formRole === "student") {
-              endpoint = "https://abms-lkw9.onrender.com/m/student/add";
+              endpoint = "/m/student/add";
               payload = {
                 user_type: "student",
                 password: password,
@@ -6340,7 +6340,7 @@ export default function App() {
                 is_active: true
               };
             } else if (formRole === "instructor" || formRole === "teacher") {
-              endpoint = "https://abms-lkw9.onrender.com/m/teacher/add";
+              endpoint = "/m/teacher/add";
               payload = {
                 user_type: "teacher",
                 password: password,
@@ -6367,7 +6367,7 @@ export default function App() {
                 is_active: true
               };
             } else if (formRole === "parents" || formRole === "parent") {
-              endpoint = "https://abms-lkw9.onrender.com/m/parent/add";
+              endpoint = "/m/parent/add";
               payload = {
                 user_type: "parent",
                 password: password,
@@ -6425,7 +6425,7 @@ export default function App() {
             }
 
             if (!requestSuccess) {
-              const fallbackEndpoint = "https://abms-lkw9.onrender.com/df/register/add";
+              const fallbackEndpoint = "/df/register/add";
               const fallbackPayload = {
                 user_type_id: formRole === "parents" ? "parent" : (formRole === "instructor" || formRole === "teacher" ? "instructor" : "student"),
                 nic: formUsername,
@@ -6489,13 +6489,13 @@ export default function App() {
                   completed: true
                 };
 
-                await fetch("https://abms-lkw9.onrender.com/rel/teacherQualification/add", {
+                await fetch("/rel/teacherQualification/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(qualPayload)
                 }).catch(e => console.warn("Failed to post to /rel/teacherQualification/add:", e));
 
-                await fetch("https://abms-lkw9.onrender.com/rel_teacher_qualifications/add", {
+                await fetch("/rel_teacher_qualifications/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(qualPayload)
@@ -6508,7 +6508,7 @@ export default function App() {
             // Handle mappings
             if (formRole === "student" && selectedClass) {
               try {
-                await fetch("https://abms-lkw9.onrender.com/rel/studentClass/add", {
+                await fetch("/rel/studentClass/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -6523,7 +6523,7 @@ export default function App() {
               }
             } else if ((formRole === "instructor" || formRole === "teacher") && selectedClass && selectedSection && selectedSubject) {
               try {
-                await fetch("https://abms-lkw9.onrender.com/rel/teacherSubjectClass/add", {
+                await fetch("/rel/teacherSubjectClass/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -6534,7 +6534,7 @@ export default function App() {
                   })
                 });
 
-                await fetch("https://abms-lkw9.onrender.com/rel/teacherClass/add", {
+                await fetch("/rel/teacherClass/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -6545,7 +6545,7 @@ export default function App() {
                 });
 
                 // Also post to rel_teacher_classes / rel_teacher_classes/add
-                await fetch("https://abms-lkw9.onrender.com/rel_teacher_classes/add", {
+                await fetch("/rel_teacher_classes/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -6559,7 +6559,7 @@ export default function App() {
                 }).catch(e => console.warn(e));
 
                 // Also post to rel_teacher_subject_classrs and rel_teacher_subject_classes
-                await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classrs/add", {
+                await fetch("/rel_teacher_subject_classrs/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -6572,7 +6572,7 @@ export default function App() {
                   })
                 }).catch(e => console.warn(e));
 
-                await fetch("https://abms-lkw9.onrender.com/rel_teacher_subject_classes/add", {
+                await fetch("/rel_teacher_subject_classes/add", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -6590,7 +6590,7 @@ export default function App() {
             } else if ((formRole === "parents" || formRole === "parent") && selectedStudents.length > 0) {
               try {
                 const promises = selectedStudents.map(studentId =>
-                  fetch("https://abms-lkw9.onrender.com/rel/parentStudent/add", {
+                  fetch("/rel/parentStudent/add", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -8389,7 +8389,7 @@ export default function App() {
           setFeeSuccess("");
 
           try {
-            const response = await fetch("https://abms-lkw9.onrender.com/class/fee/add", {
+            const response = await fetch("/class/fee/add", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -8432,7 +8432,7 @@ export default function App() {
           setFeeSuccess("");
 
           try {
-            const response = await fetch("https://abms-lkw9.onrender.com/class/fee/updateStatus", {
+            const response = await fetch("/class/fee/updateStatus", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -9442,8 +9442,8 @@ export default function App() {
 
           try {
             const endpoint = modalIsNew 
-              ? "https://abms-lkw9.onrender.com/class/fee/add"
-              : "https://abms-lkw9.onrender.com/class/fee/updateStatus";
+              ? "/class/fee/add"
+              : "/class/fee/updateStatus";
 
             const finalStudentId = modalExistingStudentId || modalStudent.nic || modalStudent.username || modalStudent._id || modalStudent.id;
             const payload = {

@@ -50,7 +50,7 @@ export default function TeacherNotificationsView({
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;
       }
-      const res = await fetch("https://abms-lkw9.onrender.com/m/notification/retrieve", {
+      const res = await fetch("/m/notification/retrieve", {
         method: "POST",
         headers,
         body: JSON.stringify({})

@@ -58,7 +58,7 @@ export default function TeacherLeavesView({
   const fetchLeaves = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherLeave/retrieve", {
+      const res = await fetch("/rel/teacherLeave/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -135,7 +135,7 @@ export default function TeacherLeavesView({
     let apiErrorMsg = "";
 
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherLeave/add", {
+      const res = await fetch("/rel/teacherLeave/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

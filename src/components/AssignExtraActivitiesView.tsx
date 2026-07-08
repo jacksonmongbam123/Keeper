@@ -73,7 +73,7 @@ export default function AssignExtraActivitiesView({
   // 1. Fetch Activity Types
   const fetchActivityTypes = async () => {
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/df/extraActivityType/retrieve", {
+      const res = await fetch("/df/extraActivityType/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +114,7 @@ export default function AssignExtraActivitiesView({
   // 2. Fetch Activity Positions
   const fetchActivityPositions = async () => {
     try {
-      let res = await fetch("https://abms-lkw9.onrender.com/df/extraActivityPositions/retrieve", {
+      let res = await fetch("/df/extraActivityPositions/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -124,7 +124,7 @@ export default function AssignExtraActivitiesView({
       });
       
       if (!res.ok) {
-        res = await fetch("https://abms-lkw9.onrender.com/df/extraActivityPiaitions/retrieve", {
+        res = await fetch("/df/extraActivityPiaitions/retrieve", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -168,7 +168,7 @@ export default function AssignExtraActivitiesView({
   const fetchRelations = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherExtraActivity/retrieve", {
+      const res = await fetch("/rel/teacherExtraActivity/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -244,7 +244,7 @@ export default function AssignExtraActivitiesView({
     };
 
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherExtraActivity/add", {
+      const res = await fetch("/rel/teacherExtraActivity/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -298,7 +298,7 @@ export default function AssignExtraActivitiesView({
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const res = await fetch(`https://abms-lkw9.onrender.com/rel/teacherExtraActivity/delete/${id}`, {
+      const res = await fetch(`/rel/teacherExtraActivity/delete/${id}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`

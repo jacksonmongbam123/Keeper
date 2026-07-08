@@ -41,7 +41,7 @@ export default function TeacherAssignedActivitiesView({
   // 1. Fetch Activity Types
   const fetchActivityTypes = async () => {
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/df/extraActivityType/retrieve", {
+      const res = await fetch("/df/extraActivityType/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -82,7 +82,7 @@ export default function TeacherAssignedActivitiesView({
   // 2. Fetch Activity Positions
   const fetchActivityPositions = async () => {
     try {
-      let res = await fetch("https://abms-lkw9.onrender.com/df/extraActivityPositions/retrieve", {
+      let res = await fetch("/df/extraActivityPositions/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -92,7 +92,7 @@ export default function TeacherAssignedActivitiesView({
       });
       
       if (!res.ok) {
-        res = await fetch("https://abms-lkw9.onrender.com/df/extraActivityPiaitions/retrieve", {
+        res = await fetch("/df/extraActivityPiaitions/retrieve", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -136,7 +136,7 @@ export default function TeacherAssignedActivitiesView({
   const fetchRelations = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/rel/teacherExtraActivity/retrieve", {
+      const res = await fetch("/rel/teacherExtraActivity/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

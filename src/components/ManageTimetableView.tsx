@@ -159,7 +159,7 @@ export default function ManageTimetableView({
     setIsLoading(true);
     setErrorMsg("");
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/timetable/retrieve", {
+      const res = await fetch("/timetable/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -238,7 +238,7 @@ export default function ManageTimetableView({
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("https://abms-lkw9.onrender.com/timetable/add", {
+      const res = await fetch("/timetable/add", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -282,7 +282,7 @@ export default function ManageTimetableView({
     setSuccessMsg("");
 
     try {
-      const res = await fetch(`https://abms-lkw9.onrender.com/timetable/delete/${entryId}`, {
+      const res = await fetch(`/timetable/delete/${entryId}`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`

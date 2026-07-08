@@ -150,7 +150,7 @@ export default function ViewTimetableView({
         ? { class_id: selectedClassId } 
         : {}; // If looking at "mine" or all, fetch all to be able to cross-reference
 
-      const res = await fetch("https://abms-lkw9.onrender.com/timetable/retrieve", {
+      const res = await fetch("/timetable/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
