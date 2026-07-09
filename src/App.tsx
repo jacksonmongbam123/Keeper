@@ -52,6 +52,9 @@ import * as XLSX from "xlsx";
 import AssignHomeworkView from "./components/AssignHomeworkView";
 import ManageTimetableView from "./components/ManageTimetableView";
 import ViewTimetableView from "./components/ViewTimetableView";
+import ViewMarksView from "./components/ViewMarksView";
+import StudentAttendanceCalendarView from "./components/StudentAttendanceCalendarView";
+import StudentHomeworkView from "./components/StudentHomeworkView";
 import TeacherNotificationsView from "./components/TeacherNotificationsView";
 import HeaderNotificationsDropdown from "./components/HeaderNotificationsDropdown";
 import AssignExtraActivitiesView from "./components/AssignExtraActivitiesView";
@@ -194,6 +197,13 @@ export default function App() {
 
   // Dashboard states
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Keep activeTab in sync with student's available tabs
+  useEffect(() => {
+    if (selectedRole === "student" && ["overview", "courses", "exams", "settings", "schedule"].includes(activeTab)) {
+      setActiveTab("my-timetable");
+    }
+  }, [selectedRole, activeTab]);
   const [userTypeFilter, setUserTypeFilter] = useState<"all" | "student" | "instructor" | "parents">("all");
   const [institutionDetails, setInstitutionDetails] = useState<any>(null);
   const [isLoadingInstitution, setIsLoadingInstitution] = useState(false);
@@ -3401,11 +3411,11 @@ export default function App() {
       { id: "assign-activities", label: "Assign Extra Activities", icon: Briefcase },
       { id: "manage-leaves", label: "Manage Teacher Leaves", icon: ClipboardList }
     ] : selectedRole === "student" ? [
-      { id: "overview", label: "Overview Dashboard", icon: Home },
-      { id: "courses", label: "My Curriculum", icon: BookOpen },
-      { id: "exams", label: "Exam Progress", icon: FileText },
-      { id: "schedule", label: "Weekly Schedule", icon: Calendar },
-      { id: "settings", label: "Portal Settings", icon: Settings }
+      { id: "my-timetable", label: "My Timetable", icon: Calendar },
+      { id: "my-marks", label: "My Marks", icon: Award },
+      { id: "my-attendance", label: "My Attendance", icon: Calendar },
+      { id: "my-homework", label: "My Homeworks", icon: FileCode2 },
+      { id: "institutions", label: "Institute Details", icon: Building }
     ] : selectedRole === "instructor" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "roster", label: "Student Rosters", icon: Users },
@@ -3421,6 +3431,7 @@ export default function App() {
       { id: "progress", label: "Academic Progress", icon: Activity },
       { id: "attendance", label: "Attendance Tracker", icon: Calendar },
       { id: "billing", label: "Billing & Invoices", icon: FileText },
+      { id: "institutions", label: "Institute Details", icon: Building },
       { id: "settings", label: "Portal Settings", icon: Settings }
     ];
 
@@ -3650,6 +3661,27 @@ export default function App() {
           );
         }
 
+        if (activeTab === "my-timetable") {
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          return (
+            <div className="space-y-6">
+              <ViewTimetableView 
+                token={token}
+                classSectionsList={getFilteredClassSections()}
+                subjectsList={getFilteredSubjects()}
+                userDirectory={userDirectory}
+                currentUserId={currentUserId}
+                organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+                studentClassRelations={studentClassRelations}
+                teacherSubjectClasses={teacherSubjectClasses}
+                mClassesList={getFilteredMClasses()}
+                isStudent={true}
+              />
+            </div>
+          );
+        }
+
         if (activeTab === "settings") {
           return (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm max-w-xl space-y-4">
@@ -3676,6 +3708,169 @@ export default function App() {
                     <span className="text-[10px] text-slate-500">Notify me prior to major database migrations or sandbox resets.</span>
                   </div>
                 </label>
+              </div>
+            </div>
+          );
+        }
+
+        if (activeTab === "my-marks") {
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          return (
+            <div className="space-y-6">
+              <ViewMarksView
+                marksList={marksList}
+                fetchMarks={fetchMarks}
+                isLoadingMarks={isLoadingMarks}
+                marksFetchError={marksFetchError}
+                currentUserId={currentUserId}
+                subjectsList={getFilteredSubjects()}
+                mClassesList={getFilteredMClasses()}
+                classSectionsList={getFilteredClassSections()}
+                dfMarksGrades={dfMarksGrades}
+                userDirectory={userDirectory}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "my-attendance") {
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.nic || "";
+          return (
+            <div className="space-y-6">
+              <StudentAttendanceCalendarView
+                absencesList={absencesList}
+                userDirectory={userDirectory}
+                currentUserId={currentUserId}
+                currentUsername={currentUsername}
+                isLoadingAbsences={isLoadingSearchDetails}
+                onRefresh={fetchSearchDetails}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "my-homework") {
+          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+          return (
+            <div className="space-y-6">
+              <StudentHomeworkView
+                token={token}
+                classSectionsList={getFilteredClassSections()}
+                subjectsList={getFilteredSubjects()}
+                studentClassRelations={studentClassRelations}
+                currentUserId={currentUserId}
+              />
+            </div>
+          );
+        }
+
+        if (activeTab === "institutions") {
+          return (
+            <div className="space-y-6 max-w-4xl animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-indigo-50 flex items-center gap-3">
+                  <Building className="h-6 w-6 text-cyan-600" />
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Institute Details</h2>
+                    <p className="text-xs text-slate-500 mt-1">Organization information and address details</p>
+                  </div>
+                </div>
+
+                {isLoadingInstitution ? (
+                  <div className="p-8 flex items-center justify-center">
+                    <div className="text-center space-y-2">
+                      <div className="inline-block animate-spin">
+                        <Clock className="h-6 w-6 text-cyan-600" />
+                      </div>
+                      <p className="text-sm text-slate-500">Loading institution details...</p>
+                    </div>
+                  </div>
+                ) : institutionDetails ? (
+                  <div className="p-6 space-y-6">
+                    {/* Name */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Institution Name</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-semibold text-slate-900">
+                        {institutionDetails.name || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* Address Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Line 1 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Street Address</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line1 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* Line 2 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Building / Suite</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line2 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* Line 3 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Additional Info</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line3 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* City */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">City</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.city || "Not provided"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Postcode */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Postal Code</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                        {institutionDetails.postcode || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* Key */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Organization Key</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-mono text-slate-700">
+                        {institutionDetails.key || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Database ID</label>
+                      <div className="bg-slate-900 text-slate-300 rounded-lg px-4 py-3 text-xs font-mono">
+                        {institutionDetails._id || "Not available"}
+                      </div>
+                    </div>
+
+                    {/* Summary Card */}
+                    <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-bold text-cyan-900">📍 Location Summary</p>
+                      <p className="text-sm text-cyan-800">
+                        {[institutionDetails.line1, institutionDetails.line2, institutionDetails.line3, institutionDetails.city, institutionDetails.postcode]
+                          .filter(Boolean)
+                          .join(", ") || "No address information available"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-500">
+                    <p className="text-sm font-semibold">No institute details available.</p>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -4719,6 +4914,116 @@ export default function App() {
                     <span className="text-[10px] text-slate-500">Send an SMS instantly if attendance records indicate student is missing from roster.</span>
                   </div>
                 </label>
+              </div>
+            </div>
+          );
+        }
+
+        if (activeTab === "institutions") {
+          return (
+            <div className="space-y-6 max-w-4xl animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-violet-50 to-indigo-50 flex items-center gap-3">
+                  <Building className="h-6 w-6 text-violet-600" />
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Institute Details</h2>
+                    <p className="text-xs text-slate-500 mt-1">Organization information and address details</p>
+                  </div>
+                </div>
+
+                {isLoadingInstitution ? (
+                  <div className="p-8 flex items-center justify-center">
+                    <div className="text-center space-y-2">
+                      <div className="inline-block animate-spin">
+                        <Clock className="h-6 w-6 text-violet-600" />
+                      </div>
+                      <p className="text-sm text-slate-500">Loading institution details...</p>
+                    </div>
+                  </div>
+                ) : institutionDetails ? (
+                  <div className="p-6 space-y-6">
+                    {/* Name */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Institution Name</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-semibold text-slate-900">
+                        {institutionDetails.name || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* Address Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Line 1 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Street Address</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line1 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* Line 2 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Building / Suite</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line2 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* Line 3 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">Additional Info</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.line3 || "Not provided"}
+                        </div>
+                      </div>
+
+                      {/* City */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-slate-500">City</label>
+                        <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                          {institutionDetails.city || "Not provided"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Postcode */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Postal Code</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm text-slate-700">
+                        {institutionDetails.postcode || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* Key */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Organization Key</label>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-sm font-mono text-slate-700">
+                        {institutionDetails.key || "Not provided"}
+                      </div>
+                    </div>
+
+                    {/* ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-slate-500">Database ID</label>
+                      <div className="bg-slate-900 text-slate-300 rounded-lg px-4 py-3 text-xs font-mono">
+                        {institutionDetails._id || "Not available"}
+                      </div>
+                    </div>
+
+                    {/* Summary Card */}
+                    <div className="bg-violet-50 border border-violet-200 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-bold text-violet-900">📍 Location Summary</p>
+                      <p className="text-sm text-violet-800">
+                        {[institutionDetails.line1, institutionDetails.line2, institutionDetails.line3, institutionDetails.city, institutionDetails.postcode]
+                          .filter(Boolean)
+                          .join(", ") || "No address information available"}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center text-slate-500">
+                    <p className="text-sm font-semibold">No institute details available.</p>
+                  </div>
+                )}
               </div>
             </div>
           );

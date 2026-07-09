@@ -9,17 +9,17 @@ try {
   Object.defineProperty(window, 'fetch', {
     value: function (input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
       if (typeof input === "string" && input.startsWith("/")) {
-        const hostname = window.location.hostname;
-        const isLocalOrDev =
-          hostname === "localhost" ||
-          hostname === "127.0.0.1" ||
-          hostname.includes("ais-dev") ||
-          hostname.includes("ais-pre");
-
-        const isBackendDomain = hostname.includes("abms-lkw9.onrender.com");
-
-        if (!isLocalOrDev && !isBackendDomain) {
-          input = `https://abms-lkw9.onrender.com${input}`;
+        const path = input;
+        const isApiRoute = 
+          path.startsWith("/login") || 
+          path.startsWith("/m/") || 
+          path.startsWith("/class/") || 
+          path.startsWith("/rel/") ||
+          path.startsWith("/homework/") ||
+          path.startsWith("/api/");
+          
+        if (isApiRoute) {
+          input = `https://abms-lkw9.onrender.com${path}`;
         }
       }
       return originalFetch(input, init);

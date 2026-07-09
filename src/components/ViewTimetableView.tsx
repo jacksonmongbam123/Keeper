@@ -22,6 +22,7 @@ interface ViewTimetableViewProps {
   studentClassRelations?: any[];
   teacherSubjectClasses?: any[];
   mClassesList?: any[];
+  isStudent?: boolean;
 }
 
 const DAYS_OF_WEEK = [
@@ -42,21 +43,39 @@ export default function ViewTimetableView({
   organizationId,
   studentClassRelations = [],
   teacherSubjectClasses = [],
-  mClassesList = []
+  mClassesList = [],
+  isStudent = false
 }: ViewTimetableViewProps) {
+  // Find currently logged in student's assigned class section (if any)
+  const studentRel = isStudent ? (studentClassRelations || []).find((rel: any) => {
+    if (!rel) return false;
+    const sId = rel.student_id && typeof rel.student_id === "object"
+      ? rel.student_id._id || rel.student_id.id
+      : rel.student_id;
+    return String(sId) === String(currentUserId);
+  }) : null;
+  const studentClassId = studentRel ? studentRel.class_id : "";
+
   // App states
-  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState(isStudent ? studentClassId : "");
   const [timetableEntries, setTimetableEntries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   
   // Filter state: "all" or "mine"
-  const [filterType, setFilterType] = useState<"all" | "mine">("mine");
+  const [filterType, setFilterType] = useState<"all" | "mine">(isStudent ? "all" : "mine");
+
+  // Synchronize selectedClassId once studentClassId is loaded
+  useEffect(() => {
+    if (isStudent && studentClassId && !selectedClassId) {
+      setSelectedClassId(studentClassId);
+    }
+  }, [isStudent, studentClassId]);
 
   // Helper: Format teacher name beautifully
   const getTeacherName = (teacherId: string) => {
     if (!teacherId) return "No teacher assigned";
-    if (teacherId === currentUserId) return "You (Assigned)";
+    if (teacherId === currentUserId && !isStudent) return "You (Assigned)";
     const t = userDirectory.find((u: any) => u && (u._id === teacherId || u.id === teacherId));
     if (!t) return "Unknown Teacher";
     const first = t.first_name || "";
@@ -139,15 +158,20 @@ export default function ViewTimetableView({
 
   // Fetch timetable entries for either a selected class, or all classes to filter for 'mine'
   const fetchTimetables = async () => {
+    const targetClassId = selectedClassId || studentClassId;
+    if (isStudent && !targetClassId) {
+      setTimetableEntries([]);
+      setErrorMsg("You are not currently assigned to any class section. Please contact the administrator.");
+      return;
+    }
+
     setIsLoading(true);
     setErrorMsg("");
     try {
-      // If filtering for "mine", we need to check timetable slots across all class sections to see where this teacher is assigned.
-      // Therefore, we can either make multiple fetches or a single fetch with no class_id to get all, then filter.
-      // Looking at timetable_routes.js, if req.body.class_id is not passed, it queries find({}) (retrieve all)!
-      // Let's verify: `if (req.body.class_id) { query.class_id = req.body.class_id; }` - yes, if omitted, it retrieves ALL!
-      const bodyPayload = filterType === "all" && selectedClassId 
-        ? { class_id: selectedClassId } 
+      // If filtering for "mine" (and not a student), we need to check timetable slots across all class sections to see where this teacher is assigned.
+      // Otherwise, we query by class_id.
+      const bodyPayload = (filterType === "all" || isStudent) && targetClassId
+        ? { class_id: targetClassId } 
         : {}; // If looking at "mine" or all, fetch all to be able to cross-reference
 
       const res = await fetch("/timetable/retrieve", {
@@ -181,12 +205,12 @@ export default function ViewTimetableView({
             return true;
           });
           
-          if (filterType === "mine") {
+          if (!isStudent && filterType === "mine") {
             // Filter where teacher_id matches currently logged in teacher
             filtered = filtered.filter(slot => slot.teacher_id === currentUserId);
-          } else if (selectedClassId) {
+          } else if (targetClassId) {
             // Filter by selected class (in case we fetched all, or if backend returned all)
-            filtered = filtered.filter(slot => slot.class_id === selectedClassId);
+            filtered = filtered.filter(slot => slot.class_id === targetClassId);
           }
 
           // Sort chronologically by start time
@@ -212,7 +236,7 @@ export default function ViewTimetableView({
   // Fetch whenever classId or filterType changes
   useEffect(() => {
     fetchTimetables();
-  }, [selectedClassId, filterType]);
+  }, [selectedClassId, studentClassId, filterType]);
 
   // Stats calculations
   const totalSlots = timetableEntries.length;
@@ -235,6 +259,12 @@ export default function ViewTimetableView({
     }
   });
 
+  const getStudentClassName = () => {
+    const targetId = selectedClassId || studentClassId;
+    if (!targetId) return "Unassigned Class Section";
+    return getClassDetails(targetId);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Panel */}
@@ -242,73 +272,87 @@ export default function ViewTimetableView({
         <div>
           <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight flex items-center gap-2.5">
             <Calendar className="w-5 h-5 text-cyan-600 animate-pulse" />
-            My Class Timetable & Schedule
+            {isStudent ? "My Class Timetable" : "My Class Timetable & Schedule"}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Browse your assigned lecture slots, timings, classroom locations, and weekly teaching schedule.
+            {isStudent 
+              ? "Browse your weekly class timetable, subjects, timings, and classroom locations."
+              : "Browse your assigned lecture slots, timings, classroom locations, and weekly teaching schedule."}
           </p>
         </div>
 
         {/* Controls Panel (Right-aligned inside the header container) */}
-        <div className="pt-4 border-t border-slate-100 flex justify-end items-center gap-3">
-          {/* Toggle buttons: My Schedule vs Class Wise */}
-          <div className="bg-slate-100 p-1 rounded-xl border border-slate-200/60 flex items-center gap-1">
-            <button
-              onClick={() => {
-                setFilterType("mine");
-                setSelectedClassId("");
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                filterType === "mine"
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              My Schedule
-            </button>
-            <button
-              onClick={() => {
-                setFilterType("all");
-                // Default to first class if none selected
-                if (!selectedClassId && mClassesList.length > 0) {
-                  setSelectedClassId(mClassesList[0]._id || mClassesList[0].id);
-                }
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                filterType === "all"
-                  ? "bg-white text-slate-900 shadow-xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              <Filter className="w-3.5 h-3.5" />
-              Class Timetable
-            </button>
-          </div>
-
-          {/* Conditional Class Dropdown Selector */}
-          {filterType === "all" && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
-              <select
-                value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+        {!isStudent ? (
+          <div className="pt-4 border-t border-slate-100 flex justify-end items-center gap-3">
+            {/* Toggle buttons: My Schedule vs Class Wise */}
+            <div className="bg-slate-100 p-1 rounded-xl border border-slate-200/60 flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setFilterType("mine");
+                  setSelectedClassId("");
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  filterType === "mine"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
               >
-                <option value="">-- Choose Class Section --</option>
-                {mClassesList.map((c: any) => {
-                  const matchedCs = classSectionsList.find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
-                  const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
-                  return (
-                    <option key={c._id || c.id} value={c._id || c.id}>
-                      {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
-                    </option>
-                  );
-                })}
-              </select>
+                <User className="w-3.5 h-3.5" />
+                My Schedule
+              </button>
+              <button
+                onClick={() => {
+                  setFilterType("all");
+                  // Default to first class if none selected
+                  if (!selectedClassId && mClassesList.length > 0) {
+                    setSelectedClassId(mClassesList[0]._id || mClassesList[0].id);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  filterType === "all"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Class Timetable
+              </button>
             </div>
-          )}
-        </div>
+
+            {/* Conditional Class Dropdown Selector */}
+            {filterType === "all" && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cohort:</span>
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+                >
+                  <option value="">-- Choose Class Section --</option>
+                  {mClassesList.map((c: any) => {
+                    const matchedCs = classSectionsList.find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                    const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                    return (
+                      <option key={c._id || c.id} value={c._id || c.id}>
+                        {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-cyan-600" />
+              Assigned Class: <strong className="text-cyan-700 font-bold">{getStudentClassName()}</strong>
+            </span>
+            <span className="text-[10px] font-bold bg-cyan-100 text-cyan-800 px-2.5 py-1 rounded-full uppercase tracking-wider">
+              Student View Mode
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Schedule Stats Summary Bento Cards */}
@@ -325,8 +369,10 @@ export default function ViewTimetableView({
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Active Cohorts</span>
             <div className="flex items-baseline gap-1.5 mt-2">
-              <span className="text-2xl font-black text-cyan-700">{filterType === "mine" ? cohortsCount : mClassesList.length}</span>
-              <span className="text-[10px] text-slate-400 font-medium">different classes</span>
+              <span className="text-2xl font-black text-cyan-700">
+                {isStudent ? "1" : (filterType === "mine" ? cohortsCount : mClassesList.length)}
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">class section</span>
             </div>
           </div>
 
@@ -343,8 +389,8 @@ export default function ViewTimetableView({
           <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-col justify-between">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">View Mode Filter</span>
             <div className="flex items-baseline gap-1.5 mt-2">
-              <span className="text-sm font-extrabold text-indigo-700">
-                {filterType === "mine" ? "My Custom Schedule" : "Whole Class View"}
+              <span className="text-sm font-extrabold text-indigo-700 truncate block max-w-full">
+                {isStudent ? "Assigned Section" : (filterType === "mine" ? "My Custom Schedule" : "Whole Class View")}
               </span>
             </div>
           </div>
@@ -401,7 +447,7 @@ export default function ViewTimetableView({
                       );
                       const subjectName = subjectObj ? (subjectObj.name || subjectObj.subject) : slot.subject_id;
                       
-                      const isMySlot = slot.teacher_id === currentUserId;
+                      const isMySlot = !isStudent && slot.teacher_id === currentUserId;
 
                       return (
                         <motion.div
@@ -445,7 +491,7 @@ export default function ViewTimetableView({
                           {/* Teacher / Room / Class Section details */}
                           <div className="space-y-1 pt-1.5 border-t border-slate-200/60 text-[10px] text-slate-500">
                             {/* Class section name - very useful when showing 'My Schedule' */}
-                            {filterType === "mine" && (
+                            {(!isStudent && filterType === "mine") && (
                               <div className="flex items-center gap-1.5 truncate">
                                 <Users className="w-3 h-3 text-slate-400 shrink-0" />
                                 <span className="font-semibold text-slate-700 truncate" title={getClassDetails(slot.class_id)}>
@@ -455,7 +501,7 @@ export default function ViewTimetableView({
                             )}
 
                             {/* Teacher name */}
-                            {filterType === "all" && (
+                            {(isStudent || filterType === "all") && (
                               <div className="flex items-center gap-1.5 truncate">
                                 <User className="w-3 h-3 text-slate-400 shrink-0" />
                                 <span className={`truncate ${isMySlot ? "font-semibold text-cyan-800" : ""}`} title={getTeacherName(slot.teacher_id)}>
