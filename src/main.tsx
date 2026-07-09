@@ -14,9 +14,11 @@ try {
           path.startsWith("/login") || 
           path.startsWith("/m/") || 
           path.startsWith("/class/") || 
-          path.startsWith("/rel/") ||
+          path.startsWith("/rel") ||
           path.startsWith("/homework/") ||
-          path.startsWith("/api/");
+          path.startsWith("/api/") ||
+          path.startsWith("/df/") ||
+          path.startsWith("/timetable/");
           
         if (isApiRoute) {
           input = `https://abms-lkw9.onrender.com${path}`;

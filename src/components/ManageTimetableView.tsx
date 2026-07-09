@@ -125,7 +125,7 @@ export default function ManageTimetableView({
     return classIdsInOrg.has(cs._id || cs.id);
   });
 
-  const allowedClassIds = new Set(mClassesList.map((c: any) => c._id || c.id));
+  const allowedClassIds = new Set(mClassesList.map((c: any) => String(c._id || c.id)));
 
   // Filter teachers/instructors from the directory
   const teachersList = userDirectory.filter(
@@ -177,11 +177,19 @@ export default function ManageTimetableView({
               if (!slot) return false;
               
               // 1. Must belong to our allowed class sections
-              if (!allowedClassIds.has(slot.class_id)) return false;
+              const slotClassId = slot.class_id && typeof slot.class_id === "object"
+                ? (slot.class_id._id || slot.class_id.id)
+                : slot.class_id;
+              const slotClassIdStr = slotClassId ? String(slotClassId).trim() : "";
+              
+              if (!allowedClassIds.has(slotClassIdStr)) return false;
               
               // 2. If a teacher is assigned, they must belong to our organization
               if (slot.teacher_id) {
-                const teacherIdStr = String(slot.teacher_id).trim();
+                const teacherId = slot.teacher_id && typeof slot.teacher_id === "object"
+                  ? (slot.teacher_id._id || slot.teacher_id.id)
+                  : slot.teacher_id;
+                const teacherIdStr = teacherId ? String(teacherId).trim() : "";
                 if (teacherIdStr && !ourOrgUserIds.has(teacherIdStr)) {
                   return false;
                 }

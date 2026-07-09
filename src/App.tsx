@@ -200,8 +200,9 @@ export default function App() {
 
   // Keep activeTab in sync with student's available tabs
   useEffect(() => {
-    if (selectedRole === "student" && ["overview", "courses", "exams", "settings", "schedule"].includes(activeTab)) {
-      setActiveTab("my-timetable");
+    const studentTabs = ["overview", "my-timetable", "my-marks", "my-attendance", "my-homework", "my-fees", "my-profile", "institutions"];
+    if (selectedRole === "student" && !studentTabs.includes(activeTab)) {
+      setActiveTab("overview");
     }
   }, [selectedRole, activeTab]);
   const [userTypeFilter, setUserTypeFilter] = useState<"all" | "student" | "instructor" | "parents">("all");
@@ -1679,17 +1680,23 @@ export default function App() {
     }
   }, []);
 
-  // Fetch fee records when switching to the fee viewer tab or on success admin login
+  // Fetch fee records when switching to relevant tabs
   useEffect(() => {
-    if (loginResult?.success && selectedRole === "administrator" && activeTab === "grade-section-fees") {
-      fetchFeeRecords();
+    if (loginResult?.success) {
+      if ((selectedRole === "administrator" && activeTab === "grade-section-fees") ||
+          (selectedRole === "student" && ["overview", "my-fees", "my-profile"].includes(activeTab))) {
+        fetchFeeRecords();
+      }
     }
   }, [activeTab, loginResult, selectedRole]);
 
-  // Fetch marks when switching to the marks management tab
+  // Fetch marks when switching to relevant tabs
   useEffect(() => {
-    if (loginResult?.success && selectedRole === "administrator" && activeTab === "marks-management") {
-      fetchMarks();
+    if (loginResult?.success) {
+      if ((selectedRole === "administrator" && activeTab === "marks-management") ||
+          (selectedRole === "student" && ["overview", "my-marks", "my-profile"].includes(activeTab))) {
+        fetchMarks();
+      }
     }
   }, [activeTab, loginResult, selectedRole]);
 
@@ -3411,10 +3418,13 @@ export default function App() {
       { id: "assign-activities", label: "Assign Extra Activities", icon: Briefcase },
       { id: "manage-leaves", label: "Manage Teacher Leaves", icon: ClipboardList }
     ] : selectedRole === "student" ? [
+      { id: "overview", label: "Overview Dashboard", icon: Home },
       { id: "my-timetable", label: "My Timetable", icon: Calendar },
       { id: "my-marks", label: "My Marks", icon: Award },
       { id: "my-attendance", label: "My Attendance", icon: Calendar },
       { id: "my-homework", label: "My Homeworks", icon: FileCode2 },
+      { id: "my-fees", label: "My Fees", icon: CreditCard },
+      { id: "my-profile", label: "My Profile", icon: User },
       { id: "institutions", label: "Institute Details", icon: Building }
     ] : selectedRole === "instructor" ? [
       { id: "overview", label: "Overview Dashboard", icon: Home },
@@ -3440,38 +3450,105 @@ export default function App() {
 
       if (selectedRole === "student") {
         if (activeTab === "overview") {
+          // Compute student specific metrics
+          const currentStudentId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentStudentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.reg_no || "";
+          
+          // Registered class relation
+          const myRelation = (studentClassRelations || []).find((rel: any) => {
+            if (!rel) return false;
+            const sId = rel.student_id && typeof rel.student_id === "object"
+              ? rel.student_id._id || rel.student_id.id
+              : rel.student_id;
+            return String(sId) === String(currentStudentId);
+          });
+          const myClassId = myRelation ? myRelation.class_id : "";
+          
+          // Class name
+          const myClassRecord = (mClassesList || []).find(c => (c._id === myClassId || c.id === myClassId));
+          const myClassSecRecord = myClassRecord ? (classSectionsList || []).find(cs => cs._id === myClassRecord.class_section_id || cs.id === myClassRecord.class_section_id) : null;
+          const myClassName = myClassRecord 
+            ? `${myClassRecord.class_name}${myClassSecRecord ? ` - ${myClassSecRecord.__section || myClassSecRecord.section || ""}` : ""}`
+            : "No Assigned Cohort";
+
+          // Calculate student's marks & GPA
+          const myMarks = (marksList || []).filter((mark: any) => {
+            if (!mark) return false;
+            const sId = mark.student_id && typeof mark.student_id === "object"
+              ? mark.student_id._id || mark.student_id.id
+              : mark.student_id;
+            return String(sId) === String(currentStudentId);
+          });
+          const totalScoreSum = myMarks.reduce((sum, m) => sum + (Number(m.score) || 0), 0);
+          const avgScore = myMarks.length > 0 ? Math.round(totalScoreSum / myMarks.length) : null;
+          const currentGPA = avgScore ? ((avgScore / 100) * 4).toFixed(2) : "N/A";
+
+          // Calculate absences & Attendance Rate
+          const myAbsences = (absencesList || []).filter((abs: any) => {
+            if (!abs) return false;
+            const sid = String(abs.studentID || "").toLowerCase();
+            return sid === currentStudentId.toLowerCase() || sid === currentStudentUsername.toLowerCase();
+          });
+          const absencesCount = myAbsences.length;
+          const myAttendancePercent = absencesCount === 0 ? "100.0%" : `${Math.max(60, 100 - absencesCount * 5.0).toFixed(1)}%`;
+
+          // Local submissions
+          let mySubmissionCount = 0;
+          try {
+            const saved = localStorage.getItem(`abms_homework_submissions_${currentStudentId}`);
+            if (saved) {
+              const subs = JSON.parse(saved);
+              if (Array.isArray(subs)) {
+                mySubmissionCount = subs.length;
+              }
+            }
+          } catch (e) {
+            console.warn("Could not read submissions for overview count", e);
+          }
+
+          // Filtered subjects
+          const mySubjects = getFilteredSubjects();
+
           return (
-            <div className="space-y-6">
-              {/* Alert banner */}
-              <div className="bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 border border-cyan-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-6 animate-fade-in">
+              {/* Welcome banner */}
+              <div className="bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 border border-cyan-100 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-cyan-600" />
-                    Semester Registration Validated
+                  <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-cyan-600 animate-spin" />
+                    Student Portal Active &bull; {myClassName}
                   </h4>
-                  <p className="text-[11px] text-slate-600">
-                    Welcome to the Academic Portal. Your course schedule for Term B 2026 is fully loaded.
+                  <p className="text-xs text-slate-600">
+                    Welcome back, <strong className="text-cyan-700">{displayNameWithSurname}</strong> (ID: {currentStudentUsername || "N/A"}). Here is your real-time academic progress tracked from the database.
                   </p>
                 </div>
-                <button 
-                  onClick={() => { setActiveTab("courses"); setSearchQuery(""); }}
-                  className="text-[11px] bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg shrink-0 cursor-pointer"
-                >
-                  View Curriculum
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => { setActiveTab("my-timetable"); }}
+                    className="text-[11px] bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                  >
+                    My Timetable
+                  </button>
+                  <button 
+                    onClick={() => { setActiveTab("my-homework"); }}
+                    className="text-[11px] bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+                  >
+                    Homework Hub
+                  </button>
+                </div>
               </div>
 
-              {/* Stats grid */}
+              {/* Real Database Stats grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: "Grade Point Average", val: "3.92", desc: "Top 5% of cohort", icon: Activity, color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
-                  { label: "Attendance Rate", val: "98.4%", desc: "1 excused absence", icon: Calendar, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
-                  { label: "Earned Credits", val: "45 / 120", desc: "Sufficient progress", icon: BookOpen, color: "text-violet-600 bg-violet-50 border-violet-100" },
-                  { label: "Financial Status", val: "Cleared", desc: "No outstanding balances", icon: CheckCircle2, color: "text-amber-600 bg-amber-50 border-amber-100" }
+                  { label: "Grade Point Average", val: currentGPA === "N/A" ? "N/A" : `${currentGPA} / 4.0`, desc: avgScore ? `Average: ${avgScore}% score` : "No graded marks yet", icon: Activity, color: "text-cyan-600 bg-cyan-50 border-cyan-100" },
+                  { label: "Attendance Performance", val: myAttendancePercent, desc: `${absencesCount} absence(s) logged`, icon: Calendar, color: "text-emerald-600 bg-emerald-50 border-emerald-100" },
+                  { label: "Academic Subjects", val: `${mySubjects.length}`, desc: "Registered courses", icon: BookOpen, color: "text-violet-600 bg-violet-50 border-violet-100" },
+                  { label: "Homework Uploads", val: `${mySubmissionCount}`, desc: "Solutions submitted", icon: FileCode2, color: "text-amber-600 bg-amber-50 border-amber-100" }
                 ].map((item, idx) => {
                   const Icon = item.icon;
                   return (
-                    <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
                       <div className="flex justify-between items-start">
                         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">{item.label}</span>
                         <div className={`p-1.5 rounded-lg border ${item.color}`}>
@@ -3485,53 +3562,70 @@ export default function App() {
                 })}
               </div>
 
-              {/* Directives details and quick panel */}
+              {/* Database Lists Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Courses widget */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                {/* Real Subjects List */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2.5 mb-3">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                       <BookOpen className="w-3.5 h-3.5 text-cyan-600" />
-                      Active Courses
+                      Assigned Subjects
                     </h3>
-                    <button onClick={() => { setActiveTab("courses"); setSearchQuery(""); }} className="text-[10px] text-cyan-600 font-bold hover:underline cursor-pointer">View All</button>
+                    <span className="text-[10px] font-mono text-cyan-600 font-bold bg-cyan-50 border border-cyan-100 px-2 py-0.5 rounded">
+                      {mySubjects.length} Active
+                    </span>
                   </div>
-                  <div className="space-y-2">
-                    {studentCourses.slice(0, 3).map((c) => (
-                      <div key={c.code} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">{c.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{c.code} &bull; {c.instructor}</p>
+                  <div className="space-y-2 flex-1 overflow-y-auto max-h-[250px]">
+                    {mySubjects.length > 0 ? (
+                      mySubjects.map((sub: any) => (
+                        <div key={sub._id || sub.id} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors">
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">{sub.name}</p>
+                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">Subject Code: {sub.code || "N/A"}</p>
+                          </div>
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+                            Core Curriculum
+                          </span>
                         </div>
-                        <span className="text-xs font-mono font-bold text-cyan-600 bg-cyan-50 px-2 py-0.5 rounded border border-cyan-100">{c.grade}</span>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-xs text-slate-400">No subjects assigned to this institution yet.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
-                {/* Exam widget */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                {/* Real Recorded Marks List */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex flex-col">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2.5 mb-3">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-violet-600" />
-                      Recent & Upcoming Assessments
+                      <Award className="w-3.5 h-3.5 text-violet-600" />
+                      Recent Database Graded Marks
                     </h3>
-                    <button onClick={() => { setActiveTab("exams"); setSearchQuery(""); }} className="text-[10px] text-violet-600 font-bold hover:underline cursor-pointer">View All</button>
+                    <button onClick={() => { setActiveTab("my-marks"); }} className="text-[10px] text-violet-600 font-bold hover:underline cursor-pointer">View All Marks</button>
                   </div>
-                  <div className="space-y-2">
-                    {studentExams.slice(0, 3).map((e) => (
-                      <div key={e.id} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800 truncate max-w-[180px]">{e.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{e.date}</p>
-                        </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          e.status === "Graded" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-blue-50 text-blue-700 border border-blue-100"
-                        }`}>
-                          {e.score}
-                        </span>
+                  <div className="space-y-2 flex-1 overflow-y-auto max-h-[250px]">
+                    {myMarks.length > 0 ? (
+                      myMarks.slice(0, 4).map((m: any) => {
+                        const subObj = mySubjects.find(s => (s._id || s.id) === m.subject_id);
+                        return (
+                          <div key={m._id || m.id} className="flex justify-between items-center p-2.5 rounded-lg bg-slate-50 border border-slate-100 hover:bg-slate-100/50 transition-colors">
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">{subObj ? subObj.name : "Exam Record"}</p>
+                              <p className="text-[10px] text-slate-400 font-mono mt-0.5">{m.term || "Regular Test"} &bull; Date: {m.exam_date || m.date || "N/A"}</p>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-violet-700 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded">
+                              {m.score}%
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-xs text-slate-400">No graded exam or test marks recorded in database yet.</p>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               </div>
@@ -3762,6 +3856,452 @@ export default function App() {
                 studentClassRelations={studentClassRelations}
                 currentUserId={currentUserId}
               />
+            </div>
+          );
+        }
+
+        if (activeTab === "my-fees") {
+          const currentStudentId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentStudentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.reg_no || "";
+          const studentObj = loginResult?.data?.user;
+          const myFees = matchStudentFees(studentObj, allFeeRecords, feeViewerYear);
+
+          // Render Fee Table and Status
+          return (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-cyan-50 to-indigo-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-indigo-50 border border-indigo-100 rounded-xl text-indigo-600">
+                      <CreditCard className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900 font-sans tracking-tight">My Fees Status</h2>
+                      <p className="text-xs text-slate-500 mt-1">Review all your billing cycles, paid tuition, and pending clearances.</p>
+                    </div>
+                  </div>
+                  
+                  {/* Academic Year Selector */}
+                  <div className="flex items-center gap-2 bg-white/80 backdrop-blur-xs border border-slate-200 px-3 py-1.5 rounded-xl text-xs w-full sm:w-auto">
+                    <span className="text-slate-400 font-bold uppercase text-[10px] shrink-0">Academic Year:</span>
+                    <select
+                      value={feeViewerYear}
+                      onChange={(e) => setFeeViewerYear(e.target.value)}
+                      className="bg-transparent border-none text-slate-700 font-bold focus:outline-none focus:ring-0 cursor-pointer text-xs p-0 pr-6"
+                    >
+                      {["2024", "2025", "2026", "2027"].map((yr) => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Main Content Info */}
+                <div className="p-6 space-y-6">
+                  {/* Mini stats cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {(() => {
+                      let totalPaid = 0;
+                      let totalPending = 0;
+                      let totalUnpaid = 0;
+                      for (let t = 1; t <= 4; t++) {
+                        const rec = myFees.find(r => parseTermNumber(r.term) === t);
+                        const status = rec ? String(rec.fee_status || rec.feeStatus || "unpaid").toLowerCase() : "unpaid";
+                        if (status === "paid") totalPaid++;
+                        else if (status === "pending") totalPending++;
+                        else totalUnpaid++;
+                      }
+                      return (
+                        <>
+                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-bold text-emerald-600/80 uppercase tracking-wider block">Paid Terms</span>
+                              <p className="text-2xl font-black text-emerald-700 mt-1">{totalPaid} / 4</p>
+                              <span className="text-[10px] text-emerald-600 block mt-0.5">Cleared cycles</span>
+                            </div>
+                            <div className="p-2 bg-emerald-100/50 rounded-lg text-emerald-600 border border-emerald-200">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                          </div>
+                          <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-bold text-amber-600/80 uppercase tracking-wider block">Pending Review</span>
+                              <p className="text-2xl font-black text-amber-700 mt-1">{totalPending} / 4</p>
+                              <span className="text-[10px] text-amber-600 block mt-0.5">Under approval</span>
+                            </div>
+                            <div className="p-2 bg-amber-100/50 rounded-lg text-amber-600 border border-amber-200">
+                              <Activity className="w-5 h-5 animate-pulse" />
+                            </div>
+                          </div>
+                          <div className="bg-rose-50/50 border border-rose-100 rounded-xl p-4 flex items-center justify-between">
+                            <div>
+                              <span className="text-[10px] font-bold text-rose-600/80 uppercase tracking-wider block">Outstanding Terms</span>
+                              <p className="text-2xl font-black text-rose-700 mt-1">{totalUnpaid} / 4</p>
+                              <span className="text-[10px] text-rose-600 block mt-0.5">Due soon</span>
+                            </div>
+                            <div className="p-2 bg-rose-100/50 rounded-lg text-rose-600 border border-rose-200">
+                              <AlertCircle className="w-5 h-5" />
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Detailed Terms Grid */}
+                  <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Term / Period</th>
+                          <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Academic Year</th>
+                          <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estimated Amount</th>
+                          <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Payment Status</th>
+                          <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Details</th>
+                          <th className="p-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider pr-6">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[1, 2, 3, 4].map((termNum) => {
+                          const rec = myFees.find(r => parseTermNumber(r.term) === termNum);
+                          const status = rec ? String(rec.fee_status || rec.feeStatus || "unpaid").toLowerCase() : "unpaid";
+                          const referenceId = rec?._id || rec?.id || "";
+
+                          return (
+                            <tr key={termNum} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/30 transition-colors">
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                  <span className="font-bold text-slate-800">Term {termNum} Tuition</span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-xs font-mono text-slate-500">{feeViewerYear}</td>
+                              <td className="p-4 text-xs font-mono font-bold text-slate-800">$1,200.00</td>
+                              <td className="p-4">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
+                                  status === "paid"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                                    : status === "pending"
+                                    ? "bg-amber-50 text-amber-700 border-amber-100 animate-pulse"
+                                    : "bg-rose-50 text-rose-700 border-rose-100"
+                                }`}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="p-4 text-xs text-slate-500">
+                                {referenceId ? (
+                                  <span className="font-mono text-[10px]">Ref: {referenceId}</span>
+                                ) : (
+                                  <span className="text-slate-400">No active transaction</span>
+                                )}
+                              </td>
+                              <td className="p-4 text-right pr-6">
+                                {status === "unpaid" ? (
+                                  <button
+                                    onClick={async () => {
+                                      // Simulate payment request / database update
+                                      try {
+                                        const endpoint = "/class/fee/add";
+                                        const payload = {
+                                          studentID: currentStudentId || currentStudentUsername,
+                                          student_id: currentStudentId || currentStudentUsername,
+                                          term: termNum,
+                                          year: Number(feeViewerYear),
+                                          feeStatus: "pending",
+                                          fee_status: "pending"
+                                        };
+                                        const response = await fetch(endpoint, {
+                                          method: "POST",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                            "Authorization": `Bearer ${loginResult?.data?.token}`
+                                          },
+                                          body: JSON.stringify(payload)
+                                        });
+                                        if (response.ok) {
+                                          alert("Payment submission pending! The system has successfully filed a request with status 'pending' for review.");
+                                          fetchFeeRecords();
+                                        } else {
+                                          alert("Could not update fee records. Please check database permissions.");
+                                        }
+                                      } catch (err: any) {
+                                        console.error("Error submitting simulated payment:", err);
+                                      }
+                                    }}
+                                    className="text-[10px] bg-slate-900 hover:bg-slate-800 text-white font-bold px-2.5 py-1 rounded cursor-pointer transition-all"
+                                  >
+                                    Pay Term {termNum}
+                                  </button>
+                                ) : status === "pending" ? (
+                                  <span className="text-[10px] text-amber-600 font-bold italic">Awaiting Admin Verification</span>
+                                ) : (
+                                  <span className="text-[10px] text-emerald-600 font-bold flex items-center justify-end gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Fully Cleared
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Payment Methods and Notice */}
+                  <div className="bg-slate-50/50 border border-slate-100 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-lg mt-0.5 shrink-0">
+                        <CreditCard className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">Bank Transfer & Online Gateways</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Please transfer outstanding dues to the Institution Account, quoting your unique ID: <strong className="text-cyan-700 font-mono">{currentStudentUsername || "N/A"}</strong> as transaction reference.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100/80 px-2 py-1 rounded">SECURE CHANNEL</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (activeTab === "my-profile") {
+          const currentStudentId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentStudentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.reg_no || "";
+          const studentObj = loginResult?.data?.user;
+          const myFees = matchStudentFees(studentObj, allFeeRecords, feeViewerYear);
+          
+          // Registered class relation
+          const myRelation = (studentClassRelations || []).find((rel: any) => {
+            if (!rel) return false;
+            const sId = rel.student_id && typeof rel.student_id === "object"
+              ? rel.student_id._id || rel.student_id.id
+              : rel.student_id;
+            return String(sId) === String(currentStudentId);
+          });
+          const myClassId = myRelation ? myRelation.class_id : "";
+          
+          // Class name
+          const myClassRecord = (mClassesList || []).find(c => (c._id === myClassId || c.id === myClassId));
+          const myClassSecRecord = myClassRecord ? (classSectionsList || []).find(cs => cs._id === myClassRecord.class_section_id || cs.id === myClassRecord.class_section_id) : null;
+          const myClassName = myClassRecord 
+            ? `${myClassRecord.class_name}${myClassSecRecord ? ` - ${myClassSecRecord.__section || myClassSecRecord.section || ""}` : ""}`
+            : "No Assigned Cohort";
+
+          // Calculate student's marks & GPA
+          const myMarks = (marksList || []).filter((mark: any) => {
+            if (!mark) return false;
+            const sId = mark.student_id && typeof mark.student_id === "object"
+              ? mark.student_id._id || mark.student_id.id
+              : mark.student_id;
+            return String(sId) === String(currentStudentId);
+          });
+          const totalScoreSum = myMarks.reduce((sum, m) => sum + (Number(m.score) || 0), 0);
+          const avgScore = myMarks.length > 0 ? Math.round(totalScoreSum / myMarks.length) : null;
+          const currentGPA = avgScore ? ((avgScore / 100) * 4).toFixed(2) : "N/A";
+
+          // Calculate absences & Attendance Rate
+          const myAbsences = (absencesList || []).filter((abs: any) => {
+            if (!abs) return false;
+            const sid = String(abs.studentID || "").toLowerCase();
+            return sid === currentStudentId.toLowerCase() || sid === currentStudentUsername.toLowerCase();
+          });
+          const absencesCount = myAbsences.length;
+          const myAttendancePercent = absencesCount === 0 ? "100.0%" : `${Math.max(60, 100 - absencesCount * 5.0).toFixed(1)}%`;
+
+          // Filtered subjects
+          const mySubjects = getFilteredSubjects();
+
+          return (
+            <div className="space-y-6 max-w-7xl mx-auto animate-fade-in pb-10">
+              {/* Profile Card Header */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="relative h-32 bg-gradient-to-r from-cyan-500 to-indigo-600">
+                  <div className="absolute inset-0 bg-white/10 backdrop-blur-xs"></div>
+                </div>
+                <div className="px-6 pb-6 relative">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-12 sm:-mt-16 mb-4">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr from-cyan-400 to-indigo-500 border-4 border-white flex items-center justify-center text-white text-3xl font-black shadow-md shrink-0">
+                      {loginResult?.data?.user?.name?.charAt(0) || displayNameWithSurname?.charAt(0) || "S"}
+                    </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h2 className="text-xl font-bold text-slate-900 truncate font-sans tracking-tight">{displayNameWithSurname}</h2>
+                        <span className="text-[10px] bg-cyan-50 text-cyan-700 font-bold px-2 py-0.5 rounded-full border border-cyan-100 uppercase tracking-wide">
+                          Student Portal Active
+                        </span>
+                      </div>
+                      <p className="text-xs font-mono text-slate-500">Registration ID: <strong className="text-indigo-600">{currentStudentUsername || "N/A"}</strong></p>
+                      <p className="text-xs text-slate-400">Class: <strong className="text-slate-700">{myClassName}</strong></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bento Grid Info Panel */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                {/* 1. Personal & Contact Details Card */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                    <User className="w-3.5 h-3.5 text-cyan-600" />
+                    Personal Dossier
+                  </h3>
+                  <div className="space-y-3">
+                    {[
+                      { label: "Full Name", val: displayNameWithSurname },
+                      { label: "ID / Username", val: currentStudentUsername, isMono: true },
+                      { label: "Phone Number", val: loginResult?.data?.user?.phone || "N/A" },
+                      { label: "Registered Email", val: loginResult?.data?.user?.email || "N/A" },
+                      { label: "Date of Birth", val: displayDob || "N/A" },
+                      { label: "Sex / Gender", val: displaySex || "N/A" },
+                      { label: "Identity (NIC/Passport)", val: loginResult?.data?.user?.nic || displayPassport || "N/A", isMono: true }
+                    ].map((row, idx) => (
+                      <div key={idx} className="flex justify-between items-start text-xs border-b border-slate-50 pb-1.5 last:border-0 last:pb-0">
+                        <span className="text-slate-400 font-medium shrink-0">{row.label}</span>
+                        <span className={`text-slate-800 text-right font-semibold ${row.isMono ? "font-mono text-[11px]" : ""}`}>{row.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2. Real-time Database Academic Summary Stats */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                    <Award className="w-3.5 h-3.5 text-violet-600" />
+                    Academic Metrics
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-4 pb-2">
+                    <div className="bg-cyan-50/50 border border-cyan-100/50 p-3 rounded-xl text-center">
+                      <span className="text-[9px] uppercase font-bold text-cyan-600 tracking-wider block">Estimated GPA</span>
+                      <span className="text-xl font-black text-slate-800 mt-1 block">{currentGPA}</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5 block">{avgScore ? `Avg Score: ${avgScore}%` : "No scores logged"}</span>
+                    </div>
+                    <div className="bg-emerald-50/50 border border-emerald-100/50 p-3 rounded-xl text-center">
+                      <span className="text-[9px] uppercase font-bold text-emerald-600 tracking-wider block">Attendance Rate</span>
+                      <span className="text-xl font-black text-slate-800 mt-1 block">{myAttendancePercent}</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5 block">{absencesCount} Absence(s)</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1.5">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400 font-medium">Assigned Cohort</span>
+                      <span className="text-slate-700 font-bold">{myClassName}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400 font-medium">Core Subjects</span>
+                      <span className="text-slate-700 font-bold">{mySubjects.length} subjects</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-400 font-medium">Billing Period</span>
+                      <span className="text-slate-700 font-bold">Academic Year {feeViewerYear}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Fee Ledger Status Overview */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                    <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+                    Fees Ledger Status ({feeViewerYear})
+                  </h3>
+                  <div className="space-y-2.5">
+                    {[1, 2, 3, 4].map((termNum) => {
+                      const rec = myFees.find(r => parseTermNumber(r.term) === termNum);
+                      const status = rec ? String(rec.fee_status || rec.feeStatus || "unpaid").toLowerCase() : "unpaid";
+                      return (
+                        <div key={termNum} className="flex justify-between items-center p-2 rounded-xl bg-slate-50 border border-slate-100/60 text-xs">
+                          <span className="font-bold text-slate-600">Term {termNum} Tuition</span>
+                          <span className={`text-[9px] px-2 py-0.5 rounded border font-black uppercase tracking-wider ${
+                            status === "paid"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                              : status === "pending"
+                              ? "bg-amber-50 text-amber-700 border-amber-100"
+                              : "bg-rose-50 text-rose-700 border-rose-100"
+                          }`}>
+                            {status}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Performance detail section (All Marks & Absences list) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 4. Complete Marks breakdown */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-violet-600" />
+                      Recorded Academic Graded Marks
+                    </h3>
+                    <span className="text-[10px] font-mono text-slate-400">{myMarks.length} records</span>
+                  </div>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {myMarks.length > 0 ? (
+                      myMarks.map((m: any) => {
+                        const subObj = mySubjects.find(s => (s._id || s.id) === m.subject_id);
+                        return (
+                          <div key={m._id || m.id} className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100/80 hover:bg-slate-100/50 transition-colors">
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-bold text-slate-800">{subObj ? subObj.name : "Exam Record"}</p>
+                              <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono">
+                                <span>{m.term || "Regular Test"}</span>
+                                <span>&bull;</span>
+                                <span>Date: {m.exam_date || m.date || "N/A"}</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-mono font-bold text-violet-700 bg-violet-50 border border-violet-100 px-2 py-0.5 rounded">
+                                {m.score}%
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-slate-400 py-10 text-center">No graded marks or assessments logged in database yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 5. Complete Absence logs */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                  <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+                      Absences Log History
+                    </h3>
+                    <span className="text-[10px] font-mono text-slate-400">{absencesCount} absences</span>
+                  </div>
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {absencesCount > 0 ? (
+                      myAbsences.map((abs: any, i: number) => (
+                        <div key={abs._id || abs.id || i} className="flex justify-between items-center p-3 rounded-xl bg-slate-50 border border-slate-100/80 hover:bg-slate-100/50 transition-colors">
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-bold text-slate-800">{abs.reason || "No explicit reason submitted"}</p>
+                            <p className="text-[10px] font-mono text-slate-400">Date: {abs.date ? new Date(abs.date).toLocaleDateString() : "N/A"}</p>
+                          </div>
+                          <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100 px-2.5 py-0.5 rounded-lg font-mono">
+                            Absent
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 py-10 text-center">Great job! You have perfect attendance with zero recorded absences.</p>
+                    )}
+                  </div>
+                </div>
+
+              </div>
             </div>
           );
         }

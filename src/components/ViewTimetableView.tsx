@@ -54,7 +54,10 @@ export default function ViewTimetableView({
       : rel.student_id;
     return String(sId) === String(currentUserId);
   }) : null;
-  const studentClassId = studentRel ? studentRel.class_id : "";
+  const rawStudentClassId = studentRel ? studentRel.class_id : "";
+  const studentClassId = rawStudentClassId && typeof rawStudentClassId === "object"
+    ? String(rawStudentClassId._id || rawStudentClassId.id || "")
+    : String(rawStudentClassId || "");
 
   // App states
   const [selectedClassId, setSelectedClassId] = useState(isStudent ? studentClassId : "");
@@ -145,11 +148,14 @@ export default function ViewTimetableView({
     return classIdsInOrg.has(cs._id || cs.id);
   });
 
-  const allowedClassIds = new Set(mClassesList.map((c: any) => c._id || c.id));
+  const allowedClassIds = new Set(mClassesList.map((c: any) => String(c._id || c.id)));
 
   // Helper: Get Class/Cohort details
   const getClassDetails = (classId: string) => {
-    const c = mClassesList.find(cls => (cls._id === classId || cls.id === classId));
+    const c = mClassesList.find(cls => {
+      const clsId = cls && typeof cls === "object" ? (cls._id || cls.id) : cls;
+      return String(clsId) === String(classId);
+    });
     if (!c) return "N/A";
     const matchedCs = classSectionsList.find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
     const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
@@ -192,11 +198,19 @@ export default function ViewTimetableView({
             if (!slot) return false;
             
             // 1. The class must belong to our organization's allowed class sections
-            if (!allowedClassIds.has(slot.class_id)) return false;
+            const slotClassId = slot.class_id && typeof slot.class_id === "object"
+              ? (slot.class_id._id || slot.class_id.id)
+              : slot.class_id;
+            const slotClassIdStr = slotClassId ? String(slotClassId).trim() : "";
+            
+            if (!allowedClassIds.has(slotClassIdStr)) return false;
             
             // 2. If a teacher is assigned, the teacher must belong to our organization (ourOrgUserIds)
             if (slot.teacher_id) {
-              const teacherIdStr = String(slot.teacher_id).trim();
+              const teacherId = slot.teacher_id && typeof slot.teacher_id === "object"
+                ? (slot.teacher_id._id || slot.teacher_id.id)
+                : slot.teacher_id;
+              const teacherIdStr = teacherId ? String(teacherId).trim() : "";
               if (teacherIdStr && !ourOrgUserIds.has(teacherIdStr)) {
                 return false;
               }
@@ -207,10 +221,30 @@ export default function ViewTimetableView({
           
           if (!isStudent && filterType === "mine") {
             // Filter where teacher_id matches currently logged in teacher
-            filtered = filtered.filter(slot => slot.teacher_id === currentUserId);
+            const currentUserIdStr = String(currentUserId).trim();
+            filtered = filtered.filter(slot => {
+              const teacherId = slot.teacher_id && typeof slot.teacher_id === "object"
+                ? (slot.teacher_id._id || slot.teacher_id.id)
+                : slot.teacher_id;
+              return String(teacherId).trim() === currentUserIdStr;
+            });
+          } else if (isStudent) {
+            const studentClassIdStr = String(studentClassId).trim();
+            filtered = filtered.filter(slot => {
+              const slotClassId = slot.class_id && typeof slot.class_id === "object"
+                ? (slot.class_id._id || slot.class_id.id)
+                : slot.class_id;
+              return String(slotClassId).trim() === studentClassIdStr;
+            });
           } else if (targetClassId) {
             // Filter by selected class (in case we fetched all, or if backend returned all)
-            filtered = filtered.filter(slot => slot.class_id === targetClassId);
+            const targetClassIdStr = String(targetClassId).trim();
+            filtered = filtered.filter(slot => {
+              const slotClassId = slot.class_id && typeof slot.class_id === "object"
+                ? (slot.class_id._id || slot.class_id.id)
+                : slot.class_id;
+              return String(slotClassId).trim() === targetClassIdStr;
+            });
           }
 
           // Sort chronologically by start time

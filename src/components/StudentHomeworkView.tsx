@@ -50,10 +50,10 @@ export default function StudentHomeworkView({
   useEffect(() => {
     if (detectedClassId) {
       setSelectedClassId(detectedClassId);
-    } else if (classSectionsList.length > 0 && !selectedClassId) {
-      setSelectedClassId(classSectionsList[0]._id || classSectionsList[0].id || "");
+    } else {
+      setSelectedClassId("");
     }
-  }, [detectedClassId, classSectionsList]);
+  }, [detectedClassId]);
 
   // Homework lists states
   const [homeworkList, setHomeworkList] = useState<any[]>([]);
@@ -101,7 +101,10 @@ export default function StudentHomeworkView({
 
   // Fetch homework list for selected class section
   const fetchHomeworks = async (classId: string) => {
-    if (!classId) return;
+    if (!classId || classId !== detectedClassId) {
+      setHomeworkList([]);
+      return;
+    }
     setIsLoading(true);
     setErrorMsg("");
     try {
@@ -273,17 +276,13 @@ export default function StudentHomeworkView({
           {/* Class selector */}
           <div className="flex items-center gap-2 bg-white/80 backdrop-blur-xs border border-slate-200 px-3 py-1.5 rounded-xl text-xs w-full md:w-auto">
             <span className="text-slate-400 font-bold uppercase text-[10px] shrink-0">Viewing Class:</span>
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="bg-transparent border-none text-slate-700 font-bold focus:outline-none focus:ring-0 cursor-pointer text-xs p-0 pr-6"
-            >
-              {classSectionsList.map((cs: any) => (
-                <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                  {cs.grade} - {cs.__section || cs.section || "N/A"}
-                </option>
-              ))}
-            </select>
+            <span className="text-cyan-700 font-bold">
+              {(() => {
+                if (!detectedClassId) return "Unassigned Class";
+                const matched = classSectionsList.find(cs => (cs._id || cs.id) === detectedClassId);
+                return matched ? `${matched.grade} - ${matched.__section || matched.section || "N/A"}` : "Assigned Class";
+              })()}
+            </span>
           </div>
 
           <button
