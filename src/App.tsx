@@ -3955,7 +3955,6 @@ export default function App() {
                         <tr className="bg-slate-50 border-b border-slate-100">
                           <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Term / Period</th>
                           <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Academic Year</th>
-                          <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Estimated Amount</th>
                           <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Payment Status</th>
                           <th className="p-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Details</th>
                           <th className="p-4 text-right text-[11px] font-bold text-slate-400 uppercase tracking-wider pr-6">Action</th>
@@ -3976,7 +3975,6 @@ export default function App() {
                                 </div>
                               </td>
                               <td className="p-4 text-xs font-mono text-slate-500">{feeViewerYear}</td>
-                              <td className="p-4 text-xs font-mono font-bold text-slate-800">$1,200.00</td>
                               <td className="p-4">
                                 <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold uppercase tracking-wider ${
                                   status === "paid"
