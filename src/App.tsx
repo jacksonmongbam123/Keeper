@@ -4406,12 +4406,12 @@ export default function App() {
             <div className="space-y-6 max-w-7xl mx-auto animate-fade-in pb-10">
               {/* Profile Card Header */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="relative h-32 bg-gradient-to-r from-cyan-500 to-indigo-600">
+                <div className="relative h-32 bg-slate-100 border-b border-slate-200">
                   <div className="absolute inset-0 bg-white/10 backdrop-blur-xs"></div>
                 </div>
                 <div className="px-6 pb-6 relative">
                   <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-12 sm:-mt-16 mb-4">
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr from-cyan-400 to-indigo-500 border-4 border-white flex items-center justify-center text-white text-3xl font-black shadow-md shrink-0">
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-cyan-400 to-indigo-500 border-4 border-white flex items-center justify-center text-white text-3xl font-black shadow-md shrink-0">
                       {loginResult?.data?.user?.name?.charAt(0) || displayNameWithSurname?.charAt(0) || "S"}
                     </div>
                     <div className="space-y-1.5 flex-1 min-w-0">
