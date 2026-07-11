@@ -261,6 +261,7 @@ export default function App() {
   const [edQualifications, setEdQualifications] = useState<any[]>([]);
   const [edSpecialities, setEdSpecialities] = useState<any[]>([]);
   const [maritalStatusesList, setMaritalStatusesList] = useState<any[]>([]);
+  const [relationTypesList, setRelationTypesList] = useState<any[]>([]);
   const [teacherGradesList, setTeacherGradesList] = useState<any[]>([]);
   const [searchRoleFilter, setSearchRoleFilter] = useState<string>("all");
   const [isLoadingSearchDetails, setIsLoadingSearchDetails] = useState<boolean>(false);
@@ -627,6 +628,17 @@ export default function App() {
       if (maritalRes.ok) {
         const data = await maritalRes.json();
         setMaritalStatusesList(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch relation types
+      const relationTypeRes = await fetch("/df/relationType/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (relationTypeRes.ok) {
+        const data = await relationTypeRes.json();
+        setRelationTypesList(Array.isArray(data) ? data.filter(Boolean) : []);
       }
 
       // Fetch teacher grades
@@ -2502,6 +2514,7 @@ export default function App() {
   const [formOccupation, setFormOccupation] = useState("");
   const [formOccupationType, setFormOccupationType] = useState("");
   const [formMaritalStatus, setFormMaritalStatus] = useState("");
+  const [formRelationType, setFormRelationType] = useState("");
   const [parentFilterGrade, setParentFilterGrade] = useState("");
   const [parentFilterSection, setParentFilterSection] = useState("");
   const [formQualification, setFormQualification] = useState("");
@@ -2545,6 +2558,7 @@ export default function App() {
     setFormOccupation("");
     setFormOccupationType("");
     setFormMaritalStatus("");
+    setFormRelationType("");
     setParentFilterGrade("");
     setParentFilterSection("");
     setFormQualification("");
@@ -2714,6 +2728,7 @@ export default function App() {
     setSelectedSection("");
     setSelectedSubject("");
     setSelectedStudents([]);
+    setFormRelationType("");
     setIsMappingModalOpen(true);
   };
 
@@ -2873,7 +2888,8 @@ export default function App() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             parent_id: selectedUserForMapping._id,
-            student_id: studentId
+            student_id: studentId,
+            relation_type_id: formRelationType || undefined
           })
         })
       );
@@ -2884,7 +2900,8 @@ export default function App() {
         const newRels = selectedStudents.map(studentId => ({
           _id: `rel_parent_student_${Date.now()}_${studentId}`,
           parent_id: selectedUserForMapping._id,
-          student_id: studentId
+          student_id: studentId,
+          relation_type_id: formRelationType
         }));
         setParentStudentRelations(prev => [...(Array.isArray(prev) ? prev : []), ...newRels]);
 
@@ -7074,33 +7091,50 @@ export default function App() {
                       )}
 
                       {mappingType === "parent" && (
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">Select Students</label>
-                          <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3">
-                            {filteredUserDirectory
-                              .filter((u: any) => {
-                                if (u.role !== "student") return false;
-                                const uOrg = normalizeOrgIdLocalGlobal(u.organization_id);
-                                const adminOrg = normalizeOrgIdLocalGlobal(adminOrganizationId || loginResult?.data?.user?.organization_id);
-                                return uOrg === adminOrg;
-                              })
-                              .map((student: any) => (
-                                <label key={student._id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedStudents.includes(student._id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedStudents([...selectedStudents, student._id]);
-                                      } else {
-                                        setSelectedStudents(selectedStudents.filter(id => id !== student._id));
-                                      }
-                                    }}
-                                    className="rounded"
-                                  />
-                                  <span className="text-sm text-slate-700">{student.name}</span>
-                                </label>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Relation Type <span className="text-red-500">*</span></label>
+                            <select
+                              value={formRelationType}
+                              onChange={(e) => setFormRelationType(e.target.value)}
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm font-medium"
+                              required
+                            >
+                              <option value="">-- Choose Relation Type --</option>
+                              {relationTypesList.map((r: any) => (
+                                <option key={r._id || r.id} value={r._id || r.id}>{r.relation || "Unknown"}</option>
                               ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Select Students</label>
+                            <div className="space-y-2 max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-3">
+                              {filteredUserDirectory
+                                .filter((u: any) => {
+                                  if (u.role !== "student") return false;
+                                  const uOrg = normalizeOrgIdLocalGlobal(u.organization_id);
+                                  const adminOrg = normalizeOrgIdLocalGlobal(adminOrganizationId || loginResult?.data?.user?.organization_id);
+                                  return uOrg === adminOrg;
+                                })
+                                .map((student: any) => (
+                                  <label key={student._id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedStudents.includes(student._id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedStudents([...selectedStudents, student._id]);
+                                        } else {
+                                          setSelectedStudents(selectedStudents.filter(id => id !== student._id));
+                                        }
+                                      }}
+                                      className="rounded"
+                                    />
+                                    <span className="text-sm text-slate-700">{student.name}</span>
+                                  </label>
+                                ))}
+                            </div>
                           </div>
                         </div>
                       )}
@@ -7486,7 +7520,8 @@ export default function App() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       parent_id: newUserId,
-                      student_id: studentId
+                      student_id: studentId,
+                      relation_type_id: formRelationType || undefined
                     })
                   })
                 );
@@ -7496,7 +7531,8 @@ export default function App() {
                 const newRels = selectedStudents.map(studentId => ({
                   _id: `rel_parent_student_${Date.now()}_${studentId}`,
                   parent_id: newUserId,
-                  student_id: studentId
+                  student_id: studentId,
+                  relation_type_id: formRelationType
                 }));
                 setParentStudentRelations(prev => [...(Array.isArray(prev) ? prev : []), ...newRels]);
               } catch (err) {
@@ -8141,16 +8177,17 @@ export default function App() {
                             </div>
 
                             <div className="space-y-1.5 col-span-1">
-                              <label className="text-xs font-bold text-slate-700">Marital Status <span className="text-red-500">*</span></label>
+                              <label className="text-xs font-bold text-slate-700">Relation Type <span className="text-red-500">*</span></label>
                               <select
-                                value={formMaritalStatus}
-                                onChange={(e) => setFormMaritalStatus(e.target.value)}
+                                value={formRelationType}
+                                onChange={(e) => setFormRelationType(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
                               >
-                                <option value="Single">Single</option>
-                                <option value="Married">Married</option>
-                                <option value="Divorced">Divorced</option>
-                                <option value="Widowed">Widowed</option>
+                                <option value="">-- Choose Relation Type --</option>
+                                {relationTypesList.map((r: any) => (
+                                  <option key={r._id || r.id} value={r._id || r.id}>{r.relation || "Unknown"}</option>
+                                ))}
                               </select>
                             </div>
                           </div>
@@ -9159,23 +9196,38 @@ export default function App() {
                               No student profiles have been linked to this parent record yet.
                             </div>
                           ) : (
-                            getParentChildrenList(selectedUser._id || selectedUser.id).map((child) => (
-                              <div key={child._id || child.id} className="bg-slate-50 border border-slate-100/80 p-3 rounded-xl flex items-center justify-between">
-                                <div className="space-y-1 text-xs">
-                                  <p className="font-bold text-slate-900">{child.name}</p>
-                                  <p className="text-[10px] text-slate-400 font-mono">Roll: {child.reg_no || child.regNo || "N/A"}</p>
-                                  <p className="text-[10px] text-cyan-700 font-semibold uppercase tracking-wider">
-                                    Class: {getStudentClassSectionName(child._id || child.id)}
-                                  </p>
+                            getParentChildrenList(selectedUser._id || selectedUser.id).map((child) => {
+                              const pId = selectedUser._id || selectedUser.id;
+                              const cId = child._id || child.id;
+                              const relObj = (parentStudentRelations || []).find(r => r && r.parent_id === pId && r.student_id === cId);
+                              const relTypeObj = relObj ? relationTypesList.find(rt => rt._id === relObj.relation_type_id) : null;
+                              const relTypeName = relTypeObj ? relTypeObj.relation : "";
+
+                              return (
+                                <div key={child._id || child.id} className="bg-slate-50 border border-slate-100/80 p-3 rounded-xl flex items-center justify-between">
+                                  <div className="space-y-1 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <p className="font-bold text-slate-900">{child.name}</p>
+                                      {relTypeName && (
+                                        <span className="bg-cyan-50 border border-cyan-100 text-cyan-700 font-bold px-2 py-0.5 rounded text-[9px] uppercase tracking-wider">
+                                          {relTypeName}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 font-mono">Roll: {child.reg_no || child.regNo || "N/A"}</p>
+                                    <p className="text-[10px] text-cyan-700 font-semibold uppercase tracking-wider">
+                                      Class: {getStudentClassSectionName(child._id || child.id)}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => setSearchStudentSelectedId(child._id || child.id)}
+                                    className="text-[10px] px-3 py-1.5 bg-white border border-slate-200 hover:border-cyan-300 hover:bg-cyan-50 text-slate-600 hover:text-cyan-700 font-bold rounded-lg shadow-sm transition-all cursor-pointer"
+                                  >
+                                    View Profile
+                                  </button>
                                 </div>
-                                <button
-                                  onClick={() => setSearchStudentSelectedId(child._id || child.id)}
-                                  className="text-[10px] px-3 py-1.5 bg-white border border-slate-200 hover:border-cyan-300 hover:bg-cyan-50 text-slate-600 hover:text-cyan-700 font-bold rounded-lg shadow-sm transition-all cursor-pointer"
-                                >
-                                  View Profile
-                                </button>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       </div>
