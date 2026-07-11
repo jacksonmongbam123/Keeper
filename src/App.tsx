@@ -1008,8 +1008,16 @@ export default function App() {
                      cs._id === rawClassVal;
             });
             if (classObj) {
-              resolvedClassId = classObj._id || classObj.id;
-              resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+              const csId = classObj._id || classObj.id;
+              // Find corresponding mapped class (m_classes)
+              const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === String(csId).toLowerCase());
+              if (matchedMClass) {
+                resolvedClassId = matchedMClass._id || matchedMClass.id;
+                resolvedClassText = matchedMClass.class_name;
+              } else {
+                resolvedClassId = csId;
+                resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+              }
             } else {
               rowErrorLogs.push(`Class Section '${rawClassVal}' not found.`);
             }
@@ -1380,8 +1388,16 @@ export default function App() {
                      cs._id === rawClassSection;
             });
             if (classObj) {
-              resolvedClassId = classObj._id || classObj.id;
-              resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+              const csId = classObj._id || classObj.id;
+              // Find corresponding mapped class (m_classes)
+              const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === String(csId).toLowerCase());
+              if (matchedMClass) {
+                resolvedClassId = matchedMClass._id || matchedMClass.id;
+                resolvedClassText = matchedMClass.class_name;
+              } else {
+                resolvedClassId = csId;
+                resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+              }
               resolvedSection = classObj.__section || classObj.section || "";
             } else {
               rowErrorLogs.push(`Class Section '${rawClassSection}' not found.`);
