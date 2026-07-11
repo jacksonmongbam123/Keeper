@@ -1246,13 +1246,18 @@ export default function App() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Student_Registration_Template");
 
     // Add another sheet listing active class sections as reference helper!
-    const activeSections = (classSectionsList || []).map((cs: any) => ({
-      "Class Section (Excel input format)": `${cs.grade} - ${cs.__section || cs.section || ""}`,
-      "Grade ID": cs.grade || "",
-      "Section": cs.__section || cs.section || ""
-    }));
+    const activeSections = (classSectionsList || []).map((cs: any) => {
+      const csIdStr = String(cs._id || cs.id);
+      const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === csIdStr.toLowerCase());
+      return {
+        "Class Section (Excel input format)": `${cs.grade} - ${cs.__section || cs.section || ""}`,
+        "Mapped Class Name": matchedMClass ? matchedMClass.class_name : "Not Mapped / Default",
+        "Grade ID": cs.grade || "",
+        "Section": cs.__section || cs.section || ""
+      };
+    });
 
-    const refWorksheet = XLSX.utils.json_to_sheet(activeSections.length > 0 ? activeSections : [{ "Class Section (Excel input format)": "No active classes found" }]);
+    const refWorksheet = XLSX.utils.json_to_sheet(activeSections.length > 0 ? activeSections : [{ "Class Section (Excel input format)": "No active classes found", "Mapped Class Name": "", "Grade ID": "", "Section": "" }]);
     XLSX.utils.book_append_sheet(workbook, refWorksheet, "Class_Sections_Guide");
 
     // Add a third sheet for relation types and occupations reference guide
