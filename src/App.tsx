@@ -252,6 +252,7 @@ export default function App() {
   // --- Student Search and Comprehensive View States ---
   const [parentStudentRelations, setParentStudentRelations] = useState<any[]>([]);
   const [occupationsList, setOccupationsList] = useState<any[]>([]);
+  const [occupationCategoriesList, setOccupationCategoriesList] = useState<any[]>([]);
   const [absencesList, setAbsencesList] = useState<any[]>([]);
   const [verifiedAbsences, setVerifiedAbsences] = useState<any[]>([]);
   const [isVerifyingAbsences, setIsVerifyingAbsences] = useState<boolean>(false);
@@ -550,6 +551,17 @@ export default function App() {
       if (occRes.ok) {
         const data = await occRes.json();
         setOccupationsList(Array.isArray(data) ? data.filter(Boolean) : []);
+      }
+
+      // Fetch occupation categories
+      const occCatRes = await fetch("/df/occupationCategory/retrieve", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({})
+      });
+      if (occCatRes.ok) {
+        const data = await occCatRes.json();
+        setOccupationCategoriesList(Array.isArray(data) ? data.filter(Boolean) : []);
       }
 
       // Fetch absences
@@ -2488,6 +2500,7 @@ export default function App() {
 
   // Role-specific form states
   const [formOccupation, setFormOccupation] = useState("");
+  const [formOccupationType, setFormOccupationType] = useState("");
   const [formMaritalStatus, setFormMaritalStatus] = useState("");
   const [parentFilterGrade, setParentFilterGrade] = useState("");
   const [parentFilterSection, setParentFilterSection] = useState("");
@@ -2530,6 +2543,7 @@ export default function App() {
       setFormAccessLevelId("6");
     }
     setFormOccupation("");
+    setFormOccupationType("");
     setFormMaritalStatus("");
     setParentFilterGrade("");
     setParentFilterSection("");
@@ -2866,6 +2880,14 @@ export default function App() {
       const results = await Promise.all(promises);
       const allSuccess = results.every(r => r.ok);
       if (allSuccess) {
+        // Update local state parentStudentRelations
+        const newRels = selectedStudents.map(studentId => ({
+          _id: `rel_parent_student_${Date.now()}_${studentId}`,
+          parent_id: selectedUserForMapping._id,
+          student_id: studentId
+        }));
+        setParentStudentRelations(prev => [...(Array.isArray(prev) ? prev : []), ...newRels]);
+
         alert(`Parent assigned to ${selectedStudents.length} student(s) successfully!`);
         setIsMappingModalOpen(false);
       } else {
@@ -7120,17 +7142,36 @@ export default function App() {
           if (parentFilterGrade) {
             return (studentClassRelations || []).some((rel: any) => {
               if (!rel) return false;
-              if (rel.student_id !== u._id && rel.student_id !== u.id) return false;
               
+              // Handle populated objects or raw strings for student_id comparison
+              const relStudentId = rel.student_id && typeof rel.student_id === "object"
+                ? (rel.student_id._id || rel.student_id.id || "")
+                : (rel.student_id || "");
+              const uId = u._id || u.id || "";
+              if (String(relStudentId).toLowerCase().trim() !== String(uId).toLowerCase().trim()) {
+                return false;
+              }
+              
+              // Handle populated objects or raw strings for class_id comparison
+              const relClassId = rel.class_id && typeof rel.class_id === "object"
+                ? (rel.class_id._id || rel.class_id.id || "")
+                : (rel.class_id || "");
+
               const matchedMClass = (mClassesList || []).find(c => c && (c._id === parentFilterGrade || c.id === parentFilterGrade));
               const classSectionIdOfMClass = matchedMClass ? matchedMClass.class_section_id : "";
               const matchedCs = (classSectionsList || []).find(cs => cs && cs._id === parentFilterGrade);
-              const classMatch = rel.class_id === parentFilterGrade || 
-                                 (classSectionIdOfMClass && rel.class_id === classSectionIdOfMClass) ||
-                                 (matchedCs && (rel.class_id === matchedCs.grade || rel.class_id === matchedCs.name)) ||
-                                 ((classesList || []).find(c => c && c._id === parentFilterGrade)?.grade === rel.class_id) || 
-                                 ((classesList || []).find(c => c && c._id === parentFilterGrade)?.name === rel.class_id);
-              const secMatch = !parentFilterSection || rel.section_id === parentFilterSection || (matchedCs && rel.section_id === matchedCs.__section);
+              const classMatch = String(relClassId).toLowerCase().trim() === String(parentFilterGrade).toLowerCase().trim() || 
+                                 (classSectionIdOfMClass && String(relClassId).toLowerCase().trim() === String(classSectionIdOfMClass).toLowerCase().trim()) ||
+                                 (matchedCs && (String(relClassId).toLowerCase().trim() === String(matchedCs.grade).toLowerCase().trim() || String(relClassId).toLowerCase().trim() === String(matchedCs.name).toLowerCase().trim())) ||
+                                 (String((classesList || []).find(c => c && c._id === parentFilterGrade)?.grade || "").toLowerCase().trim() === String(relClassId).toLowerCase().trim()) || 
+                                 (String((classesList || []).find(c => c && c._id === parentFilterGrade)?.name || "").toLowerCase().trim() === String(relClassId).toLowerCase().trim());
+              
+              const relSectionId = rel.section_id && typeof rel.section_id === "object"
+                ? (rel.section_id._id || rel.section_id.id || rel.section_id.__section || rel.section_id.section || "")
+                : (rel.section_id || "");
+              const secMatch = !parentFilterSection || 
+                               String(relSectionId).toLowerCase().trim() === String(parentFilterSection).toLowerCase().trim() || 
+                               (matchedCs && String(relSectionId).toLowerCase().trim() === String(matchedCs.__section || matchedCs.section || "").toLowerCase().trim());
               return classMatch && secMatch;
             });
           }
@@ -7450,6 +7491,14 @@ export default function App() {
                   })
                 );
                 await Promise.all(promises);
+                
+                // Add to local state parentStudentRelations so the UI updates immediately
+                const newRels = selectedStudents.map(studentId => ({
+                  _id: `rel_parent_student_${Date.now()}_${studentId}`,
+                  parent_id: newUserId,
+                  student_id: studentId
+                }));
+                setParentStudentRelations(prev => [...(Array.isArray(prev) ? prev : []), ...newRels]);
               } catch (err) {
                 console.error("Parent mapping error:", err);
               }
@@ -8049,20 +8098,49 @@ export default function App() {
                             <p className="text-[11px] text-violet-700">Specify occupation and filter students of this organization to link child-parent relations.</p>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1.5">
-                              <label className="text-xs font-bold text-slate-700">Occupation <span className="text-red-500">*</span></label>
-                              <input
-                                type="text"
-                                value={formOccupation}
-                                onChange={(e) => setFormOccupation(e.target.value)}
-                                placeholder="e.g. Software Engineer, Business Owner"
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1.5 col-span-1">
+                              <label className="text-xs font-bold text-slate-700">Occupation Type <span className="text-red-500">*</span></label>
+                              <select
+                                value={formOccupationType}
+                                onChange={(e) => {
+                                  const catVal = e.target.value;
+                                  setFormOccupationType(catVal);
+                                  setFormOccupation(""); // Reset occupation when category changes
+                                }}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
                                 required
-                              />
+                              >
+                                <option value="">-- Select Type --</option>
+                                {occupationCategoriesList.map((cat: any) => (
+                                  <option key={cat._id || cat.id} value={cat._id || cat.id}>
+                                    {cat.occupation_category || cat.category || "Unknown"}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
 
-                            <div className="space-y-1.5">
+                            <div className="space-y-1.5 col-span-1">
+                              <label className="text-xs font-bold text-slate-700">Occupation <span className="text-red-500">*</span></label>
+                              <select
+                                value={formOccupation}
+                                onChange={(e) => setFormOccupation(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:border-cyan-500 text-sm font-medium"
+                                required
+                                disabled={!formOccupationType}
+                              >
+                                <option value="">-- Select Occupation --</option>
+                                {occupationsList
+                                  .filter((occ: any) => occ.occupation_category_id === formOccupationType)
+                                  .map((occ: any) => (
+                                    <option key={occ._id || occ.id} value={occ._id || occ.id}>
+                                      {occ.occupation}
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1.5 col-span-1">
                               <label className="text-xs font-bold text-slate-700">Marital Status <span className="text-red-500">*</span></label>
                               <select
                                 value={formMaritalStatus}
