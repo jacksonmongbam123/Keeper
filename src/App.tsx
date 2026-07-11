@@ -1190,7 +1190,14 @@ export default function App() {
         "Password (Optional)": "demoPassword123",
         "Biological Sex (Male/Female/Other)": "Male",
         "Date of Birth (YYYY-MM-DD)": "2010-05-15",
-        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A"
+        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A",
+        "Parent Title (Mr/Mrs/Ms/Dr) (Optional)": "Mr",
+        "Parent First Name (Optional)": "Robert",
+        "Parent Last Name (Optional)": "Doe",
+        "Parent Mobile Phone (Optional)": "0771112222",
+        "Parent Email (Optional)": "robert.doe@example.com",
+        "Parent Occupation (Optional)": "Doctor",
+        "Parent Relation Type (Optional)": "Father"
       },
       {
         "Title (e.g. Mr, Mrs, Miss, Dr)": "Miss",
@@ -1204,7 +1211,14 @@ export default function App() {
         "Password (Optional)": "demoPassword123",
         "Biological Sex (Male/Female/Other)": "Female",
         "Date of Birth (YYYY-MM-DD)": "2011-09-20",
-        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A"
+        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A",
+        "Parent Title (Mr/Mrs/Ms/Dr) (Optional)": "Mrs",
+        "Parent First Name (Optional)": "Linda",
+        "Parent Last Name (Optional)": "Connor",
+        "Parent Mobile Phone (Optional)": "0777999888",
+        "Parent Email (Optional)": "linda@example.com",
+        "Parent Occupation (Optional)": "Business",
+        "Parent Relation Type (Optional)": "Mother"
       }
     ];
 
@@ -1222,6 +1236,27 @@ export default function App() {
     const refWorksheet = XLSX.utils.json_to_sheet(activeSections.length > 0 ? activeSections : [{ "Class Section (Excel input format)": "No active classes found" }]);
     XLSX.utils.book_append_sheet(workbook, refWorksheet, "Class_Sections_Guide");
 
+    // Add a third sheet for relation types and occupations reference guide
+    const relationData = (relationTypesList || []).map((rt: any) => ({
+      "Relation Types (Use under Parent Relation Type)": rt.relation || "Unknown"
+    }));
+    const occupationData = (occupationsList || []).map((occ: any) => ({
+      "Occupations (Use under Parent Occupation)": occ.occupation || "Unknown"
+    }));
+
+    // Merge relationData and occupationData into one helper sheet columns
+    const maxLength = Math.max(relationData.length, occupationData.length, 1);
+    const refGuides = [];
+    for (let i = 0; i < maxLength; i++) {
+      refGuides.push({
+        "Relation Types (Use under Parent Relation Type)": relationData[i]?.["Relation Types (Use under Parent Relation Type)"] || "",
+        "Occupations (Use under Parent Occupation)": occupationData[i]?.["Occupations (Use under Parent Occupation)"] || ""
+      });
+    }
+
+    const guidesWorksheet = XLSX.utils.json_to_sheet(refGuides);
+    XLSX.utils.book_append_sheet(workbook, guidesWorksheet, "Relations_Occupations_Guide");
+
     // Auto-fit column widths
     const fitToColumn = (dataList: any[]) => {
       const keys = Object.keys(dataList[0] || {});
@@ -1236,6 +1271,7 @@ export default function App() {
     if (activeSections.length > 0) {
       refWorksheet["!cols"] = fitToColumn(activeSections);
     }
+    guidesWorksheet["!cols"] = fitToColumn(refGuides);
 
     XLSX.writeFile(workbook, "Student_Bulk_Registration_Template.xlsx");
   };
@@ -1283,6 +1319,15 @@ export default function App() {
           const rawSex = String(getVal(["biologicalsexmalefemaleother", "biologicalsex", "sex", "gender"]) || "Male").trim();
           const rawDob = String(getVal(["dateofbirthyyyymmdd", "dateofbirth", "dob"]) || "").trim();
           const rawClassSection = String(getVal(["classsectioneggrade1sectiona", "classsection", "class", "section"]) || "").trim();
+
+          // New optional parent fields
+          const rawParentTitle = String(getVal(["parenttitlemrmrsmsdr", "parenttitle", "parenttitleid"]) || "Mr").trim();
+          const rawParentFirstName = String(getVal(["parentfirstname", "parentfirst_name", "parentfirst"]) || "").trim();
+          const rawParentLastName = String(getVal(["parentlastname", "parentlast_name", "parentlast"]) || "").trim();
+          const rawParentPhone = String(getVal(["parentmobilephone", "parentphone", "parentmobile", "parentphonenumber"]) || "").trim();
+          const rawParentEmail = String(getVal(["parentemail", "parentemailoptional"]) || "").trim();
+          const rawParentOccupation = String(getVal(["parentoccupation", "occupation"]) || "").trim();
+          const rawParentRelation = String(getVal(["parentrelationtype", "relationtype", "relation", "parentrelation"]) || "").trim();
 
           const rowErrorLogs: string[] = [];
 
@@ -1363,6 +1408,55 @@ export default function App() {
             rowErrorLogs.push("Date of birth is missing.");
           }
 
+          // Resolve optional Parent relation type
+          let resolvedRelationTypeId = "";
+          let resolvedRelationText = "";
+          if (rawParentRelation) {
+            const matchedRel = (relationTypesList || []).find((rt: any) => 
+              String(rt.relation || "").toLowerCase() === rawParentRelation.toLowerCase()
+            );
+            if (matchedRel) {
+              resolvedRelationTypeId = matchedRel._id || matchedRel.id;
+              resolvedRelationText = matchedRel.relation;
+            } else {
+              rowErrorLogs.push(`Relation Type '${rawParentRelation}' not found. Valid: ${(relationTypesList || []).map((rt: any) => rt.relation).join(", ")}`);
+            }
+          } else if (rawParentFirstName || rawParentLastName || rawParentPhone) {
+            if (relationTypesList && relationTypesList.length > 0) {
+              resolvedRelationTypeId = relationTypesList[0]._id || relationTypesList[0].id;
+              resolvedRelationText = relationTypesList[0].relation;
+            }
+          }
+
+          // Resolve optional Parent occupation
+          let resolvedOccupationId = "None";
+          let resolvedOccupationText = "None";
+          if (rawParentOccupation) {
+            const matchedOcc = (occupationsList || []).find((occ: any) => 
+              String(occ.occupation || "").toLowerCase() === rawParentOccupation.toLowerCase()
+            );
+            if (matchedOcc) {
+              resolvedOccupationId = matchedOcc._id || matchedOcc.id;
+              resolvedOccupationText = matchedOcc.occupation;
+            } else {
+              rowErrorLogs.push(`Occupation '${rawParentOccupation}' not found.`);
+            }
+          }
+
+          // Validate parent fields grouping
+          const hasParentFields = !!(rawParentFirstName || rawParentLastName || rawParentPhone || rawParentEmail);
+          if (hasParentFields) {
+            if (!rawParentFirstName) {
+              rowErrorLogs.push("Parent First Name is missing.");
+            }
+            if (!rawParentLastName) {
+              rowErrorLogs.push("Parent Last Name is missing.");
+            }
+            if (!rawParentPhone) {
+              rowErrorLogs.push("Parent Mobile Phone is missing.");
+            }
+          }
+
           return {
             rowNumber: rowNum,
             rawTitle: rawTitle || "Mr",
@@ -1381,6 +1475,20 @@ export default function App() {
             resolvedClassId,
             resolvedClassText,
             resolvedSection,
+
+            // Parent mappings
+            rawParentTitle: rawParentTitle || "Mr",
+            rawParentFirstName,
+            rawParentLastName,
+            rawParentPhone,
+            rawParentEmail,
+            rawParentOccupation,
+            rawParentRelation,
+            resolvedRelationTypeId,
+            resolvedRelationText,
+            resolvedOccupationId,
+            resolvedOccupationText,
+            hasParentInfo: hasParentFields,
 
             errors: rowErrorLogs,
             isValid: rowErrorLogs.length === 0
@@ -1415,6 +1523,22 @@ export default function App() {
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
+
+    const fetchParentStudentRelations = async () => {
+      try {
+        const relRes = await fetch("/rel/parentStudent/retrieve", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({})
+        });
+        if (relRes.ok) {
+          const data = await relRes.json();
+          setParentStudentRelations(Array.isArray(data) ? data.filter(Boolean) : []);
+        }
+      } catch (err) {
+        console.warn("Could not fetch parent student relations:", err);
+      }
+    };
 
     const uploadPromises = validRows.map(async (row) => {
       const payload = {
@@ -1518,6 +1642,99 @@ export default function App() {
             console.error("Bulk Student Mapping err:", mapErr);
           }
 
+          // Handle optional Parent registration and linking
+          if (row.hasParentInfo) {
+            let parentId = "";
+            const existingParent = (userDirectoryState || []).find(u => 
+              u && (u.role === "parents" || u.role === "parent") && 
+              String(u.phone || "").replace(/[^0-9]/g, "") === String(row.rawParentPhone).replace(/[^0-9]/g, "")
+            );
+            if (existingParent) {
+              parentId = existingParent._id || existingParent.id;
+            } else {
+              const parentPayload = {
+                user_type: "parent",
+                password: row.rawParentPhone,
+                first_name: row.rawParentFirstName,
+                middle_name: "",
+                last_name: row.rawParentLastName,
+                nic: `PRN${row.rawParentPhone}`,
+                email: row.rawParentEmail || `parent.${row.rawParentPhone}@example.com`,
+                phone: row.rawParentPhone,
+                passport: "None",
+                sex: "Male",
+                dob: "1980-01-01",
+                title_id: row.rawParentTitle,
+                title: row.rawParentTitle,
+                user_type_id: "parent",
+                access_level_id: 6,
+                organization_id: adminOrganizationId,
+                occupation_id: row.resolvedOccupationId || "None",
+                marital_status_id: "None",
+                is_active: true
+              };
+
+              try {
+                const parentResponse = await fetch("/m/parent/add", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify(parentPayload)
+                });
+                const pText = await parentResponse.text();
+                let pData: any = {};
+                try {
+                  pData = JSON.parse(pText);
+                } catch (e) {
+                  pData = { rawResponse: pText };
+                }
+                if (parentResponse.ok) {
+                  parentId = pData._id || pData.id || pData.data?._id || pData.createdParent?._id || pData.createdParent?.id;
+                  if (parentId) {
+                    const newParentObj = {
+                      _id: parentId,
+                      username: parentPayload.nic,
+                      name: `${parentPayload.title}. ${parentPayload.first_name} ${parentPayload.last_name}`,
+                      role: "parents",
+                      phone: parentPayload.phone,
+                      status: "Active",
+                      first_name: parentPayload.first_name,
+                      middle_name: "",
+                      last_name: parentPayload.last_name,
+                      email: parentPayload.email,
+                      password: parentPayload.password,
+                      passport: "None",
+                      title_id: parentPayload.title,
+                      sex: "Male",
+                      dob: parentPayload.dob,
+                      access_level_id: "6",
+                      organization_id: adminOrganizationId,
+                      occupation_id: parentPayload.occupation_id
+                    };
+                    setUserDirectoryState(prev => [...prev, newParentObj]);
+                  }
+                }
+              } catch (pErr) {
+                console.error("Bulk parent creation error:", pErr);
+              }
+            }
+
+            if (parentId) {
+              try {
+                await fetch("/rel/parentStudent/add", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    parent_id: parentId,
+                    student_id: newUserId,
+                    relation_type_id: row.resolvedRelationTypeId || undefined
+                  })
+                });
+              } catch (mapParentErr) {
+                console.error("Bulk parent mapping error:", mapParentErr);
+              }
+            }
+          }
+
           // Build local state object
           const newUserObj = {
             _id: newUserId,
@@ -1558,6 +1775,7 @@ export default function App() {
       setUserDirectoryState(prev => [...prev, ...successfulUsers]);
     }
     fetchStudentRelations();
+    await fetchParentStudentRelations();
 
     setIsStudentBulkUploading(false);
     const successes = successfulUsers.length;
@@ -7174,39 +7392,60 @@ export default function App() {
           const adminOrg = normalizeOrgIdLocalGlobal(adminOrganizationId || loginResult?.data?.user?.organization_id);
           if (uOrg !== adminOrg) return false;
           if (parentFilterGrade) {
-            return (studentClassRelations || []).some((rel: any) => {
-              if (!rel) return false;
-              
-              // Handle populated objects or raw strings for student_id comparison
-              const relStudentId = rel.student_id && typeof rel.student_id === "object"
-                ? (rel.student_id._id || rel.student_id.id || "")
-                : (rel.student_id || "");
-              const uId = u._id || u.id || "";
-              if (String(relStudentId).toLowerCase().trim() !== String(uId).toLowerCase().trim()) {
-                return false;
+            const filterId = String(parentFilterGrade).trim().toLowerCase();
+            const matchedMClasses = (mClassesList || []).filter(c => 
+              c && (
+                String(c._id || c.id).toLowerCase() === filterId ||
+                String(c.class_section_id || "").toLowerCase() === filterId
+              )
+            );
+            
+            const allowedMClassIds = new Set<string>([filterId]);
+            const allowedSectionIds = new Set<string>();
+            
+            matchedMClasses.forEach(c => {
+              allowedMClassIds.add(String(c._id || c.id).toLowerCase());
+              if (c.class_section_id) {
+                allowedSectionIds.add(String(c.class_section_id).toLowerCase());
               }
-              
-              // Handle populated objects or raw strings for class_id comparison
-              const relClassId = rel.class_id && typeof rel.class_id === "object"
-                ? (rel.class_id._id || rel.class_id.id || "")
-                : (rel.class_id || "");
+            });
 
-              const matchedMClass = (mClassesList || []).find(c => c && (c._id === parentFilterGrade || c.id === parentFilterGrade));
-              const classSectionIdOfMClass = matchedMClass ? matchedMClass.class_section_id : "";
-              const matchedCs = (classSectionsList || []).find(cs => cs && cs._id === parentFilterGrade);
-              const classMatch = String(relClassId).toLowerCase().trim() === String(parentFilterGrade).toLowerCase().trim() || 
-                                 (classSectionIdOfMClass && String(relClassId).toLowerCase().trim() === String(classSectionIdOfMClass).toLowerCase().trim()) ||
-                                 (matchedCs && (String(relClassId).toLowerCase().trim() === String(matchedCs.grade).toLowerCase().trim() || String(relClassId).toLowerCase().trim() === String(matchedCs.name).toLowerCase().trim())) ||
-                                 (String((classesList || []).find(c => c && c._id === parentFilterGrade)?.grade || "").toLowerCase().trim() === String(relClassId).toLowerCase().trim()) || 
-                                 (String((classesList || []).find(c => c && c._id === parentFilterGrade)?.name || "").toLowerCase().trim() === String(relClassId).toLowerCase().trim());
-              
+            const directSection = (classSectionsList || []).find(cs => 
+              cs && String(cs._id || cs.id).toLowerCase() === filterId
+            );
+            if (directSection) {
+              allowedSectionIds.add(filterId);
+              (mClassesList || []).forEach(c => {
+                if (c && String(c.class_section_id || "").toLowerCase() === filterId) {
+                  allowedMClassIds.add(String(c._id || c.id).toLowerCase());
+                }
+              });
+            }
+
+            const studentId = String(u._id || u.id || "").trim().toLowerCase();
+
+            return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some((rel: any) => {
+              if (!rel) return false;
+
+              const relStudentId = rel.student_id && typeof rel.student_id === "object"
+                ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
+                : String(rel.student_id || "").trim().toLowerCase();
+
+              if (relStudentId !== studentId) return false;
+
+              const relClassId = rel.class_id && typeof rel.class_id === "object"
+                ? String(rel.class_id._id || rel.class_id.id || "").trim().toLowerCase()
+                : String(rel.class_id || "").trim().toLowerCase();
+
               const relSectionId = rel.section_id && typeof rel.section_id === "object"
-                ? (rel.section_id._id || rel.section_id.id || rel.section_id.__section || rel.section_id.section || "")
-                : (rel.section_id || "");
-              const secMatch = !parentFilterSection || 
-                               String(relSectionId).toLowerCase().trim() === String(parentFilterSection).toLowerCase().trim() || 
-                               (matchedCs && String(relSectionId).toLowerCase().trim() === String(matchedCs.__section || matchedCs.section || "").toLowerCase().trim());
-              return classMatch && secMatch;
+                ? String(rel.section_id._id || rel.section_id.id || "").trim().toLowerCase()
+                : String(rel.section_id || "").trim().toLowerCase();
+
+              return (
+                allowedMClassIds.has(relClassId) ||
+                allowedSectionIds.has(relClassId) ||
+                (relSectionId && allowedSectionIds.has(relSectionId))
+              );
             });
           }
           return true;
@@ -10054,20 +10293,50 @@ export default function App() {
         // Find matching relations based on selection using robust matching on m_classes IDs
         const isStudentInSelectedClass = (student: any) => {
           if (!selectedDfClassSection) return true;
+          
           const sId = String(student._id || student.id || "").trim().toLowerCase();
           const sName = String(student.name || "").trim().toLowerCase();
           const sUsername = String(student.username || "").trim().toLowerCase();
           const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
           const sNic = String(student.nic || "").trim().toLowerCase();
 
-          // Find the selected mClass object and its class_section_id
-          const selectedMClass = (mClassesList || []).find(c => c && (String(c._id || c.id).toLowerCase() === String(selectedDfClassSection).toLowerCase()));
-          const selectedClassSectionId = selectedMClass ? String(selectedMClass.class_section_id || "").toLowerCase() : "";
+          // Collect all allowed class and section IDs for matching
+          const filterId = String(selectedDfClassSection).trim().toLowerCase();
+          const matchedMClasses = (mClassesList || []).filter(c => 
+            c && (
+              String(c._id || c.id).toLowerCase() === filterId ||
+              String(c.class_section_id || "").toLowerCase() === filterId
+            )
+          );
+          
+          const allowedMClassIds = new Set<string>([filterId]);
+          const allowedSectionIds = new Set<string>();
+          
+          matchedMClasses.forEach(c => {
+            allowedMClassIds.add(String(c._id || c.id).toLowerCase());
+            if (c.class_section_id) {
+              allowedSectionIds.add(String(c.class_section_id).toLowerCase());
+            }
+          });
+
+          // Also check if filterId itself is a class section ID
+          const directSection = (classSectionsList || []).find(cs => 
+            cs && String(cs._id || cs.id).toLowerCase() === filterId
+          );
+          if (directSection) {
+            allowedSectionIds.add(filterId);
+            // find any mClasses linked to this section
+            (mClassesList || []).forEach(c => {
+              if (c && String(c.class_section_id || "").toLowerCase() === filterId) {
+                allowedMClassIds.add(String(c._id || c.id).toLowerCase());
+              }
+            });
+          }
 
           return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some(rel => {
             if (!rel) return false;
             
-            // Extract class_id (handles populated objects or raw strings)
+            // Extract rel class and section IDs
             const relClassId = rel.class_id && typeof rel.class_id === "object"
               ? String(rel.class_id._id || rel.class_id.id || "").trim().toLowerCase()
               : String(rel.class_id || "").trim().toLowerCase();
@@ -10076,12 +10345,10 @@ export default function App() {
               ? String(rel.section_id._id || rel.section_id.id || "").trim().toLowerCase()
               : String(rel.section_id || "").trim().toLowerCase();
 
-            const filterClassId = String(selectedDfClassSection).trim().toLowerCase();
-
             const isClassMatch = 
-              relClassId === filterClassId ||
-              (selectedClassSectionId && relClassId === selectedClassSectionId) ||
-              (selectedClassSectionId && relSectionId === selectedClassSectionId);
+              allowedMClassIds.has(relClassId) ||
+              allowedSectionIds.has(relClassId) ||
+              (relSectionId && allowedSectionIds.has(relSectionId));
 
             if (!isClassMatch) return false;
             
@@ -10288,20 +10555,50 @@ export default function App() {
         // Find matching relations based on selection using robust matching on m_classes IDs
         const isStudentInSelectedClass = (student: any) => {
           if (!feeViewerClassSection) return true;
+          
           const sId = String(student._id || student.id || "").trim().toLowerCase();
           const sName = String(student.name || "").trim().toLowerCase();
           const sUsername = String(student.username || "").trim().toLowerCase();
           const sRegNo = String(student.regNo || student.reg_no || "").trim().toLowerCase();
           const sNic = String(student.nic || "").trim().toLowerCase();
 
-          // Find the selected mClass object and its class_section_id
-          const selectedMClass = (mClassesList || []).find(c => c && (String(c._id || c.id).toLowerCase() === String(feeViewerClassSection).toLowerCase()));
-          const selectedClassSectionId = selectedMClass ? String(selectedMClass.class_section_id || "").toLowerCase() : "";
+          // Collect all allowed class and section IDs for matching
+          const filterId = String(feeViewerClassSection).trim().toLowerCase();
+          const matchedMClasses = (mClassesList || []).filter(c => 
+            c && (
+              String(c._id || c.id).toLowerCase() === filterId ||
+              String(c.class_section_id || "").toLowerCase() === filterId
+            )
+          );
+          
+          const allowedMClassIds = new Set<string>([filterId]);
+          const allowedSectionIds = new Set<string>();
+          
+          matchedMClasses.forEach(c => {
+            allowedMClassIds.add(String(c._id || c.id).toLowerCase());
+            if (c.class_section_id) {
+              allowedSectionIds.add(String(c.class_section_id).toLowerCase());
+            }
+          });
+
+          // Also check if filterId itself is a class section ID
+          const directSection = (classSectionsList || []).find(cs => 
+            cs && String(cs._id || cs.id).toLowerCase() === filterId
+          );
+          if (directSection) {
+            allowedSectionIds.add(filterId);
+            // find any mClasses linked to this section
+            (mClassesList || []).forEach(c => {
+              if (c && String(c.class_section_id || "").toLowerCase() === filterId) {
+                allowedMClassIds.add(String(c._id || c.id).toLowerCase());
+              }
+            });
+          }
 
           return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some(rel => {
             if (!rel) return false;
             
-            // Extract class_id (handles populated objects or raw strings)
+            // Extract rel class and section IDs
             const relClassId = rel.class_id && typeof rel.class_id === "object"
               ? String(rel.class_id._id || rel.class_id.id || "").trim().toLowerCase()
               : String(rel.class_id || "").trim().toLowerCase();
@@ -10310,12 +10607,10 @@ export default function App() {
               ? String(rel.section_id._id || rel.section_id.id || "").trim().toLowerCase()
               : String(rel.section_id || "").trim().toLowerCase();
 
-            const filterClassId = String(feeViewerClassSection).trim().toLowerCase();
-
             const isClassMatch = 
-              relClassId === filterClassId ||
-              (selectedClassSectionId && relClassId === selectedClassSectionId) ||
-              (selectedClassSectionId && relSectionId === selectedClassSectionId);
+              allowedMClassIds.has(relClassId) ||
+              allowedSectionIds.has(relClassId) ||
+              (relSectionId && allowedSectionIds.has(relSectionId));
 
             if (!isClassMatch) return false;
             
@@ -12077,6 +12372,7 @@ export default function App() {
                                 <th className="p-3">Title & Full Name</th>
                                 <th className="p-3">Phone & Email</th>
                                 <th className="p-3">Resolved Class Section</th>
+                                <th className="p-3">Parent Mapping</th>
                                 <th className="p-3 pr-4 text-center">Status</th>
                               </tr>
                             </thead>
@@ -12102,6 +12398,16 @@ export default function App() {
                                   <td className="p-3 text-left">
                                     <div className="font-semibold text-slate-700">{row.resolvedClassText}</div>
                                     <div className="text-[9px] text-slate-400 font-semibold">Source: "{row.rawClassSection}"</div>
+                                  </td>
+                                  <td className="p-3 text-left">
+                                    {row.hasParentInfo ? (
+                                      <div>
+                                        <div className="font-bold text-slate-700">{row.rawParentFirstName} {row.rawParentLastName}</div>
+                                        <div className="text-[9px] font-mono text-slate-400 font-semibold">{row.rawParentPhone} ({row.resolvedRelationText || "Parent"})</div>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 font-semibold italic">None</span>
+                                    )}
                                   </td>
                                   <td className="p-3 pr-4 text-center">
                                     {row.isValid ? (
