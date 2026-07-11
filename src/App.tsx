@@ -7422,16 +7422,14 @@ export default function App() {
               });
             }
 
-            const studentId = String(u._id || u.id || "").trim().toLowerCase();
+            const sId = String(u._id || u.id || "").trim().toLowerCase();
+            const sName = String(u.name || "").trim().toLowerCase();
+            const sUsername = String(u.username || "").trim().toLowerCase();
+            const sRegNo = String(u.regNo || u.reg_no || "").trim().toLowerCase();
+            const sNic = String(u.nic || "").trim().toLowerCase();
 
             return (Array.isArray(studentClassRelations) ? studentClassRelations : []).some((rel: any) => {
               if (!rel) return false;
-
-              const relStudentId = rel.student_id && typeof rel.student_id === "object"
-                ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
-                : String(rel.student_id || "").trim().toLowerCase();
-
-              if (relStudentId !== studentId) return false;
 
               const relClassId = rel.class_id && typeof rel.class_id === "object"
                 ? String(rel.class_id._id || rel.class_id.id || "").trim().toLowerCase()
@@ -7441,10 +7439,27 @@ export default function App() {
                 ? String(rel.section_id._id || rel.section_id.id || "").trim().toLowerCase()
                 : String(rel.section_id || "").trim().toLowerCase();
 
-              return (
+              const isClassMatch = 
                 allowedMClassIds.has(relClassId) ||
                 allowedSectionIds.has(relClassId) ||
-                (relSectionId && allowedSectionIds.has(relSectionId))
+                (relSectionId && allowedSectionIds.has(relSectionId));
+
+              if (!isClassMatch) return false;
+
+              const relStudentId = rel.student_id && typeof rel.student_id === "object"
+                ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
+                : String(rel.student_id || "").trim().toLowerCase();
+
+              if (!relStudentId) return false;
+
+              return (
+                relStudentId === sId ||
+                relStudentId === sName ||
+                relStudentId === sUsername ||
+                relStudentId === sRegNo ||
+                relStudentId === sNic ||
+                sId.includes(relStudentId) ||
+                relStudentId.includes(sId)
               );
             });
           }
