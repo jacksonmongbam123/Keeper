@@ -965,13 +965,24 @@ export default function App() {
           if (!rawStudentVal) {
             rowErrorLogs.push("Student ID/username is missing.");
           } else {
-            const studentObj = (userDirectoryState || []).find((u: any) => 
-              u && u.role === "student" && (
-                String(u.username || "").toLowerCase() === rawStudentVal.toLowerCase() ||
-                String(u._id || "").toLowerCase() === rawStudentVal.toLowerCase() ||
-                String(u.id || "").toLowerCase() === rawStudentVal.toLowerCase()
-              )
-            );
+            const studentObj = (userDirectoryState || []).find((u: any) => {
+              if (!u || u.role !== "student") return false;
+              const sId = String(u._id || u.id || "").trim().toLowerCase();
+              const sName = String(u.name || "").trim().toLowerCase();
+              const sUsername = String(u.username || "").trim().toLowerCase();
+              const sRegNo = String(u.regNo || u.reg_no || "").trim().toLowerCase();
+              const sNic = String(u.nic || "").trim().toLowerCase();
+              const val = rawStudentVal.trim().toLowerCase();
+              return (
+                sId === val ||
+                sName === val ||
+                sUsername === val ||
+                sRegNo === val ||
+                sNic === val ||
+                sId.includes(val) ||
+                val.includes(sId)
+              );
+            });
             if (studentObj) {
               resolvedStudentId = studentObj._id || studentObj.id;
               resolvedStudentName = studentObj.name;
