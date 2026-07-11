@@ -7398,10 +7398,7 @@ export default function App() {
       // Register Profile Tab (Add User Tab)
       if (activeTab === "add-user") {
         const parentFilteredStudents = (userDirectory || []).filter((u: any) => {
-          if (!u || u.role !== "student") return false;
-          const uOrg = normalizeOrgIdLocalGlobal(u.organization_id);
-          const adminOrg = normalizeOrgIdLocalGlobal(adminOrganizationId || loginResult?.data?.user?.organization_id);
-          if (uOrg !== adminOrg) return false;
+          if (!u || String(u.role || "").toLowerCase() !== "student") return false;
           if (parentFilterGrade) {
             const filterId = String(parentFilterGrade).trim().toLowerCase();
             const matchedMClasses = (mClassesList || []).filter(c => 
