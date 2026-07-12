@@ -201,7 +201,7 @@ export default function App() {
   // Keep activeTab in sync with student's available tabs
   useEffect(() => {
     const studentTabs = ["overview", "my-timetable", "my-marks", "my-attendance", "my-homework", "my-fees", "my-profile", "institutions"];
-    if (selectedRole === "student" && !studentTabs.includes(activeTab)) {
+    if ((selectedRole === "student" || selectedRole === "parents") && !studentTabs.includes(activeTab)) {
       setActiveTab("overview");
     }
   }, [selectedRole, activeTab]);
@@ -251,6 +251,99 @@ export default function App() {
 
   // --- Student Search and Comprehensive View States ---
   const [parentStudentRelations, setParentStudentRelations] = useState<any[]>([]);
+  // --- Parents active child selection state ---
+  const [selectedChildId, setSelectedChildId] = useState<string>(() => {
+    return localStorage.getItem("abms_selected_child_id") || "";
+  });
+
+  // Find the parent's actual record in userDirectoryState
+  const loggedInParentRecord = React.useMemo(() => {
+    if (selectedRole !== "parents" || !loginResult?.success) return null;
+    const baseUserObj = loginResult?.data?.user || {};
+    const loginUserId = baseUserObj._id || baseUserObj.id || baseUserObj.user_id || "";
+    const loginUsernameStr = String(baseUserObj.username || username || "").toLowerCase().trim();
+    const loginPhoneStr = String(baseUserObj.phone || baseUserObj.username || username || "").trim();
+    const loginEmailStr = String(baseUserObj.email || "").toLowerCase().trim();
+
+    return (userDirectoryState || []).find((u: any) => {
+      if (!u || u.role !== "parents") return false;
+      
+      const uId = u._id || u.id || "";
+      const uUsername = String(u.username || "").toLowerCase().trim();
+      const uPhone = String(u.phone || "").trim();
+      const uEmail = String(u.email || "").toLowerCase().trim();
+
+      return (
+        (loginUserId && String(uId) === String(loginUserId)) ||
+        (loginUsernameStr && uUsername === loginUsernameStr) ||
+        (loginPhoneStr && uPhone === loginPhoneStr) ||
+        (loginEmailStr && uEmail === loginEmailStr) ||
+        (loginPhoneStr && uUsername === loginPhoneStr) ||
+        (loginUsernameStr && uPhone === loginUsernameStr)
+      );
+    });
+  }, [selectedRole, loginResult, userDirectoryState, username]);
+
+  // Find children of logged in parent
+  const parentChildren = React.useMemo(() => {
+    if (selectedRole !== "parents" || !loginResult?.success) return [];
+    
+    // Parent's real DB _id or fallback to login user ID
+    const parentId = loggedInParentRecord?._id || loggedInParentRecord?.id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+    if (!parentId) return [];
+    
+    // Parent's phone and email for robust indirect mapping if needed
+    const parentPhone = loggedInParentRecord?.phone || loginResult?.data?.user?.phone || "";
+    const parentEmail = loggedInParentRecord?.email || loginResult?.data?.user?.email || "";
+
+    const rels = (Array.isArray(parentStudentRelations) ? parentStudentRelations : []).filter(item => {
+      if (!item) return false;
+      
+      // Direct ID match
+      if (String(item.parent_id) === String(parentId)) return true;
+      
+      // Fallback: match by parent's registered details in userDirectory
+      const relParent = (userDirectoryState || []).find(u => u && u._id === item.parent_id && u.role === "parents");
+      if (relParent) {
+        if (parentPhone && relParent.phone === parentPhone) return true;
+        if (parentEmail && relParent.email && relParent.email.toLowerCase() === parentEmail.toLowerCase()) return true;
+      }
+      return false;
+    });
+    
+    const list: any[] = [];
+    rels.forEach(rel => {
+      const studentObj = (userDirectoryState || []).find(
+        u => u && (String(u._id) === String(rel.student_id) || String(u.id) === String(rel.student_id)) && String(u.role).toLowerCase() === "student"
+      );
+      if (studentObj) {
+        list.push(studentObj);
+      }
+    });
+    return list;
+  }, [selectedRole, loginResult, parentStudentRelations, userDirectoryState, loggedInParentRecord]);
+
+  useEffect(() => {
+    if (selectedChildId) {
+      localStorage.setItem("abms_selected_child_id", selectedChildId);
+    } else {
+      localStorage.removeItem("abms_selected_child_id");
+    }
+  }, [selectedChildId]);
+
+  useEffect(() => {
+    if (selectedRole === "parents" && loginResult?.success) {
+      if (parentChildren.length > 0) {
+        const exists = parentChildren.some(child => (child._id === selectedChildId || child.id === selectedChildId));
+        if (!exists) {
+          const firstChildId = parentChildren[0]._id || parentChildren[0].id;
+          setSelectedChildId(firstChildId);
+        }
+      } else {
+        setSelectedChildId("");
+      }
+    }
+  }, [selectedRole, loginResult, parentChildren, selectedChildId]);
   const [occupationsList, setOccupationsList] = useState<any[]>([]);
   const [occupationCategoriesList, setOccupationCategoriesList] = useState<any[]>([]);
   const [absencesList, setAbsencesList] = useState<any[]>([]);
@@ -1958,21 +2051,29 @@ export default function App() {
   useEffect(() => {
     if (loginResult?.success) {
       if ((selectedRole === "administrator" && activeTab === "grade-section-fees") ||
-          (selectedRole === "student" && ["overview", "my-fees", "my-profile"].includes(activeTab))) {
+          ((selectedRole === "student" || selectedRole === "parents") && ["overview", "my-fees", "my-profile"].includes(activeTab))) {
         fetchFeeRecords();
       }
     }
-  }, [activeTab, loginResult, selectedRole]);
+  }, [activeTab, loginResult, selectedRole, selectedChildId]);
 
   // Fetch marks when switching to relevant tabs
   useEffect(() => {
     if (loginResult?.success) {
       if ((selectedRole === "administrator" && activeTab === "marks-management") ||
-          (selectedRole === "student" && ["overview", "my-marks", "my-profile"].includes(activeTab))) {
+          ((selectedRole === "student" || selectedRole === "parents") && ["overview", "my-marks", "my-profile"].includes(activeTab))) {
         fetchMarks();
       }
     }
-  }, [activeTab, loginResult, selectedRole]);
+  }, [activeTab, loginResult, selectedRole, selectedChildId]);
+
+  // Fetch search details and absences for student/parents when tabs or selected children change
+  useEffect(() => {
+    if (loginResult?.success && (selectedRole === "student" || selectedRole === "parents")) {
+      fetchSearchDetails();
+      fetchStudentRelations();
+    }
+  }, [activeTab, loginResult, selectedRole, selectedChildId]);
 
   // Fetch search details when switching to the search students tab
   useEffect(() => {
@@ -1998,9 +2099,9 @@ export default function App() {
     }
   }, [activeTab, loginResult, selectedRole]);
 
-  // Fetch real database users and merge them on successful administrator/instructor login or navigating to tabs
+  // Fetch real database users and merge them on successful login or navigating to tabs
   useEffect(() => {
-    if (loginResult?.success && (selectedRole === "administrator" || selectedRole === "instructor")) {
+    if (loginResult?.success && (selectedRole === "administrator" || selectedRole === "instructor" || selectedRole === "parents" || selectedRole === "student")) {
       const fetchAllUsers = async () => {
         const token = loginResult?.data?.token || "";
         const headers: Record<string, string> = {
@@ -2266,6 +2367,27 @@ export default function App() {
 
           if (fetchedUsers.length > 0) {
             setUserDirectoryState(fetchedUsers);
+          }
+
+          // Fetch relations for parent/student context
+          try {
+            const relRes = await fetch("/rel/parentStudent/retrieve", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({})
+            });
+            if (relRes.ok) {
+              const data = await relRes.json();
+              setParentStudentRelations(Array.isArray(data) ? data.filter(Boolean) : []);
+            }
+          } catch (relErr) {
+            console.warn("Could not fetch parent student relations inside directory scope:", relErr);
+          }
+
+          try {
+            fetchStudentRelations();
+          } catch (studentRelErr) {
+            console.warn("Could not fetch student class relations inside directory scope:", studentRelErr);
           }
         } catch (err) {
           console.error("Error fetching all users:", err);
@@ -3190,17 +3312,56 @@ export default function App() {
     }
   }, [userDirectoryState, adminOrganizationId]);
 
-  // Fetch logged-in admin or teacher's organization details
+  // Fetch logged-in user's organization details
   useEffect(() => {
     const fetchAdminOrganization = async () => {
       try {
-        // If any user is logged in and has an organization_id, prioritize it directly
-        if (loginResult?.success && loginResult?.data?.user?.organization_id) {
-          setAdminOrganizationId(loginResult.data.user.organization_id);
-          if (loginResult.data.user.access_level_id) {
-            setAdminAccessLevel(loginResult.data.user.access_level_id);
+        if (loginResult?.success) {
+          const u = loginResult.data.user || {};
+          const currentRole = selectedRole;
+
+          // For student and parents, find organization ID dynamically from user record or child record
+          if (currentRole === "student") {
+            const uid = u._id || u.id || "";
+            const matchedStudent = (userDirectoryState || []).find((usr: any) => 
+              usr && (String(usr._id) === String(uid) || String(usr.id) === String(uid)) && usr.role === "student"
+            );
+            const resolvedOrgId = matchedStudent?.organization_id || u.organization_id;
+            if (resolvedOrgId) {
+              setAdminOrganizationId(resolvedOrgId);
+              return;
+            }
+          } else if (currentRole === "parents") {
+            // Find child first
+            const childId = selectedChildId;
+            let resolvedOrgId = null;
+            if (childId) {
+              const matchedChild = (userDirectoryState || []).find((usr: any) =>
+                usr && (String(usr._id) === String(childId) || String(usr.id) === String(childId)) && usr.role === "student"
+              );
+              if (matchedChild && matchedChild.organization_id) {
+                resolvedOrgId = matchedChild.organization_id;
+              }
+            }
+            if (!resolvedOrgId) {
+              // Fallback to parent themselves
+              const uid = u._id || u.id || "";
+              const matchedParent = (userDirectoryState || []).find((usr: any) =>
+                usr && (String(usr._id) === String(uid) || String(usr.id) === String(uid)) && usr.role === "parents"
+              );
+              resolvedOrgId = matchedParent?.organization_id || u.organization_id;
+            }
+            if (resolvedOrgId) {
+              setAdminOrganizationId(resolvedOrgId);
+              return;
+            }
+          } else if (u.organization_id) {
+            setAdminOrganizationId(u.organization_id);
+            if (u.access_level_id) {
+              setAdminAccessLevel(u.access_level_id);
+            }
+            return;
           }
-          return;
         }
 
         let admin = null;
@@ -3295,7 +3456,7 @@ export default function App() {
       }
     };
     fetchAdminOrganization();
-  }, [loginResult]);
+  }, [loginResult, selectedRole, selectedChildId, userDirectoryState]);
 
   const getFilteredClassSections = () => {
     const currentOrgId = adminOrganizationId || loginResult?.data?.user?.organization_id;
@@ -3655,8 +3816,10 @@ export default function App() {
   }, [adminOrganizationId]);
 
   if (loginResult?.success) {
-    const userObj = loginResult?.data?.user || {};
-    const displayName = userObj.name || (userObj.first_name ? `${userObj.first_name} ${userObj.last_name || ""}`.trim() : "") || "Jackson Evaluation User";
+    const baseUserObj = loginResult?.data?.user || {};
+    const parentObj = loggedInParentRecord;
+    const userObj = parentObj || baseUserObj;
+    const displayName = userObj.name || (userObj.first_name ? `${userObj.first_name} ${userObj.last_name || ""}`.trim() : "") || userObj.username || userObj.phone || "Jackson Evaluation User";
     const displayRegNo = userObj.reg_no || userObj.nic || username || "REG-2026-1049";
     const displayRole = userObj.role || userObj.user_type || selectedRole;
     const displayEmail = userObj.email || `${displayRole.toLowerCase()}@abms-portal.com`;
@@ -3726,22 +3889,69 @@ export default function App() {
       { id: "my-activities", label: "My Extra Activities", icon: Briefcase },
       { id: "institutions", label: "Institute Details", icon: Building }
     ] : [ // parents
-      { id: "overview", label: "Parent Dashboard", icon: Home },
-      { id: "progress", label: "Academic Progress", icon: Activity },
-      { id: "attendance", label: "Attendance Tracker", icon: Calendar },
-      { id: "billing", label: "Billing & Invoices", icon: FileText },
-      { id: "institutions", label: "Institute Details", icon: Building },
-      { id: "settings", label: "Portal Settings", icon: Settings }
+      { id: "overview", label: "Overview Dashboard", icon: Home },
+      { id: "my-timetable", label: "Child Timetable", icon: Calendar },
+      { id: "my-marks", label: "Child Marks", icon: Award },
+      { id: "my-attendance", label: "Child Attendance", icon: Calendar },
+      { id: "my-homework", label: "Child Homeworks", icon: FileCode2 },
+      { id: "my-fees", label: "Child Fees", icon: CreditCard },
+      { id: "my-profile", label: "Child Profile", icon: User },
+      { id: "institutions", label: "Institute Details", icon: Building }
     ];
 
     const renderDashboardContent = () => {
       const lowerQuery = searchQuery.toLowerCase();
 
-      if (selectedRole === "student") {
+      if (selectedRole === "student" || selectedRole === "parents") {
+        let blockStudentObj = loginResult?.data?.user;
+        if (selectedRole === "parents") {
+          blockStudentObj = parentChildren.find(c => c._id === selectedChildId || c.id === selectedChildId);
+        }
+
+        if (selectedRole === "parents" && !blockStudentObj) {
+          return (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm text-center space-y-4 animate-fade-in max-w-md mx-auto mt-12">
+              <Users className="w-12 h-12 text-violet-500 mx-auto animate-pulse" />
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Select a Child</h3>
+              <p className="text-xs text-slate-500">
+                Please select a child to view their academic records, timetables, marks, and attendance details.
+              </p>
+              {parentChildren.length > 0 ? (
+                <div className="space-y-2">
+                  <select
+                    value={selectedChildId}
+                    onChange={(e) => setSelectedChildId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/20 cursor-pointer"
+                  >
+                    <option value="">-- Choose Child --</option>
+                    {parentChildren.map((child) => (
+                      <option key={child._id || child.id} value={child._id || child.id}>
+                        {child.name} ({child.username || child.reg_no || "N/A"})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="text-xs text-rose-500 font-semibold bg-rose-50 border border-rose-100 p-2.5 rounded-xl">
+                  No children are registered under your account. Please contact the administrator to map your phone number to your children.
+                </p>
+              )}
+            </div>
+          );
+        }
+
+        const blockStudentId = blockStudentObj?.user_id || blockStudentObj?._id || blockStudentObj?.id || "";
+        const blockStudentUsername = blockStudentObj?.username || blockStudentObj?.reg_no || blockStudentObj?.regNo || "";
+        const childName = blockStudentObj?.name || (blockStudentObj?.first_name ? `${blockStudentObj.first_name} ${blockStudentObj.last_name || ""}`.trim() : "") || "Student";
+        const childNameWithSurname = blockStudentObj?.first_name
+          ? `${blockStudentObj.first_name} ${blockStudentObj.middle_name ? blockStudentObj.middle_name + " " : ""}${blockStudentObj.last_name || ""}`.trim()
+          : childName;
+        const resolvedStudentName = selectedRole === "parents" ? childNameWithSurname : displayNameWithSurname;
+
         if (activeTab === "overview") {
           // Compute student specific metrics
-          const currentStudentId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
-          const currentStudentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.reg_no || "";
+          const currentStudentId = blockStudentId;
+          const currentStudentUsername = blockStudentUsername;
           
           // Registered class relation
           const myRelation = (studentClassRelations || []).find((rel: any) => {
@@ -3805,10 +4015,14 @@ export default function App() {
                 <div className="space-y-1">
                   <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-cyan-600 animate-spin" />
-                    Student Portal Active &bull; {myClassName}
+                    {selectedRole === "parents" ? "Ward Portal Active" : "Student Portal Active"} &bull; {myClassName}
                   </h4>
                   <p className="text-xs text-slate-600">
-                    Welcome back, <strong className="text-cyan-700">{displayNameWithSurname}</strong> (ID: {currentStudentUsername || "N/A"}). Here is your real-time academic progress tracked from the database.
+                    {selectedRole === "parents" ? (
+                      <>Viewing portal for ward <strong className="text-violet-700">{resolvedStudentName}</strong> (ID: {currentStudentUsername || "N/A"}). Here is their real-time academic progress tracked from the database.</>
+                    ) : (
+                      <>Welcome back, <strong className="text-cyan-700">{resolvedStudentName}</strong> (ID: {currentStudentUsername || "N/A"}). Here is your real-time academic progress tracked from the database.</>
+                    )}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -4046,7 +4260,7 @@ export default function App() {
 
         if (activeTab === "my-timetable") {
           const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
-          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = blockStudentId;
           return (
             <div className="space-y-6">
               <ViewTimetableView 
@@ -4097,7 +4311,7 @@ export default function App() {
         }
 
         if (activeTab === "my-marks") {
-          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = blockStudentId;
           return (
             <div className="space-y-6">
               <ViewMarksView
@@ -4117,8 +4331,8 @@ export default function App() {
         }
 
         if (activeTab === "my-attendance") {
-          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
-          const currentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.nic || "";
+          const currentUserId = blockStudentId;
+          const currentUsername = blockStudentUsername;
           return (
             <div className="space-y-6">
               <StudentAttendanceCalendarView
@@ -4134,7 +4348,7 @@ export default function App() {
         }
 
         if (activeTab === "my-homework") {
-          const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
+          const currentUserId = blockStudentId;
           const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
           return (
             <div className="space-y-6">
@@ -4150,9 +4364,9 @@ export default function App() {
         }
 
         if (activeTab === "my-fees") {
-          const currentStudentId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
-          const currentStudentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.reg_no || "";
-          const studentObj = loginResult?.data?.user;
+          const currentStudentId = blockStudentId;
+          const currentStudentUsername = blockStudentUsername;
+          const studentObj = blockStudentObj;
           const myFees = matchStudentFees(studentObj, allFeeRecords, feeViewerYear);
 
           // Render Fee Table and Status
@@ -4356,10 +4570,14 @@ export default function App() {
         }
 
         if (activeTab === "my-profile") {
-          const currentStudentId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
-          const currentStudentUsername = loginResult?.data?.user?.username || loginResult?.data?.user?.reg_no || "";
-          const studentObj = loginResult?.data?.user;
+          const currentStudentId = blockStudentId;
+          const currentStudentUsername = blockStudentUsername;
+          const studentObj = blockStudentObj;
           const myFees = matchStudentFees(studentObj, allFeeRecords, feeViewerYear);
+          
+          const profileDob = studentObj?.dob ? new Date(studentObj.dob).toLocaleDateString() : "";
+          const profileSex = studentObj?.sex || "";
+          const profilePassport = studentObj?.passport || "";
           
           // Registered class relation
           const myRelation = (studentClassRelations || []).find((rel: any) => {
@@ -4412,13 +4630,13 @@ export default function App() {
                 <div className="px-6 pb-6 relative">
                   <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4 -mt-12 sm:-mt-16 mb-4">
                     <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-cyan-400 to-indigo-500 border-4 border-white flex items-center justify-center text-white text-3xl font-black shadow-md shrink-0">
-                      {loginResult?.data?.user?.name?.charAt(0) || displayNameWithSurname?.charAt(0) || "S"}
+                      {studentObj?.name?.charAt(0) || resolvedStudentName?.charAt(0) || "S"}
                     </div>
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-xl font-bold text-slate-900 truncate font-sans tracking-tight">{displayNameWithSurname}</h2>
+                        <h2 className="text-xl font-bold text-slate-900 truncate font-sans tracking-tight">{resolvedStudentName}</h2>
                         <span className="text-[10px] bg-cyan-50 text-cyan-700 font-bold px-2 py-0.5 rounded-full border border-cyan-100 uppercase tracking-wide">
-                          Student Portal Active
+                          {selectedRole === "parents" ? "Ward Profile Active" : "Student Portal Active"}
                         </span>
                       </div>
                       <p className="text-xs font-mono text-slate-500">Registration ID: <strong className="text-indigo-600">{currentStudentUsername || "N/A"}</strong></p>
@@ -4439,13 +4657,13 @@ export default function App() {
                   </h3>
                   <div className="space-y-3">
                     {[
-                      { label: "Full Name", val: displayNameWithSurname },
+                      { label: "Full Name", val: resolvedStudentName },
                       { label: "ID / Username", val: currentStudentUsername, isMono: true },
-                      { label: "Phone Number", val: loginResult?.data?.user?.phone || "N/A" },
-                      { label: "Registered Email", val: loginResult?.data?.user?.email || "N/A" },
-                      { label: "Date of Birth", val: displayDob || "N/A" },
-                      { label: "Sex / Gender", val: displaySex || "N/A" },
-                      { label: "Identity (NIC/Passport)", val: loginResult?.data?.user?.nic || displayPassport || "N/A", isMono: true }
+                      { label: "Phone Number", val: studentObj?.phone || "N/A" },
+                      { label: "Registered Email", val: studentObj?.email || "N/A" },
+                      { label: "Date of Birth", val: profileDob || "N/A" },
+                      { label: "Sex / Gender", val: profileSex || "N/A" },
+                      { label: "Identity (NIC/Passport)", val: studentObj?.nic || profilePassport || "N/A", isMono: true }
                     ].map((row, idx) => (
                       <div key={idx} className="flex justify-between items-start text-xs border-b border-slate-50 pb-1.5 last:border-0 last:pb-0">
                         <span className="text-slate-400 font-medium shrink-0">{row.label}</span>
@@ -5582,8 +5800,8 @@ export default function App() {
         }
       }
 
-      // Parents views
-      if (selectedRole === "parents") {
+      // Parents views - Integrated dynamically inside student/ward block above
+      if (false && selectedRole === "parents") {
         if (activeTab === "overview") {
           return (
             <div className="space-y-6">
@@ -12190,6 +12408,26 @@ export default function App() {
               <span className="text-xs font-bold text-slate-800 uppercase tracking-widest bg-slate-100 px-2 py-1 rounded">
                 {activeTab}
               </span>
+
+              {selectedRole === "parents" && parentChildren.length > 0 && (
+                <>
+                  <span className="text-slate-300 font-bold hidden sm:inline">/</span>
+                  <div className="flex items-center gap-1.5 bg-violet-50 border border-violet-100 rounded-xl px-2.5 py-1 shadow-sm">
+                    <span className="text-[10px] font-bold text-violet-600 uppercase tracking-wide hidden md:inline">Ward:</span>
+                    <select
+                      value={selectedChildId}
+                      onChange={(e) => setSelectedChildId(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-violet-700 focus:outline-none cursor-pointer border-none p-0 pr-1.5"
+                    >
+                      {parentChildren.map((child) => (
+                        <option key={child._id || child.id} value={child._id || child.id} className="text-slate-800 font-semibold bg-white">
+                          {child.name} ({child.username || child.reg_no || "N/A"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Profile trigger on the right top */}
