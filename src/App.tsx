@@ -12356,7 +12356,7 @@ export default function App() {
               <GraduationCap className="w-4.5 h-4.5 text-white" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-bold tracking-tight text-white leading-none truncate">ABMS Portal</h2>
+              <h2 className="text-sm font-bold tracking-tight text-white leading-none truncate">KEEPER</h2>
               <span className="text-[9px] font-mono tracking-wider text-cyan-400 uppercase block mt-1 truncate">
                 Academic & Business
               </span>
@@ -12787,7 +12787,7 @@ export default function App() {
             <GraduationCap className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-slate-900 leading-none">ABMS Portal</h1>
+            <h1 className="text-base font-bold tracking-tight text-slate-900 leading-none">KEEPER</h1>
             <span className="text-[10px] font-mono tracking-wider text-cyan-600 uppercase">
               Academic & Business Management
             </span>
@@ -13136,7 +13136,7 @@ export default function App() {
       {/* Footer */}
       <footer className="w-full max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-400 z-10 border-t border-slate-200 pt-6 mt-6">
         <div>
-          &copy; {new Date().getFullYear()} ABMS Systems. Secured by TLS encryption.
+          &copy; {new Date().getFullYear()} KEEPER Systems. Secured by TLS encryption.
         </div>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5">
