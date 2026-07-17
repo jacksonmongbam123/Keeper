@@ -519,33 +519,40 @@ export default function ManageTimetableView({
                             key={slot._id || idx}
                             className="group relative bg-white border border-slate-200 rounded-xl p-3 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col gap-1.5"
                           >
-                            {/* Actions Group (visible on group hover) */}
-                            <div className="absolute top-2.5 right-2.5 flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-all">
+                            {/* Actions Group (Always visible for easy access on touch and desktop) */}
+                            <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 transition-all z-10">
                               {/* Edit Button */}
                               <button
                                 onClick={() => {
+                                  const subId = slot.subject_id && typeof slot.subject_id === "object"
+                                    ? (slot.subject_id._id || slot.subject_id.id)
+                                    : slot.subject_id;
+                                  const teachId = slot.teacher_id && typeof slot.teacher_id === "object"
+                                    ? (slot.teacher_id._id || slot.teacher_id.id)
+                                    : slot.teacher_id;
+
                                   setFormDay(slot.day || "Monday");
-                                  setFormSubjectId(slot.subject_id || "");
+                                  setFormSubjectId(subId || "");
                                   setFormStartTime(slot.start_time || "09:00");
                                   setFormEndTime(slot.end_time || "10:00");
-                                  setFormTeacherId(slot.teacher_id || "");
+                                  setFormTeacherId(teachId || "");
                                   setFormRoom(slot.room || "");
                                   setEditingSlotId(slot._id);
                                   setIsEditing(true);
                                 }}
-                                className="p-1 bg-white hover:bg-cyan-50 border border-slate-100 hover:border-cyan-200 text-slate-400 hover:text-cyan-600 rounded-lg shadow-sm cursor-pointer"
+                                className="p-1 bg-white hover:bg-cyan-50 border border-slate-200 hover:border-cyan-300 text-slate-500 hover:text-cyan-600 rounded-lg shadow-xs cursor-pointer transition-colors"
                                 title="Edit slot"
                               >
-                                <Pencil className="w-3 h-3" />
+                                <Pencil className="w-3.5 h-3.5" />
                               </button>
                               
                               {/* Delete Button */}
                               <button
                                 onClick={() => handleDeleteEntry(slot._id)}
-                                className="p-1 bg-white hover:bg-rose-50 border border-slate-100 hover:border-rose-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm cursor-pointer"
+                                className="p-1 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-slate-500 hover:text-rose-600 rounded-lg shadow-xs cursor-pointer transition-colors"
                                 title="Delete slot"
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
 
