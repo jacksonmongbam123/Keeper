@@ -985,10 +985,23 @@ export default function App() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Marks_Template");
 
     // Add another guide sheet listing existing students, class sections, subjects, and grade references to assist user mapping
+    const formattedSections = (classSectionsList || []).map((cs: any) => {
+      const csIdStr = String(cs._id || cs.id);
+      const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === csIdStr.toLowerCase());
+      const sectionName = cs.__section || cs.section || "";
+      if (matchedMClass) {
+        return `${matchedMClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+      } else if (cs.class || cs.grade) {
+        return `${cs.class || cs.grade} - ${sectionName}`;
+      } else {
+        return sectionName;
+      }
+    }).filter(Boolean);
+
     const refData = [
       { "Category": "Active Grade References", "Values": dfMarksGrades.map(g => g.grade || g.name).join(", ") },
       { "Category": "Academic Terms Available", "Values": "Term I, Term II, Term III, Term IV, Mid Term, Final Term" },
-      { "Category": "Valid Class Sections", "Values": (classSectionsList || []).map((cs: any) => `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`).join(", ") },
+      { "Category": "Valid Class Sections", "Values": formattedSections.join(", ") },
       { "Category": "Valid Subjects", "Values": (subjectsList || []).map((s: any) => s.name).join(", ") }
     ];
     const refWorksheet = XLSX.utils.json_to_sheet(refData);
@@ -1088,39 +1101,64 @@ export default function App() {
             }
           }
 
-          // 2. Resolve class section
+          // 2. Resolve class section robustly using mClassesList and classSectionsList
           let resolvedClassId = "";
           let resolvedClassText = "Unresolved";
+          let resolvedSection = "";
           if (!rawClassVal) {
             rowErrorLogs.push("Class Section is missing.");
           } else {
-            const classObj = (classSectionsList || []).find((cs: any) => {
-              if (!cs) return false;
-              const cleanVal = rawClassVal.toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
-              const gradePart = String(cs.class || cs.grade || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
-              const sectionPart = String(cs.__section || cs.section || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
-              const label1 = gradePart + sectionPart;
-              const label2 = `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`.toLowerCase();
-              return cleanVal === label1 || 
-                     label2 === rawClassVal.toLowerCase() ||
-                     label2.includes(rawClassVal.toLowerCase()) || 
-                     rawClassVal.toLowerCase().includes(label2) || 
-                     String(cs.class || cs.grade || "").toLowerCase() === rawClassVal.toLowerCase() ||
-                     cs._id === rawClassVal;
+            const cleanInput = rawClassVal.toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "").replace("grade", "class");
+            
+            // Search first in mapped classes (m_classes) for current organization to prevent cross-tenant mapping
+            const matchedMClass = (mClassesList || []).find((c: any) => {
+              if (!c) return false;
+              if (adminOrganizationId && c.organization_id && String(c.organization_id) !== String(adminOrganizationId)) {
+                return false;
+              }
+              const matchedCs = (classSectionsList || []).find(cs => cs && (cs._id === c.class_section_id || cs.id === c.class_section_id));
+              const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+              
+              const cleanClassName = String(c.class_name || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "").replace("grade", "class");
+              const cleanSectionName = String(sectionName).toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              
+              const comb1 = cleanClassName + cleanSectionName;
+              const comb2 = cleanClassName;
+              
+              return cleanInput === comb1 || cleanInput === comb2 || cleanInput.includes(comb1) || comb1.includes(cleanInput);
             });
-            if (classObj) {
-              const csId = classObj._id || classObj.id;
-              // Find corresponding mapped class (m_classes)
-              const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === String(csId).toLowerCase());
-              if (matchedMClass) {
-                resolvedClassId = matchedMClass._id || matchedMClass.id;
-                resolvedClassText = matchedMClass.class_name;
-              } else {
-                resolvedClassId = csId;
-                resolvedClassText = `${classObj.class || classObj.grade || ""} - ${classObj.__section || classObj.section || ""}`;
+
+            if (matchedMClass) {
+              resolvedClassId = matchedMClass._id || matchedMClass.id;
+              resolvedClassText = matchedMClass.class_name;
+              
+              const matchedCs = (classSectionsList || []).find(cs => cs && (cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id));
+              resolvedSection = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+              if (resolvedSection) {
+                resolvedClassText = `${resolvedClassText} - ${resolvedSection}`;
               }
             } else {
-              rowErrorLogs.push(`Class Section '${rawClassVal}' not found.`);
+              // Fallback directly to classSectionsList
+              const classObj = (classSectionsList || []).find((cs: any) => {
+                if (!cs) return false;
+                const sectionPart = String(cs.__section || cs.section || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+                return cleanInput === sectionPart || cleanInput.includes(sectionPart) || sectionPart.includes(cleanInput) || cs._id === rawClassVal;
+              });
+              
+              if (classObj) {
+                const csId = classObj._id || classObj.id;
+                const fallbackMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === String(csId).toLowerCase());
+                if (fallbackMClass) {
+                  resolvedClassId = fallbackMClass._id || fallbackMClass.id;
+                  resolvedClassText = fallbackMClass.class_name;
+                } else {
+                  resolvedClassId = csId;
+                  resolvedClassText = `${classObj.class || classObj.grade || "Class"} - ${classObj.__section || classObj.section || ""}`;
+                }
+                resolvedSection = classObj.__section || classObj.section || "";
+              } else {
+                rowErrorLogs.push(`Class Section '${rawClassVal}' not found.`);
+              }
             }
           }
 
@@ -1350,11 +1388,22 @@ export default function App() {
     const activeSections = (classSectionsList || []).map((cs: any) => {
       const csIdStr = String(cs._id || cs.id);
       const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === csIdStr.toLowerCase());
+      const sectionName = cs.__section || cs.section || "";
+      
+      let excelInputFormat = "";
+      if (matchedMClass) {
+        excelInputFormat = `${matchedMClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+      } else if (cs.class || cs.grade) {
+        excelInputFormat = `${cs.class || cs.grade} - ${sectionName}`;
+      } else {
+        excelInputFormat = sectionName;
+      }
+
       return {
-        "Class Section (Excel input format)": `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`,
+        "Class Section (Excel input format)": excelInputFormat,
         "Mapped Class Name": matchedMClass ? matchedMClass.class_name : "Not Mapped / Default",
         "Grade ID": cs.class || cs.grade || "",
-        "Section": cs.__section || cs.section || ""
+        "Section": sectionName
       };
     });
 
@@ -1480,41 +1529,64 @@ export default function App() {
             rowErrorLogs.push("Mobile Phone is missing.");
           }
 
-          // Resolve class section
+          // Resolve class section robustly using mClassesList and classSectionsList
           let resolvedClassId = "";
           let resolvedClassText = "Unresolved";
           let resolvedSection = "";
           if (!rawClassSection) {
             rowErrorLogs.push("Class Section is missing.");
           } else {
-            const classObj = (classSectionsList || []).find((cs: any) => {
-              if (!cs) return false;
-              const cleanVal = rawClassSection.toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
-              const gradePart = String(cs.class || cs.grade || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
-              const sectionPart = String(cs.__section || cs.section || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
-              const label1 = gradePart + sectionPart;
-              const label2 = `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`.toLowerCase();
-              return cleanVal === label1 || 
-                     label2 === rawClassSection.toLowerCase() ||
-                     label2.includes(rawClassSection.toLowerCase()) || 
-                     rawClassSection.toLowerCase().includes(label2) || 
-                     String(cs.class || cs.grade || "").toLowerCase() === rawClassSection.toLowerCase() ||
-                     cs._id === rawClassSection;
-            });
-            if (classObj) {
-              const csId = classObj._id || classObj.id;
-              // Find corresponding mapped class (m_classes)
-              const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === String(csId).toLowerCase());
-              if (matchedMClass) {
-                resolvedClassId = matchedMClass._id || matchedMClass.id;
-                resolvedClassText = matchedMClass.class_name;
-              } else {
-                resolvedClassId = csId;
-                resolvedClassText = `${classObj.class || classObj.grade || ""} - ${classObj.__section || classObj.section || ""}`;
+            const cleanInput = rawClassSection.toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "").replace("grade", "class");
+            
+            // Search first in mapped classes (m_classes) for current organization to prevent cross-tenant mapping
+            const matchedMClass = (mClassesList || []).find((c: any) => {
+              if (!c) return false;
+              if (adminOrganizationId && c.organization_id && String(c.organization_id) !== String(adminOrganizationId)) {
+                return false;
               }
-              resolvedSection = classObj.__section || classObj.section || "";
+              const matchedCs = (classSectionsList || []).find(cs => cs && (cs._id === c.class_section_id || cs.id === c.class_section_id));
+              const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+              
+              const cleanClassName = String(c.class_name || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "").replace("grade", "class");
+              const cleanSectionName = String(sectionName).toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              
+              const comb1 = cleanClassName + cleanSectionName;
+              const comb2 = cleanClassName;
+              
+              return cleanInput === comb1 || cleanInput === comb2 || cleanInput.includes(comb1) || comb1.includes(cleanInput);
+            });
+
+            if (matchedMClass) {
+              resolvedClassId = matchedMClass._id || matchedMClass.id;
+              resolvedClassText = matchedMClass.class_name;
+              
+              const matchedCs = (classSectionsList || []).find(cs => cs && (cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id));
+              resolvedSection = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+              if (resolvedSection) {
+                resolvedClassText = `${resolvedClassText} - ${resolvedSection}`;
+              }
             } else {
-              rowErrorLogs.push(`Class Section '${rawClassSection}' not found.`);
+              // Fallback directly to classSectionsList
+              const classObj = (classSectionsList || []).find((cs: any) => {
+                if (!cs) return false;
+                const sectionPart = String(cs.__section || cs.section || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+                return cleanInput === sectionPart || cleanInput.includes(sectionPart) || sectionPart.includes(cleanInput) || cs._id === rawClassSection;
+              });
+              
+              if (classObj) {
+                const csId = classObj._id || classObj.id;
+                const fallbackMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === String(csId).toLowerCase());
+                if (fallbackMClass) {
+                  resolvedClassId = fallbackMClass._id || fallbackMClass.id;
+                  resolvedClassText = fallbackMClass.class_name;
+                } else {
+                  resolvedClassId = csId;
+                  resolvedClassText = `${classObj.class || classObj.grade || "Class"} - ${classObj.__section || classObj.section || ""}`;
+                }
+                resolvedSection = classObj.__section || classObj.section || "";
+              } else {
+                rowErrorLogs.push(`Class Section '${rawClassSection}' not found.`);
+              }
             }
           }
 
