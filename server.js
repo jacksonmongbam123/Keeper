@@ -9,8 +9,10 @@ const http = require("http");
 
 const PORT = 3000;
 
-// High-performance concurrency: utilize multi-core clustering in production
-if (process.env.NODE_ENV === "production" && cluster.isPrimary) {
+// High-performance concurrency: utilize multi-core clustering in production if explicitly enabled (disabled by default on resource-constrained container platforms like Render to prevent OOM and socket polling handshake mismatches)
+const useCluster = process.env.NODE_ENV === "production" && process.env.ENABLE_CLUSTER === "true";
+
+if (useCluster && cluster.isPrimary) {
   const numCPUs = os.cpus().length || 4;
   console.log(`[Primary Process] Spawning ${numCPUs} worker processes to handle high traffic concurrently...`);
 
@@ -211,7 +213,7 @@ if (process.env.NODE_ENV === "production" && cluster.isPrimary) {
 
     // Start server listening
     const server = httpServer.listen(PORT, "0.0.0.0", () => {
-      console.log(`[Worker Process ${process.pid}] full-stack server online & serving on port ${PORT}`);
+      console.log(`[Keeper Server] Online & serving on port ${PORT} (PID: ${process.pid})`);
     });
 
     // Tune connection keep-alive for reverse proxy integration
