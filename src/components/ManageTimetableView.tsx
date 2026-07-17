@@ -13,7 +13,8 @@ import {
   Loader2,
   ChevronDown,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Pencil
 } from "lucide-react";
 
 interface ManageTimetableViewProps {
@@ -55,6 +56,9 @@ export default function ManageTimetableView({
 
   // Form State for Adding Entry
   const [isAdding, setIsAdding] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingSlotId, setEditingSlotId] = useState<string | null>(null);
+  
   const [formDay, setFormDay] = useState("Monday");
   const [formSubjectId, setFormSubjectId] = useState("");
   const [formStartTime, setFormStartTime] = useState("09:00");
@@ -283,6 +287,68 @@ export default function ManageTimetableView({
     }
   };
 
+  // Handle Update Timetable Entry
+  const handleUpdateEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    if (!editingSlotId) return;
+    if (!selectedClassId) {
+      setErrorMsg("Please select a target class section first.");
+      return;
+    }
+    if (!formSubjectId) {
+      setErrorMsg("Please select a subject.");
+      return;
+    }
+    if (!formStartTime || !formEndTime) {
+      setErrorMsg("Please enter both start and end times.");
+      return;
+    }
+    if (formStartTime >= formEndTime) {
+      setErrorMsg("Start time must be strictly earlier than end time.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/timetable/update/${editingSlotId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          class_id: selectedClassId,
+          subject_id: formSubjectId,
+          day: formDay,
+          start_time: formStartTime,
+          end_time: formEndTime,
+          teacher_id: formTeacherId,
+          room: formRoom
+        })
+      });
+
+      if (res.ok) {
+        setSuccessMsg("Timetable slot updated successfully!");
+        setFormRoom("");
+        setFormTeacherId("");
+        setIsEditing(false);
+        setEditingSlotId(null);
+        fetchTimetable(selectedClassId);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setErrorMsg(errData.error || errData.message || "Failed to update timetable slot.");
+      }
+    } catch (err: any) {
+      console.error("Error updating slot:", err);
+      setErrorMsg("Network error: Failed to update timetable slot.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Handle Delete Timetable Entry
   const handleDeleteEntry = async (entryId: string) => {
     if (!confirm("Are you sure you want to delete this timetable slot?")) return;
@@ -453,14 +519,35 @@ export default function ManageTimetableView({
                             key={slot._id || idx}
                             className="group relative bg-white border border-slate-200 rounded-xl p-3 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col gap-1.5"
                           >
-                            {/* Delete Button (visible on group hover) */}
-                            <button
-                              onClick={() => handleDeleteEntry(slot._id)}
-                              className="absolute top-2.5 right-2.5 p-1 bg-white hover:bg-rose-50 border border-slate-100 hover:border-rose-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm md:opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
-                              title="Delete slot"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            {/* Actions Group (visible on group hover) */}
+                            <div className="absolute top-2.5 right-2.5 flex items-center gap-1 md:opacity-0 group-hover:opacity-100 transition-all">
+                              {/* Edit Button */}
+                              <button
+                                onClick={() => {
+                                  setFormDay(slot.day || "Monday");
+                                  setFormSubjectId(slot.subject_id || "");
+                                  setFormStartTime(slot.start_time || "09:00");
+                                  setFormEndTime(slot.end_time || "10:00");
+                                  setFormTeacherId(slot.teacher_id || "");
+                                  setFormRoom(slot.room || "");
+                                  setEditingSlotId(slot._id);
+                                  setIsEditing(true);
+                                }}
+                                className="p-1 bg-white hover:bg-cyan-50 border border-slate-100 hover:border-cyan-200 text-slate-400 hover:text-cyan-600 rounded-lg shadow-sm cursor-pointer"
+                                title="Edit slot"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              
+                              {/* Delete Button */}
+                              <button
+                                onClick={() => handleDeleteEntry(slot._id)}
+                                className="p-1 bg-white hover:bg-rose-50 border border-slate-100 hover:border-rose-200 text-slate-400 hover:text-rose-600 rounded-lg shadow-sm cursor-pointer"
+                                title="Delete slot"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
 
                             {/* Time & Duration */}
                             <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-cyan-700">
@@ -670,6 +757,181 @@ export default function ManageTimetableView({
                       <>
                         <Plus className="w-4 h-4" />
                         Add Slot
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Entry Modal Overlay */}
+      <AnimatePresence>
+        {isEditing && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-md overflow-hidden"
+            >
+              <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Pencil className="w-4 h-4 text-cyan-600" />
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                    Edit Schedule Slot
+                  </h3>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditingSlotId(null);
+                  }}
+                  className="p-1 hover:bg-slate-200/80 rounded-lg transition-all text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleUpdateEntry} className="p-6 space-y-4">
+                {/* Day Selector */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Day of the Week <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formDay}
+                    onChange={(e) => setFormDay(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+                  >
+                    {DAYS_OF_WEEK.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Subject Selector */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Subject / Course <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={formSubjectId}
+                    onChange={(e) => setFormSubjectId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+                  >
+                    <option value="">-- Choose Subject --</option>
+                    {subjectsList.map((sub: any) => (
+                      <option key={sub._id || sub.id} value={sub._id || sub.id}>
+                        {sub.name || sub.subject}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Time Range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      Start Time <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={formStartTime}
+                      onChange={(e) => setFormStartTime(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      End Time <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="time"
+                      value={formEndTime}
+                      onChange={(e) => setFormEndTime(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Faculty Mentor Selector */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    Faculty Instructor
+                  </label>
+                  <select
+                    value={formTeacherId}
+                    onChange={(e) => setFormTeacherId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 cursor-pointer"
+                  >
+                    <option value="">-- Optional (Assign Teacher) --</option>
+                    {teachersList.map((t: any) => {
+                      const first = t.first_name || "";
+                      const last = t.last_name || "";
+                      const display = `${first} ${last}`.trim() || t.username || "Instructor";
+                      return (
+                        <option key={t._id || t.id} value={t._id || t.id}>
+                          {display} ({t.username})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Room / Location */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                    Room / Location
+                  </label>
+                  <input
+                    type="text"
+                    value={formRoom}
+                    onChange={(e) => setFormRoom(e.target.value)}
+                    placeholder="e.g. Room 304, Biology Lab"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 font-semibold"
+                  />
+                </div>
+
+                {/* Form Action Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditingSlotId(null);
+                    }}
+                    className="bg-slate-100 hover:bg-slate-200/70 text-slate-600 font-bold py-2 px-4 rounded-xl text-xs transition-all cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={`font-bold py-2 px-4 rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                      isSubmitting
+                        ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        : "bg-slate-950 hover:bg-slate-900 text-white shadow-sm"
+                    }`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      <>
+                        <Pencil className="w-4 h-4" />
+                        Save Changes
                       </>
                     )}
                   </button>

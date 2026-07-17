@@ -1,0 +1,6 @@
+{
+    "JWT_KEY": "3QbZxtLU5EdM$e!9Uewu",
+    "BACKEND_PORT": 3000,
+    "MONGO_URI": "mongodb+srv://jacksonmongbam123:Helloworld01@cluster0.kyrdzyu.mongodb.net/?appName=Cluster0",
+    "JWT_TOKEN_EXPIRATION_TIME": "1000h"
+}
