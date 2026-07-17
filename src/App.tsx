@@ -1783,6 +1783,22 @@ export default function App() {
             console.error("Bulk Student Mapping err:", mapErr);
           }
 
+          // Also store in rel_stdenr_classes
+          try {
+            await fetch("/rel/stdenrClasses/add", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                student_id: newUserId,
+                class_id: row.resolvedClassId,
+                section_id: row.resolvedSection,
+                reg_date: new Date().toISOString()
+              })
+            });
+          } catch (stdenrErr) {
+            console.error("Bulk Student stdenrClasses Mapping err:", stdenrErr);
+          }
+
           // Handle optional Parent registration and linking
           if (row.hasParentInfo) {
             let parentId = "";
