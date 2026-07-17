@@ -965,7 +965,7 @@ export default function App() {
         "Subject (e.g. Mathematics)": "Mathematics",
         "Marks Value": "85",
         "Academic Term (e.g. Term I)": "Term I",
-        "Grade Reference (e.g. A, B)": "A",
+        "Grade Reference (e.g. A)": "A",
         "Evaluation Date (YYYY-MM-DD)": "2026-07-05"
       },
       {
@@ -975,7 +975,7 @@ export default function App() {
         "Subject (e.g. Science)": "Science",
         "Marks Value": "92",
         "Academic Term (e.g. Term I)": "Term I",
-        "Grade Reference (e.g. A+)": "A+",
+        "Grade Reference (e.g. A)": "A+",
         "Evaluation Date (YYYY-MM-DD)": "2026-07-05"
       }
     ];
