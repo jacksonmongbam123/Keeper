@@ -280,7 +280,7 @@ export default function StudentHomeworkView({
               {(() => {
                 if (!detectedClassId) return "Unassigned Class";
                 const matched = classSectionsList.find(cs => (cs._id || cs.id) === detectedClassId);
-                return matched ? `${matched.grade} - ${matched.__section || matched.section || "N/A"}` : "Assigned Class";
+                return matched ? `${matched.class || matched.grade} - ${matched.__section || matched.section || "N/A"}` : "Assigned Class";
               })()}
             </span>
           </div>

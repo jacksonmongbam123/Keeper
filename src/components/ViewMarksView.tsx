@@ -76,7 +76,7 @@ export default function ViewMarksView({
     }
     const csObj = classSectionsList.find((cs: any) => cs && (cs._id === classId || cs.id === classId));
     if (csObj) {
-      return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+      return `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
     }
     return "Unknown Class";
   };

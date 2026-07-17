@@ -273,7 +273,7 @@ export default function AssignHomeworkView({
               <option value="">-- Choose Class Section --</option>
               {classSectionsList.map((cs: any) => (
                 <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                  {cs.grade} - {cs.__section || cs.section || "N/A"}
+                  {cs.class || cs.grade} - {cs.__section || cs.section || "N/A"}
                 </option>
               ))}
             </select>
@@ -400,7 +400,10 @@ export default function AssignHomeworkView({
           </div>
           {selectedClassId && (
             <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200 uppercase">
-              Class: {classSectionsList.find(c => (c._id || c.id) === selectedClassId)?.grade || "N/A"}
+              Class: {(() => {
+                const c = classSectionsList.find(item => (item._id || item.id) === selectedClassId);
+                return c ? (c.class || c.grade || "N/A") : "N/A";
+              })()}
             </span>
           )}
         </div>

@@ -961,7 +961,7 @@ export default function App() {
       {
         "Student Username / ID": "STU101",
         "Student Name (Optional)": "John Doe",
-        "Class Section (e.g. Grade 10 - A)": "Grade 10 - A",
+        "Class Section (e.g. Class 10 - A)": "Class 10 - A",
         "Subject (e.g. Mathematics)": "Mathematics",
         "Marks Value": "85",
         "Academic Term (e.g. Term I)": "Term I",
@@ -971,7 +971,7 @@ export default function App() {
       {
         "Student Username / ID": "STU102",
         "Student Name (Optional)": "Jane Smith",
-        "Class Section (e.g. Grade 10 - A)": "Grade 10 - A",
+        "Class Section (e.g. Class 10 - A)": "Class 10 - A",
         "Subject (e.g. Science)": "Science",
         "Marks Value": "92",
         "Academic Term (e.g. Term I)": "Term I",
@@ -988,7 +988,7 @@ export default function App() {
     const refData = [
       { "Category": "Active Grade References", "Values": dfMarksGrades.map(g => g.grade || g.name).join(", ") },
       { "Category": "Academic Terms Available", "Values": "Term I, Term II, Term III, Term IV, Mid Term, Final Term" },
-      { "Category": "Valid Class Sections", "Values": (classSectionsList || []).map((cs: any) => `${cs.grade} - ${cs.__section || cs.section || ""}`).join(", ") },
+      { "Category": "Valid Class Sections", "Values": (classSectionsList || []).map((cs: any) => `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`).join(", ") },
       { "Category": "Valid Subjects", "Values": (subjectsList || []).map((s: any) => s.name).join(", ") }
     ];
     const refWorksheet = XLSX.utils.json_to_sheet(refData);
@@ -1036,14 +1036,18 @@ export default function App() {
           
           const getVal = (possibleKeys: string[]) => {
             for (const key of possibleKeys) {
-              const foundKey = Object.keys(row).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === key.toLowerCase().replace(/[^a-z0-9]/g, ""));
+              const foundKey = Object.keys(row).find(k => {
+                const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, "").replace("optional", "");
+                const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "").replace("optional", "");
+                return cleanK === cleanKey;
+              });
               if (foundKey) return row[foundKey];
             }
             return "";
           };
 
           const rawStudentVal = String(getVal(["studentusernameid", "student_id", "student", "username", "studentid"]) || "").trim();
-          const rawClassVal = String(getVal(["classsectioneggrade10a", "classsection", "class_id", "class", "grade"]) || "").trim();
+          const rawClassVal = String(getVal(["classsectionegclass10a", "classsectioneggrade10a", "classsection", "class_id", "class", "grade"]) || "").trim();
           const rawSubjectVal = String(getVal(["subjectegmathematics", "subject_id", "subject", "subjectname"]) || "").trim();
           const rawMarksVal = String(getVal(["marksvalue", "marks", "score"]) || "").trim();
           const rawTermVal = String(getVal(["academictermegtermi", "academicterm", "term", "semester"]) || "").trim();
@@ -1092,12 +1096,16 @@ export default function App() {
           } else {
             const classObj = (classSectionsList || []).find((cs: any) => {
               if (!cs) return false;
-              const cleanVal = rawClassVal.toLowerCase();
-              const label = `${cs.grade} - ${cs.__section || cs.section || ""}`.toLowerCase();
-              return label === cleanVal || 
-                     label.includes(cleanVal) || 
-                     cleanVal.includes(label) || 
-                     String(cs.grade || "").toLowerCase() === cleanVal ||
+              const cleanVal = rawClassVal.toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              const gradePart = String(cs.class || cs.grade || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              const sectionPart = String(cs.__section || cs.section || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              const label1 = gradePart + sectionPart;
+              const label2 = `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`.toLowerCase();
+              return cleanVal === label1 || 
+                     label2 === rawClassVal.toLowerCase() ||
+                     label2.includes(rawClassVal.toLowerCase()) || 
+                     rawClassVal.toLowerCase().includes(label2) || 
+                     String(cs.class || cs.grade || "").toLowerCase() === rawClassVal.toLowerCase() ||
                      cs._id === rawClassVal;
             });
             if (classObj) {
@@ -1109,7 +1117,7 @@ export default function App() {
                 resolvedClassText = matchedMClass.class_name;
               } else {
                 resolvedClassId = csId;
-                resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+                resolvedClassText = `${classObj.class || classObj.grade || ""} - ${classObj.__section || classObj.section || ""}`;
               }
             } else {
               rowErrorLogs.push(`Class Section '${rawClassVal}' not found.`);
@@ -1302,7 +1310,7 @@ export default function App() {
         "Password (Optional)": "demoPassword123",
         "Biological Sex (Male/Female/Other)": "Male",
         "Date of Birth (YYYY-MM-DD)": "2010-05-15",
-        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A",
+        "Class Section (e.g. Class 1 - Section A)": "Class 1 - Section A",
         "Parent Title (Mr/Mrs/Ms/Dr) (Optional)": "Mr",
         "Parent First Name (Optional)": "Robert",
         "Parent Last Name (Optional)": "Doe",
@@ -1323,7 +1331,7 @@ export default function App() {
         "Password (Optional)": "demoPassword123",
         "Biological Sex (Male/Female/Other)": "Female",
         "Date of Birth (YYYY-MM-DD)": "2011-09-20",
-        "Class Section (e.g. Grade 1 - Section A)": "Grade 1 - Section A",
+        "Class Section (e.g. Class 1 - Section A)": "Class 1 - Section A",
         "Parent Title (Mr/Mrs/Ms/Dr) (Optional)": "Mrs",
         "Parent First Name (Optional)": "Linda",
         "Parent Last Name (Optional)": "Connor",
@@ -1343,9 +1351,9 @@ export default function App() {
       const csIdStr = String(cs._id || cs.id);
       const matchedMClass = (mClassesList || []).find((c: any) => c && String(c.class_section_id || "").toLowerCase() === csIdStr.toLowerCase());
       return {
-        "Class Section (Excel input format)": `${cs.grade} - ${cs.__section || cs.section || ""}`,
+        "Class Section (Excel input format)": `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`,
         "Mapped Class Name": matchedMClass ? matchedMClass.class_name : "Not Mapped / Default",
-        "Grade ID": cs.grade || "",
+        "Grade ID": cs.class || cs.grade || "",
         "Section": cs.__section || cs.section || ""
       };
     });
@@ -1418,7 +1426,11 @@ export default function App() {
 
           const getVal = (possibleKeys: string[]) => {
             for (const key of possibleKeys) {
-              const foundKey = Object.keys(row).find(k => k.toLowerCase().replace(/[^a-z0-9]/g, "") === key.toLowerCase().replace(/[^a-z0-9]/g, ""));
+              const foundKey = Object.keys(row).find(k => {
+                const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, "").replace("optional", "");
+                const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "").replace("optional", "");
+                return cleanK === cleanKey;
+              });
               if (foundKey) return row[foundKey];
             }
             return "";
@@ -1435,7 +1447,7 @@ export default function App() {
           const rawPassword = String(getVal(["passwordoptional", "password"]) || "demoPassword123").trim();
           const rawSex = String(getVal(["biologicalsexmalefemaleother", "biologicalsex", "sex", "gender"]) || "Male").trim();
           const rawDob = String(getVal(["dateofbirthyyyymmdd", "dateofbirth", "dob"]) || "").trim();
-          const rawClassSection = String(getVal(["classsectioneggrade1sectiona", "classsection", "class", "section"]) || "").trim();
+          const rawClassSection = String(getVal(["classsectionegclass1sectiona", "classsectioneggrade1sectiona", "classsection", "class", "section"]) || "").trim();
 
           // New optional parent fields
           const rawParentTitle = String(getVal(["parenttitlemrmrsmsdr", "parenttitle", "parenttitleid"]) || "Mr").trim();
@@ -1477,12 +1489,16 @@ export default function App() {
           } else {
             const classObj = (classSectionsList || []).find((cs: any) => {
               if (!cs) return false;
-              const cleanVal = rawClassSection.toLowerCase();
-              const label = `${cs.grade} - ${cs.__section || cs.section || ""}`.toLowerCase();
-              return label === cleanVal || 
-                     label.includes(cleanVal) || 
-                     cleanVal.includes(label) || 
-                     String(cs.grade || "").toLowerCase() === cleanVal ||
+              const cleanVal = rawClassSection.toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              const gradePart = String(cs.class || cs.grade || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              const sectionPart = String(cs.__section || cs.section || "").toLowerCase().replace(/[^a-z0-9]/g, "").replace("section", "");
+              const label1 = gradePart + sectionPart;
+              const label2 = `${cs.class || cs.grade || ""} - ${cs.__section || cs.section || ""}`.toLowerCase();
+              return cleanVal === label1 || 
+                     label2 === rawClassSection.toLowerCase() ||
+                     label2.includes(rawClassSection.toLowerCase()) || 
+                     rawClassSection.toLowerCase().includes(label2) || 
+                     String(cs.class || cs.grade || "").toLowerCase() === rawClassSection.toLowerCase() ||
                      cs._id === rawClassSection;
             });
             if (classObj) {
@@ -1494,7 +1510,7 @@ export default function App() {
                 resolvedClassText = matchedMClass.class_name;
               } else {
                 resolvedClassId = csId;
-                resolvedClassText = `${classObj.grade} - ${classObj.__section || classObj.section || ""}`;
+                resolvedClassText = `${classObj.class || classObj.grade || ""} - ${classObj.__section || classObj.section || ""}`;
               }
               resolvedSection = classObj.__section || classObj.section || "";
             } else {
@@ -8901,7 +8917,7 @@ export default function App() {
 
           const csObj = classSectionsList.find(cs => cs._id === rel.class_id);
           if (csObj) {
-            return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+            return `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
           }
 
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
@@ -8924,7 +8940,7 @@ export default function App() {
             const csObj = classSectionsList.find(cs => cs._id === item.class_id);
             let classLabel = "Unknown Class";
             if (csObj) {
-              classLabel = `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+              classLabel = `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
             } else {
               const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
               const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
@@ -10405,7 +10421,7 @@ export default function App() {
                         <option value="">-- Choose Class Section --</option>
                         {safeClassSections.map((cs) => (
                           <option key={cs._id} value={cs._id}>
-                            {cs.grade} - {cs.__section || cs.section || ""}
+                            {cs.class || cs.grade} - {cs.__section || cs.section || ""}
                           </option>
                         ))}
                       </select>
@@ -10514,7 +10530,7 @@ export default function App() {
                       let targetLabel = "All Students";
                       if (notif.target_type === "class_section") {
                         const cs = safeClassSections.find(c => c._id === notif.target_class_id);
-                        targetLabel = cs ? `Class: ${cs.grade} - ${cs.__section || cs.section || ""}` : "Specific Class Section";
+                        targetLabel = cs ? `Class: ${cs.class || cs.grade} - ${cs.__section || cs.section || ""}` : "Specific Class Section";
                       } else if (notif.target_type === "parents_of_student") {
                         const stud = studentsList.find(s => s._id === notif.target_student_id || s.id === notif.target_student_id);
                         targetLabel = stud ? `Parents of: ${stud.name}` : "Parents of Specific Student";
@@ -10665,7 +10681,7 @@ export default function App() {
 
           const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && cs._id === relClassId);
           if (csObj) {
-            return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+            return `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
           }
 
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
@@ -10931,7 +10947,7 @@ export default function App() {
             : undefined;
 
           if (csObj) {
-            return `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+            return `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
           }
 
           const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
@@ -11663,7 +11679,7 @@ export default function App() {
                         } else {
                           const csObj = (Array.isArray(classSectionsList) ? classSectionsList : []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
                           if (csObj) {
-                            classSectionText = `${csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+                            classSectionText = `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
                           }
                         }
                         

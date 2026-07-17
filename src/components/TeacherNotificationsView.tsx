@@ -129,7 +129,7 @@ export default function TeacherNotificationsView({
     
     if (type === "class_section") {
       const cs = classSectionsList.find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
-      const className = cs ? `${cs.grade} - ${cs.__section || cs.section || ""}` : "Class Section";
+      const className = cs ? `${cs.class || cs.grade} - ${cs.__section || cs.section || ""}` : "Class Section";
       return {
         label: `Cohort: ${className}`,
         style: "bg-cyan-50 text-cyan-700 border-cyan-100",
