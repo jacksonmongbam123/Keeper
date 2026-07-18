@@ -324,7 +324,7 @@ export default function ManageTimetableView({
     console.log("Submitting timetable update. ID:", editingSlotId, "Payload:", payload);
 
     try {
-      const res = await fetch(`/timetable/update/${editingSlotId}`, {
+      let res = await fetch(`/timetable/update/${editingSlotId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -334,6 +334,27 @@ export default function ManageTimetableView({
       });
 
       console.log("Timetable update response status:", res.status);
+
+      // Fallback: If update endpoint is not live/found, delete and re-add slot
+      if (res.status === 404) {
+        console.warn("Update endpoint returned 404. Falling back to delete-then-add...");
+        const deleteRes = await fetch(`/timetable/delete/${editingSlotId}`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (deleteRes.ok) {
+          res = await fetch("/timetable/add", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+        }
+      }
 
       if (res.ok) {
         const resData = await res.json().catch(() => ({}));
