@@ -312,6 +312,17 @@ export default function ManageTimetableView({
     }
 
     setIsSubmitting(true);
+    const payload = {
+      class_id: selectedClassId,
+      subject_id: formSubjectId,
+      day: formDay,
+      start_time: formStartTime,
+      end_time: formEndTime,
+      teacher_id: formTeacherId,
+      room: formRoom
+    };
+    console.log("Submitting timetable update. ID:", editingSlotId, "Payload:", payload);
+
     try {
       const res = await fetch(`/timetable/update/${editingSlotId}`, {
         method: "POST",
@@ -319,18 +330,14 @@ export default function ManageTimetableView({
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({
-          class_id: selectedClassId,
-          subject_id: formSubjectId,
-          day: formDay,
-          start_time: formStartTime,
-          end_time: formEndTime,
-          teacher_id: formTeacherId,
-          room: formRoom
-        })
+        body: JSON.stringify(payload)
       });
 
+      console.log("Timetable update response status:", res.status);
+
       if (res.ok) {
+        const resData = await res.json().catch(() => ({}));
+        console.log("Timetable update successful response:", resData);
         setSuccessMsg("Timetable slot updated successfully!");
         setFormRoom("");
         setFormTeacherId("");
@@ -339,6 +346,7 @@ export default function ManageTimetableView({
         fetchTimetable(selectedClassId);
       } else {
         const errData = await res.json().catch(() => ({}));
+        console.error("Timetable update failed response data:", errData);
         setErrorMsg(errData.error || errData.message || "Failed to update timetable slot.");
       }
     } catch (err: any) {
@@ -631,6 +639,28 @@ export default function ManageTimetableView({
               </div>
 
               <form onSubmit={handleAddEntry} className="p-6 space-y-4">
+                {errorMsg && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span>{errorMsg}</span>
+                  </motion.div>
+                )}
+
+                {successMsg && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-xs font-semibold flex items-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>{successMsg}</span>
+                  </motion.div>
+                )}
+
                 {/* Day Selector */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
@@ -803,6 +833,28 @@ export default function ManageTimetableView({
               </div>
 
               <form onSubmit={handleUpdateEntry} className="p-6 space-y-4">
+                {errorMsg && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span>{errorMsg}</span>
+                  </motion.div>
+                )}
+
+                {successMsg && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-700 text-xs font-semibold flex items-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>{successMsg}</span>
+                  </motion.div>
+                )}
+
                 {/* Day Selector */}
                 <div>
                   <label className="block text-[10px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">
