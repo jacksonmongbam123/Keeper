@@ -516,7 +516,7 @@ export default function ManageTimetableView({
                             initial={{ opacity: 0, y: 5 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.03 }}
-                            key={slot._id || idx}
+                            key={slot._id || slot.id || idx}
                             className="group relative bg-white border border-slate-200 rounded-xl p-3 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col gap-1.5"
                           >
                             {/* Actions Group (Hidden by default, visible on hover) */}
@@ -537,7 +537,7 @@ export default function ManageTimetableView({
                                   setFormEndTime(slot.end_time || "10:00");
                                   setFormTeacherId(teachId || "");
                                   setFormRoom(slot.room || "");
-                                  setEditingSlotId(slot._id);
+                                  setEditingSlotId(slot._id || slot.id);
                                   setIsEditing(true);
                                 }}
                                 className="p-1 bg-white hover:bg-cyan-50 border border-slate-200 hover:border-cyan-300 text-slate-500 hover:text-cyan-600 rounded-lg shadow-xs cursor-pointer transition-colors"
@@ -548,7 +548,7 @@ export default function ManageTimetableView({
                               
                               {/* Delete Button */}
                               <button
-                                onClick={() => handleDeleteEntry(slot._id)}
+                                onClick={() => handleDeleteEntry(slot._id || slot.id)}
                                 className="p-1 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-slate-500 hover:text-rose-600 rounded-lg shadow-xs cursor-pointer transition-colors"
                                 title="Delete slot"
                               >
