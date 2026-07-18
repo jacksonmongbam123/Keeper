@@ -46,7 +46,8 @@ import {
   ClipboardList,
   Award,
   Briefcase,
-  FileCode2
+  FileCode2,
+  Download
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import AssignHomeworkView from "./components/AssignHomeworkView";
@@ -961,7 +962,7 @@ export default function App() {
       {
         "Student Username / ID": "STU101",
         "Student Name (Optional)": "John Doe",
-        "Class Section (e.g. Class 10 - A)": "Class 10 - A",
+        "Class Section (e.g. Class 1 - Section A)": "Class 1 - Section A",
         "Subject (e.g. Mathematics)": "Mathematics",
         "Marks Value": "85",
         "Academic Term (e.g. Term I)": "Term I",
@@ -971,7 +972,7 @@ export default function App() {
       {
         "Student Username / ID": "STU102",
         "Student Name (Optional)": "Jane Smith",
-        "Class Section (e.g. Class 10 - A)": "Class 10 - A",
+        "Class Section (e.g. Class 1 - Section A)": "Class 1 - Section A",
         "Subject (e.g. Science)": "Science",
         "Marks Value": "92",
         "Academic Term (e.g. Term I)": "Term I",
@@ -1060,7 +1061,7 @@ export default function App() {
           };
 
           const rawStudentVal = String(getVal(["studentusernameid", "student_id", "student", "username", "studentid"]) || "").trim();
-          const rawClassVal = String(getVal(["classsectionegclass10a", "classsectioneggrade10a", "classsection", "class_id", "class", "grade"]) || "").trim();
+          const rawClassVal = String(getVal(["classsectionegclass1sectiona", "classsectioneggrade1amanagement", "classsectionegclass10a", "classsectioneggrade10a", "classsection", "class_id", "class", "grade"]) || "").trim();
           const rawSubjectVal = String(getVal(["subjectegmathematics", "subject_id", "subject", "subjectname"]) || "").trim();
           const rawMarksVal = String(getVal(["marksvalue", "marks", "score"]) || "").trim();
           const rawTermVal = String(getVal(["academictermegtermi", "academicterm", "term", "semester"]) || "").trim();
@@ -1448,6 +1449,410 @@ export default function App() {
     guidesWorksheet["!cols"] = fitToColumn(refGuides);
 
     XLSX.writeFile(workbook, "Student_Bulk_Registration_Template.xlsx");
+  };
+
+  const handleDownloadAllDetailsExcel = async () => {
+    try {
+      setIsLoadingSearchDetails(true);
+      const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      // Fetch latest leaves from backend
+      let leavesData: any[] = [];
+      try {
+        const res = await fetch("/rel/teacherLeave/retrieve", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({})
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            leavesData = data.filter(Boolean);
+          }
+        }
+      } catch (err) {
+        console.warn("API retrieve leaves error during Excel export, reading local storage:", err);
+      }
+      if (leavesData.length === 0) {
+        const local = localStorage.getItem("abms_rel_teacher_leaves");
+        if (local) {
+          try {
+            leavesData = JSON.parse(local);
+          } catch (e) {
+            console.error("Failed to parse local leaves:", e);
+          }
+        }
+      }
+
+      // Helper to get class & section for students
+      const getStudentClassSectionNameLocal = (studentId: string) => {
+        const rel = (Array.isArray(studentClassRelations) ? studentClassRelations : []).find(r => r && r.student_id === studentId);
+        if (!rel) return "Unassigned";
+
+        const matchedMClass = (mClassesList || []).find(c => c && (c._id === rel.class_id || c.id === rel.class_id));
+        if (matchedMClass) {
+          const matchedCs = (classSectionsList || []).find(cs => cs._id === matchedMClass.class_section_id || cs.id === matchedMClass.class_section_id);
+          const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+          return `${matchedMClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+        }
+
+        const csObj = classSectionsList.find(cs => cs._id === rel.class_id);
+        if (csObj) {
+          return `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+        }
+
+        const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+        const gradeObj = gradesList.find(g => g && (g._id === rel.class_id || g.id === rel.class_id || g.grade === rel.class_id));
+        const sectionsList = Array.isArray(dfSections) ? dfSections : [];
+        const sectionObj = rel.section_id ? sectionsList.find(s => s && (s._id === rel.section_id || s.id === rel.section_id)) : undefined;
+
+        const gradeName = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (rel.class_id || "Unknown");
+        const sectionName = sectionObj ? (sectionObj.section || sectionObj.name || sectionObj.code || "Unknown") : (rel.section_id || "Unknown");
+
+        return `${gradeName} - ${sectionName}`;
+      };
+
+      // Helper to get assignments for teachers
+      const getTeacherClassSubjectAssignmentsLocal = (teacherId: string) => {
+        const assignments = (Array.isArray(teacherSubjectClasses) ? teacherSubjectClasses : []).filter(
+          item => item && item.teacher_id === teacherId
+        );
+        return assignments.map(item => {
+          const csObj = classSectionsList.find(cs => cs._id === item.class_id);
+          let classLabel = "Unknown Class";
+          if (csObj) {
+            classLabel = `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+          } else {
+            const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+            const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
+            classLabel = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (item.class_id || "Unknown");
+          }
+          
+          const subObj = (Array.isArray(subjectsList) ? subjectsList : []).find(
+            sub => sub && (sub._id === item.subject_id || sub.id === item.subject_id)
+          );
+          const subjectLabel = subObj ? (subObj.name || subObj.subject) : item.subject_id;
+          
+          return { classLabel, subjectLabel };
+        });
+      };
+
+      // Helper to get qualifications for teachers
+      const getTeacherQualificationsListLocal = (teacherId: string) => {
+        const quals = (Array.isArray(teacherQualifications) ? teacherQualifications : []).filter(
+          item => item && item.teacher_id === teacherId
+        );
+        return quals.map(item => {
+          const qObj = (Array.isArray(edQualifications) ? edQualifications : []).find(
+            q => q && (q._id === item.ed_qualification_id || q.id === item.ed_qualification_id)
+          );
+          const qualificationLabel = qObj ? (qObj.qualification || qObj.name) : item.ed_qualification_id;
+
+          const sObj = (Array.isArray(edSpecialities) ? edSpecialities : []).find(
+            s => s && (s._id === item.ed_speciality_id || s.id === item.ed_speciality_id)
+          );
+          const specialityLabel = sObj ? (sObj.speciality || sObj.name) : item.ed_speciality_id;
+
+          return {
+            qualificationLabel,
+            specialityLabel,
+            institute: item.institute || "N/A",
+            completed: item.completed
+          };
+        });
+      };
+
+      // 1. Students Sheet
+      const studentsRaw = (filteredUserDirectory || []).filter(u => u && String(u.role).toLowerCase() === "student");
+      const studentsRows = studentsRaw.map(student => {
+        const sId = student._id || student.id || "";
+        
+        // Find parent mapping
+        const pRel = (parentStudentRelations || []).find(r => r && r.student_id === sId);
+        let pName = "Not Assigned";
+        let pPhone = "N/A";
+        let pEmail = "N/A";
+        let pOccupation = "N/A";
+        let pMarital = "N/A";
+
+        if (pRel) {
+          const parentObj = (filteredUserDirectory || []).find(u => u && u._id === pRel.parent_id && String(u.role).toLowerCase() === "parents");
+          if (parentObj) {
+            pName = parentObj.name || `${parentObj.first_name || ""} ${parentObj.last_name || ""}`.trim() || parentObj.username || "Parent";
+            pPhone = parentObj.phone || "N/A";
+            pEmail = parentObj.email || "N/A";
+            pMarital = parentObj.marital_status_id || "Not Specified";
+            if (parentObj.occupation_id) {
+              const occObj = (occupationsList || []).find(o => o._id === parentObj.occupation_id);
+              pOccupation = occObj ? occObj.occupation : parentObj.occupation_id;
+            }
+          }
+        }
+
+        return {
+          "Student ID / Username": student.reg_no || student.regNo || student.username || sId,
+          "Student Name": student.name || "N/A",
+          "Class & Section": getStudentClassSectionNameLocal(sId),
+          "Email Address": student.email || "N/A",
+          "Mobile Phone": student.phone || "N/A",
+          "Date of Birth": student.dob ? new Date(student.dob).toLocaleDateString() : "N/A",
+          "Gender / Sex": student.gender || "N/A",
+          "National ID (NIC)": student.nic || "N/A",
+          "Account Status": student.status || "Active",
+          "Parent / Guardian Name": pName,
+          "Parent Contact Phone": pPhone,
+          "Parent Email Address": pEmail,
+          "Parent Occupation": pOccupation,
+          "Parent Marital Status": pMarital
+        };
+      });
+
+      // 2. Parents Sheet
+      const parentsRaw = (filteredUserDirectory || []).filter(u => u && String(u.role).toLowerCase() === "parents");
+      const parentsRows = parentsRaw.map(parent => {
+        const pId = parent._id || parent.id || "";
+        
+        // Find children
+        const childrenRels = (parentStudentRelations || []).filter(r => r && r.parent_id === pId);
+        const childrenDetails = childrenRels.map(rel => {
+          const childObj = (filteredUserDirectory || []).find(u => u && (u._id === rel.student_id || u.id === rel.student_id) && String(u.role).toLowerCase() === "student");
+          if (childObj) {
+            return `${childObj.name} (${childObj.reg_no || childObj.username || "ID"})`;
+          }
+          return null;
+        }).filter(Boolean).join(", ");
+
+        let resolvedOccupation = "Not Specified";
+        if (parent.occupation_id) {
+          const occObj = (occupationsList || []).find(o => o._id === parent.occupation_id);
+          resolvedOccupation = occObj ? occObj.occupation : parent.occupation_id;
+        }
+
+        return {
+          "Parent ID / Username": parent.username || pId,
+          "Parent Name": parent.name || "N/A",
+          "Email Address": parent.email || "N/A",
+          "Mobile Phone": parent.phone || "N/A",
+          "Occupation": resolvedOccupation,
+          "Marital Status": parent.marital_status_id || "Not Specified",
+          "Registered Children": childrenDetails || "None assigned"
+        };
+      });
+
+      // 3. Teachers Sheet
+      const teachersRaw = (filteredUserDirectory || []).filter(u => u && (String(u.role).toLowerCase() === "instructor" || String(u.role).toLowerCase() === "teacher"));
+      const teachersRows = teachersRaw.map(teacher => {
+        const tId = teacher._id || teacher.id || "";
+
+        // Format assignments
+        const assignments = getTeacherClassSubjectAssignmentsLocal(tId);
+        const assignmentsStr = assignments.map(a => `${a.classLabel} (${a.subjectLabel})`).join(", ");
+
+        // Format qualifications
+        const quals = getTeacherQualificationsListLocal(tId);
+        const qualsStr = quals.map(q => `${q.qualificationLabel} in ${q.specialityLabel} from ${q.institute} (Completed: ${q.completed ? "Yes" : "No"})`).join("; ");
+
+        return {
+          "Teacher ID / Username": teacher.username || tId,
+          "Teacher Name": teacher.name || "N/A",
+          "Email Address": teacher.email || "N/A",
+          "Mobile Phone": teacher.phone || "N/A",
+          "Account Status": teacher.status || "Active",
+          "Assigned Classes & Subjects": assignmentsStr || "No assignments",
+          "Educational Qualifications": qualsStr || "None recorded"
+        };
+      });
+
+      // 4. Fees Sheet
+      const feesRows = (allFeeRecords || []).map(fee => {
+        const studentId = fee.student_id || fee.studentID || "";
+        const studentObj = (filteredUserDirectory || []).find(u => u && (
+          String(u._id).toLowerCase() === studentId.toLowerCase() ||
+          String(u.id).toLowerCase() === studentId.toLowerCase() ||
+          String(u.username).toLowerCase() === studentId.toLowerCase()
+        ));
+        const studentName = studentObj ? studentObj.name : "Unknown Student (" + studentId + ")";
+        const classSection = studentObj ? getStudentClassSectionNameLocal(studentObj._id || studentObj.id) : "Unassigned";
+
+        let paidDateText = "N/A";
+        if (fee.payment_date || fee.paidDate) {
+          try {
+            paidDateText = new Date(fee.payment_date || fee.paidDate).toLocaleDateString();
+          } catch {
+            paidDateText = String(fee.payment_date || fee.paidDate);
+          }
+        }
+
+        return {
+          "Student ID / Username": studentObj ? (studentObj.reg_no || studentObj.regNo || studentObj.username || studentObj._id) : studentId,
+          "Student Name": studentName,
+          "Class & Section": classSection,
+          "Academic Year": fee.year || "N/A",
+          "Fee Term / Type": fee.fee_type || fee.feeType || "N/A",
+          "Total Fee Amount ($)": fee.total_amount || fee.amount || 0,
+          "Amount Paid ($)": fee.amount_paid || fee.paid || 0,
+          "Amount Due ($)": fee.amount_due || fee.due || 0,
+          "Payment Status": fee.status || "Pending",
+          "Payment Date": paidDateText
+        };
+      });
+
+      // 5. Marks Sheet
+      const marksRows = (marksList || []).map(mark => {
+        const studentObj = (filteredUserDirectory || []).find(u => u && (u._id === mark.student_id || u.id === mark.student_id));
+        const studentName = studentObj ? studentObj.name : "Unknown Student";
+        const studentCode = studentObj ? (studentObj.reg_no || studentObj.username || "N/A") : "N/A";
+
+        // Class resolution
+        const matchedClass = (mClassesList || []).find(c => c && (c._id === mark.class_id || c.id === mark.class_id));
+        let classSectionText = mark.class_id || "Unassigned";
+        if (matchedClass) {
+          const csObj = (classSectionsList || []).find(cs => cs && (cs._id === matchedClass.class_section_id || cs.id === matchedClass.class_section_id));
+          const sectionName = csObj ? (csObj.__section || csObj.section || "") : "";
+          classSectionText = `${matchedClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+        } else {
+          const csObj = (classSectionsList || []).find(cs => cs && (cs._id === mark.class_id || cs.id === mark.class_id));
+          if (csObj) {
+            classSectionText = `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+          }
+        }
+
+        // Subject
+        const subObj = (subjectsList || []).find(s => s && (s._id === mark.subject_id || s.id === mark.subject_id));
+        const subjectText = subObj ? subObj.name : mark.subject_id || "Unassigned";
+
+        // Grade
+        const gradeObj = (dfMarksGrades || []).find(g => g && (g._id === mark.grade_id || g.id === mark.grade_id));
+        const gradeText = gradeObj ? (gradeObj.grade || gradeObj.name) : mark.grade_id || "None";
+
+        let formattedDate = "N/A";
+        if (mark.date) {
+          try {
+            formattedDate = new Date(mark.date).toLocaleDateString();
+          } catch {
+            formattedDate = String(mark.date);
+          }
+        }
+
+        return {
+          "Student ID / Username": studentCode,
+          "Student Name": studentName,
+          "Class & Section": classSectionText,
+          "Subject": subjectText,
+          "Academic Term / Evaluation": mark.term || "N/A",
+          "Marks Obtained": mark.marks || 0,
+          "Grade Assigned": gradeText,
+          "Date Evaluated": formattedDate,
+          "Recorded By (User ID)": mark.created_user_id || "N/A"
+        };
+      });
+
+      // 6. Absences Sheet
+      const absencesRows = (absencesList || []).map(abs => {
+        const studentIDVal = abs.studentID || "";
+        const studentObj = (filteredUserDirectory || []).find(u => u && (
+          String(u._id).toLowerCase() === studentIDVal.toLowerCase() ||
+          String(u.id).toLowerCase() === studentIDVal.toLowerCase() ||
+          String(u.username).toLowerCase() === studentIDVal.toLowerCase()
+        ));
+        const studentName = studentObj ? studentObj.name : "Unknown Student (" + studentIDVal + ")";
+        const classSection = studentObj ? getStudentClassSectionNameLocal(studentObj._id || studentObj.id) : "Unassigned";
+
+        let formattedDate = "N/A";
+        if (abs.date) {
+          try {
+            formattedDate = new Date(abs.date).toLocaleDateString();
+          } catch {
+            formattedDate = String(abs.date);
+          }
+        }
+
+        return {
+          "Student ID / Username": studentObj ? (studentObj.reg_no || studentObj.regNo || studentObj.username || studentObj._id) : studentIDVal,
+          "Student Name": studentName,
+          "Class & Section": classSection,
+          "Absence Date": formattedDate,
+          "Subject / Session": abs.subject_id || abs.subject || "All Day",
+          "Reason / Remarks": abs.reason || "No reason specified",
+          "Status": abs.status || "Unexcused",
+          "Authorized By": abs.approved_by || "Pending"
+        };
+      });
+
+      // 7. Teacher Leaves Sheet
+      const leavesRows = (leavesData || []).map(leaf => {
+        const teacherId = leaf.teacher_id || "";
+        const teacherObj = (filteredUserDirectory || []).find(u => u && (u._id === teacherId || u.id === teacherId));
+        const teacherName = teacherObj ? teacherObj.name : "Unknown Instructor (" + teacherId + ")";
+
+        let startDateText = "N/A";
+        if (leaf.start_date) {
+          try { startDateText = new Date(leaf.start_date).toLocaleDateString(); } catch { startDateText = String(leaf.start_date); }
+        }
+        let endDateText = "N/A";
+        if (leaf.end_date) {
+          try { endDateText = new Date(leaf.end_date).toLocaleDateString(); } catch { endDateText = String(leaf.end_date); }
+        }
+        let createdAtText = "N/A";
+        if (leaf.created_date || leaf.createdAt) {
+          try { createdAtText = new Date(leaf.created_date || leaf.createdAt).toLocaleDateString(); } catch { createdAtText = String(leaf.created_date || leaf.createdAt); }
+        }
+
+        return {
+          "Teacher ID / Username": teacherObj ? (teacherObj.username || teacherObj._id) : teacherId,
+          "Teacher Name": teacherName,
+          "Start Date": startDateText,
+          "End Date": endDateText,
+          "Leave Type / Category": leaf.type || "Casual Leave",
+          "Reason": leaf.reason || "No reason specified",
+          "Status": leaf.status || "Pending",
+          "Applied Date": createdAtText
+        };
+      });
+
+      // Create Workbook and Sheets
+      const workbook = XLSX.utils.book_new();
+
+      const addSheetToWorkbook = (rows: any[], sheetName: string) => {
+        const ws = XLSX.utils.json_to_sheet(rows.length > 0 ? rows : [{ "No Records": "No data available in this report" }]);
+        
+        // Auto-fit columns helper
+        const fitToColumn = (dataList: any[]) => {
+          if (dataList.length === 0) return [];
+          const keys = Object.keys(dataList[0]);
+          return keys.map(key => ({
+            wch: Math.max(
+              key.length,
+              ...dataList.map(row => String(row[key] || "").length)
+            ) + 4
+          }));
+        };
+        ws["!cols"] = fitToColumn(rows);
+        XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+      };
+
+      addSheetToWorkbook(studentsRows, "Students");
+      addSheetToWorkbook(parentsRows, "Parents");
+      addSheetToWorkbook(teachersRows, "Teachers");
+      addSheetToWorkbook(feesRows, "Fees_Records");
+      addSheetToWorkbook(marksRows, "Marks_Evaluations");
+      addSheetToWorkbook(absencesRows, "Absences_Attendance");
+      addSheetToWorkbook(leavesRows, "Teacher_Leaves");
+
+      XLSX.writeFile(workbook, "Comprehensive_School_Directory_Report.xlsx");
+    } catch (err: any) {
+      console.error("Failed to generate comprehensive report:", err);
+      alert("Error generating report: " + (err.message || String(err)));
+    } finally {
+      setIsLoadingSearchDetails(false);
+    }
   };
 
   const handleStudentBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -9140,9 +9545,9 @@ export default function App() {
           <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header Banner */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 bg-gradient-to-r from-cyan-500/5 via-transparent to-transparent">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-cyan-50 border border-cyan-100 rounded-xl text-cyan-600">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 bg-cyan-50 border border-cyan-100 rounded-xl text-cyan-600 shrink-0">
                     <Search className="h-6 w-6" />
                   </div>
                   <div>
@@ -9152,7 +9557,15 @@ export default function App() {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100/80">
+                  <button
+                    onClick={handleDownloadAllDetailsExcel}
+                    disabled={isLoadingSearchDetails}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm shadow-emerald-600/10"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Download All Records (Excel)
+                  </button>
                   <button
                     onClick={async () => {
                       setIsLoadingSearchDetails(true);
