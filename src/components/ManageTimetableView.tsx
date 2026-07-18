@@ -519,8 +519,8 @@ export default function ManageTimetableView({
                             key={slot._id || idx}
                             className="group relative bg-white border border-slate-200 rounded-xl p-3 hover:border-slate-300 hover:shadow-xs transition-all flex flex-col gap-1.5"
                           >
-                            {/* Actions Group (Always visible for easy access on touch and desktop) */}
-                            <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 transition-all z-10">
+                            {/* Actions Group (Hidden by default, visible on hover) */}
+                            <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
                               {/* Edit Button */}
                               <button
                                 onClick={() => {
