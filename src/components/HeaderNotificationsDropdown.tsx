@@ -19,6 +19,11 @@ interface HeaderNotificationsDropdownProps {
   userDirectory: any[];
   currentUserId: string;
   organizationId?: string;
+  selectedRole?: string;
+  studentClassRelations?: any[];
+  parentStudentRelations?: any[];
+  selectedChildId?: string;
+  mClassesList?: any[];
 }
 
 export default function HeaderNotificationsDropdown({
@@ -26,7 +31,12 @@ export default function HeaderNotificationsDropdown({
   classSectionsList = [],
   userDirectory = [],
   currentUserId = "",
-  organizationId
+  organizationId,
+  selectedRole = "",
+  studentClassRelations = [],
+  parentStudentRelations = [],
+  selectedChildId = "",
+  mClassesList = []
 }: HeaderNotificationsDropdownProps) {
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -102,7 +112,93 @@ export default function HeaderNotificationsDropdown({
             return true;
           });
 
-          setNotificationsList(orgFiltered);
+          // Filter by role & class relations
+          const finalFiltered = orgFiltered.filter((notif: any) => {
+            const type = String(notif.target_type || "").toLowerCase();
+            const targetClassId = notif.target_class_id;
+            const targetStudentId = notif.target_student_id;
+
+            // Administrators see all notifications
+            if (selectedRole === "administrator") {
+              return true;
+            }
+
+            // Teachers see teacher targeted notifications and general ones
+            if (selectedRole === "instructor") {
+              if (type === "teachers" || type === "all_teachers") {
+                return true;
+              }
+              if (type === "all_students" || type === "" || !type) {
+                return true;
+              }
+              return false;
+            }
+
+            // Students see:
+            if (selectedRole === "student") {
+              if (type === "all_students" || type === "" || !type) {
+                return true;
+              }
+              if (type === "class_section" && targetClassId) {
+                const rel = (studentClassRelations || []).find((r: any) => {
+                  const sId = r.student_id && typeof r.student_id === "object" ? r.student_id._id || r.student_id.id : r.student_id;
+                  return String(sId) === String(currentUserId);
+                });
+                if (rel) {
+                  const studentClassId = String(rel.class_id);
+                  if (studentClassId === String(targetClassId)) {
+                    return true;
+                  }
+                  const mClass = (mClassesList || []).find(c => String(c._id || c.id) === studentClassId);
+                  if (mClass && String(mClass.class_section_id) === String(targetClassId)) {
+                    return true;
+                  }
+                }
+              }
+              return false;
+            }
+
+            // Parents see:
+            if (selectedRole === "parents") {
+              if (type === "all_students" || type === "" || !type) {
+                return true;
+              }
+
+              const childRels = (parentStudentRelations || []).filter((r: any) => {
+                const pId = r.parent_id && typeof r.parent_id === "object" ? r.parent_id._id || r.parent_id.id : r.parent_id;
+                return String(pId) === String(currentUserId);
+              });
+
+              const activeChildId = selectedChildId || (childRels[0] ? childRels[0].student_id : "");
+              if (!activeChildId) return false;
+
+              if (type === "parents_of_student" && targetStudentId) {
+                return String(targetStudentId) === String(activeChildId);
+              }
+
+              if (type === "class_section" && targetClassId) {
+                const rel = (studentClassRelations || []).find((r: any) => {
+                  const sId = r.student_id && typeof r.student_id === "object" ? r.student_id._id || r.student_id.id : r.student_id;
+                  return String(sId) === String(activeChildId);
+                });
+                if (rel) {
+                  const childClassId = String(rel.class_id);
+                  if (childClassId === String(targetClassId)) {
+                    return true;
+                  }
+                  const mClass = (mClassesList || []).find(c => String(c._id || c.id) === childClassId);
+                  if (mClass && String(mClass.class_section_id) === String(targetClassId)) {
+                    return true;
+                  }
+                }
+              }
+              return false;
+            }
+
+            return true;
+          });
+
+          setNotificationsList(finalFiltered);
 
           // Check if there are notifications not yet seen
           const unseen = orgFiltered.some((notif: any) => notif._id && !seenIds.includes(notif._id));
@@ -152,8 +248,17 @@ export default function HeaderNotificationsDropdown({
     }
     
     if (type === "class_section") {
-      const cs = classSectionsList.find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
-      const className = cs ? `${cs.class || cs.grade} - ${cs.__section || cs.section || ""}` : "Cohort";
+      const mClass = (mClassesList || []).find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
+      let className = "Cohort";
+      if (mClass) {
+        const cs = classSectionsList.find(c => c._id === mClass.class_section_id || c.id === mClass.class_section_id);
+        className = `${mClass.class_name}${cs ? ` - ${cs.__section || cs.section || ""}` : ""}`;
+      } else {
+        const cs = classSectionsList.find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
+        if (cs) {
+          className = `${cs.class || cs.grade} - ${cs.__section || cs.section || ""}`;
+        }
+      }
       return {
         label: `${className}`,
         style: "bg-cyan-50 text-cyan-700 border-cyan-100",

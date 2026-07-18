@@ -23,6 +23,7 @@ interface TeacherNotificationsViewProps {
   userDirectory: any[];
   organizationId?: string;
   currentUserId?: string;
+  mClassesList?: any[];
 }
 
 export default function TeacherNotificationsView({
@@ -30,7 +31,8 @@ export default function TeacherNotificationsView({
   classSectionsList = [],
   userDirectory = [],
   organizationId,
-  currentUserId = ""
+  currentUserId = "",
+  mClassesList = []
 }: TeacherNotificationsViewProps) {
   const [notificationsList, setNotificationsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -128,8 +130,17 @@ export default function TeacherNotificationsView({
     }
     
     if (type === "class_section") {
-      const cs = classSectionsList.find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
-      const className = cs ? `${cs.class || cs.grade} - ${cs.__section || cs.section || ""}` : "Class Section";
+      const mClass = (mClassesList || []).find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
+      let className = "Class Section";
+      if (mClass) {
+        const cs = classSectionsList.find(c => c._id === mClass.class_section_id || c.id === mClass.class_section_id);
+        className = `${mClass.class_name}${cs ? ` - ${cs.__section || cs.section || ""}` : ""}`;
+      } else {
+        const cs = classSectionsList.find(c => c._id === notif.target_class_id || c.id === notif.target_class_id);
+        if (cs) {
+          className = `${cs.class || cs.grade} - ${cs.__section || cs.section || ""}`;
+        }
+      }
       return {
         label: `Cohort: ${className}`,
         style: "bg-cyan-50 text-cyan-700 border-cyan-100",

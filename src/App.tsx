@@ -6162,6 +6162,7 @@ export default function App() {
                 userDirectory={userDirectoryState}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
                 currentUserId={currentUserId}
+                mClassesList={getFilteredMClasses()}
               />
             </div>
           );
@@ -10799,23 +10800,21 @@ export default function App() {
         );
       }
 
-      // Notifications Portal Tab
+        // Notifications Portal Tab
       if (activeTab === "notifications") {
         const studentsList = (userDirectory || []).filter((u: any) => u && u.role === "student");
-        const studentIds = new Set(studentsList.map((s: any) => s._id || s.id));
-        const classIdsInOrg = new Set(
-          (studentClassRelations || [])
-            .filter((rel: any) => rel && studentIds.has(rel.student_id))
-            .map((rel: any) => rel.class_id)
-        );
-        const safeClassSections = (Array.isArray(classSectionsList) ? classSectionsList : []).filter((cs: any) => {
-          if (!cs) return false;
+        
+        let safeClassSections = getFilteredClassSections();
+        if (!safeClassSections || safeClassSections.length === 0) {
           const currentOrg = adminOrganizationId || loginResult?.data?.user?.organization_id;
-          if (cs.organization_id && currentOrg) {
-            return cs.organization_id === currentOrg;
-          }
-          return classIdsInOrg.has(cs._id || cs.id);
-        });
+          safeClassSections = (Array.isArray(classSectionsList) ? classSectionsList : []).filter((cs: any) => {
+            if (!cs) return false;
+            if (cs.organization_id && currentOrg) {
+              return String(cs.organization_id).trim().toLowerCase() === String(currentOrg).trim().toLowerCase();
+            }
+            return true;
+          });
+        }
 
         const normalizeOrgId = (id: any): string => {
           if (!id) return "";
@@ -10920,11 +10919,15 @@ export default function App() {
                         required
                       >
                         <option value="">-- Choose Class Section --</option>
-                        {safeClassSections.map((cs) => (
-                          <option key={cs._id} value={cs._id}>
-                            {cs.class || cs.grade} - {cs.__section || cs.section || ""}
-                          </option>
-                        ))}
+                        {getFilteredMClasses().map((c: any) => {
+                          const matchedCs = getFilteredClassSections().find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                          const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                          return (
+                            <option key={c._id || c.id} value={c._id || c.id}>
+                              {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
                   )}
@@ -11030,8 +11033,15 @@ export default function App() {
                     {safeNotifications.map((notif: any) => {
                       let targetLabel = "All Students";
                       if (notif.target_type === "class_section") {
-                        const cs = safeClassSections.find(c => c._id === notif.target_class_id);
-                        targetLabel = cs ? `Class: ${cs.class || cs.grade} - ${cs.__section || cs.section || ""}` : "Specific Class Section";
+                        const mClass = getFilteredMClasses().find(c => (c._id === notif.target_class_id || c.id === notif.target_class_id));
+                        if (mClass) {
+                          const matchedCs = getFilteredClassSections().find(cs => cs._id === mClass.class_section_id || cs.id === mClass.class_section_id);
+                          const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                          targetLabel = `Class: ${mClass.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+                        } else {
+                          const cs = safeClassSections.find(c => c._id === notif.target_class_id);
+                          targetLabel = cs ? `Class: ${cs.class || cs.grade} - ${cs.__section || cs.section || ""}` : "Specific Class Section";
+                        }
                       } else if (notif.target_type === "parents_of_student") {
                         const stud = studentsList.find(s => s._id === notif.target_student_id || s.id === notif.target_student_id);
                         targetLabel = stud ? `Parents of: ${stud.name}` : "Parents of Specific Student";
@@ -12964,6 +12974,11 @@ export default function App() {
                     userDirectory={userDirectoryState || []}
                     currentUserId={headerUserId}
                     organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+                    selectedRole={selectedRole}
+                    studentClassRelations={studentClassRelations}
+                    parentStudentRelations={parentStudentRelations}
+                    selectedChildId={selectedChildId}
+                    mClassesList={getFilteredMClasses()}
                   />
                 ) : null;
               })()}
