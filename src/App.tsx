@@ -3363,71 +3363,113 @@ export default function App() {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
 
+      let currentAbsencesList = absencesList;
+      try {
+        const absRes = await fetch("/class/attendance/absence", {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (absRes.ok) {
+          const data = await absRes.json();
+          if (Array.isArray(data)) {
+            currentAbsencesList = data.filter(Boolean);
+            setAbsencesList(currentAbsencesList);
+          }
+        }
+      } catch (e) {
+        console.error("Could not sync absences list in fetchAttendanceHistory:", e);
+      }
+
       const students = customStudentsList || getTeacherClassStudents();
       
       const promises = students.map(async (student: any) => {
         try {
-          const res = await fetch("/class/attendance/lookup", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              studentID: student.username,
-              date: dateStr
-            })
-          });
-          
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data) && data.length > 0) {
-              const record = data[data.length - 1];
-              return {
-                studentID: student.username,
-                name: student.name,
-                phone: student.phone || "N/A",
-                attended: record.attended,
-                marked: true,
-                _id: record._id || record.id || undefined,
-                date: record.date || undefined
-              };
+          const candidateIds = Array.from(new Set([
+            student.username,
+            student._id,
+            student.id,
+            student.user_id,
+            student.student_id,
+            student.regNo,
+            student.reg_no,
+            student.email,
+            (student.email && typeof student.email === "string" && student.email.includes("@")) ? student.email.split("@")[0] : null
+          ].filter(Boolean).map((s: any) => String(s).trim())));
+
+          let foundRecord: any = null;
+
+          for (const candId of candidateIds) {
+            try {
+              const res = await fetch("/class/attendance/lookup", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  studentID: candId,
+                  date: dateStr
+                })
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                  foundRecord = data[data.length - 1];
+                  break;
+                }
+              }
+            } catch (err) {
+              // Ignore single lookup failure and try next candidate ID
             }
           }
 
-          // Fallback check in absencesList
-          const isAbsentInGlobalList = absencesList.some((abs: any) => {
-            if (!abs || !abs.date || abs.studentID !== student.username) return false;
+          if (foundRecord) {
+            const isAttended = foundRecord.attended === true || 
+                               String(foundRecord.attended).toLowerCase() === "true" || 
+                               Number(foundRecord.attended) === 1;
+            return {
+              studentID: student.username || student._id || student.id,
+              name: student.name,
+              phone: student.phone || "N/A",
+              attended: isAttended,
+              marked: true,
+              _id: foundRecord._id || foundRecord.id || undefined,
+              date: foundRecord.date || undefined
+            };
+          }
+
+          // Fallback check in fresh absencesList
+          const matchingAbs = currentAbsencesList.find((abs: any) => {
+            if (!abs || !abs.date) return false;
+            const absSid = String(abs.studentID || abs.student_id || abs.student || "").trim().toLowerCase();
+            const matchesId = candidateIds.some(cid => cid.toLowerCase() === absSid);
+            if (!matchesId) return false;
+
+            let absDateStr = "";
             try {
-              const absDateStr = new Date(abs.date).toISOString().split("T")[0];
-              return absDateStr === dateStr;
-            } catch (e) {
-              return false;
+              absDateStr = new Date(abs.date).toISOString().split("T")[0];
+            } catch {
+              absDateStr = String(abs.date);
             }
+            return absDateStr === dateStr || String(abs.date).startsWith(dateStr);
           });
 
-          if (isAbsentInGlobalList) {
-            const matchingAbs = absencesList.find(abs => {
-              if (!abs || !abs.date || abs.studentID !== student.username) return false;
-              try {
-                return new Date(abs.date).toISOString().split("T")[0] === dateStr;
-              } catch {
-                return false;
-              }
-            });
+          if (matchingAbs) {
             return {
-              studentID: student.username,
+              studentID: student.username || student._id || student.id,
               name: student.name,
               phone: student.phone || "N/A",
               attended: false,
               marked: true,
-              _id: matchingAbs?._id || matchingAbs?.id || undefined,
-              date: matchingAbs?.date || undefined
+              _id: matchingAbs._id || matchingAbs.id || undefined,
+              date: matchingAbs.date || undefined
             };
           }
 
           return {
-            studentID: student.username,
+            studentID: student.username || student._id || student.id,
             name: student.name,
             phone: student.phone || "N/A",
             attended: false,
@@ -3436,7 +3478,7 @@ export default function App() {
         } catch (err) {
           console.error(`Error looking up attendance for ${student.username}:`, err);
           return {
-            studentID: student.username,
+            studentID: student.username || student._id || student.id,
             name: student.name,
             phone: student.phone || "N/A",
             attended: false,
