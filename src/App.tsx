@@ -1525,23 +1525,30 @@ export default function App() {
       // Helper to get assignments for teachers
       const getTeacherClassSubjectAssignmentsLocal = (teacherId: string) => {
         const assignments = (Array.isArray(teacherSubjectClasses) ? teacherSubjectClasses : []).filter(
-          item => item && item.teacher_id === teacherId
+          item => item && (item.teacher_id === teacherId || item.teacherId === teacherId)
         );
         return assignments.map(item => {
-          const csObj = classSectionsList.find(cs => cs._id === item.class_id);
-          let classLabel = "Unknown Class";
-          if (csObj) {
-            classLabel = `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+          const mClassObj = (mClassesList || []).find(c => c && (c._id === item.class_id || c.id === item.class_id));
+          let classLabel = "";
+          if (mClassObj) {
+            const matchedCs = (classSectionsList || []).find(cs => cs._id === mClassObj.class_section_id || cs.id === mClassObj.class_section_id);
+            const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+            classLabel = `${mClassObj.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
           } else {
-            const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
-            const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
-            classLabel = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (item.class_id || "Unknown");
+            const csObj = (classSectionsList || []).find(cs => cs && (cs._id === item.class_id || cs.id === item.class_id || cs._id === item.class_section_id || cs.id === item.class_section_id));
+            if (csObj) {
+              classLabel = `${csObj.class_name || csObj.class || csObj.grade || "Class"} - ${csObj.__section || csObj.section || ""}`;
+            } else {
+              const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+              const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
+              classLabel = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown Class") : "Unknown Class";
+            }
           }
           
           const subObj = (Array.isArray(subjectsList) ? subjectsList : []).find(
             sub => sub && (sub._id === item.subject_id || sub.id === item.subject_id)
           );
-          const subjectLabel = subObj ? (subObj.name || subObj.subject) : item.subject_id;
+          const subjectLabel = subObj ? (subObj.name || subObj.subject) : (item.subject_name || item.subject || "Subject");
           
           return { classLabel, subjectLabel };
         });
@@ -9721,23 +9728,30 @@ export default function App() {
         // helper to get assignments for teachers
         const getTeacherClassSubjectAssignments = (teacherId: string) => {
           const assignments = (Array.isArray(teacherSubjectClasses) ? teacherSubjectClasses : []).filter(
-            item => item && item.teacher_id === teacherId
+            item => item && (item.teacher_id === teacherId || item.teacherId === teacherId)
           );
           return assignments.map(item => {
-            const csObj = classSectionsList.find(cs => cs._id === item.class_id);
-            let classLabel = "Unknown Class";
-            if (csObj) {
-              classLabel = `${csObj.class || csObj.grade} - ${csObj.__section || csObj.section || ""}`;
+            const mClassObj = (mClassesList || []).find(c => c && (c._id === item.class_id || c.id === item.class_id));
+            let classLabel = "";
+            if (mClassObj) {
+              const matchedCs = (classSectionsList || []).find(cs => cs._id === mClassObj.class_section_id || cs.id === mClassObj.class_section_id);
+              const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+              classLabel = `${mClassObj.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
             } else {
-              const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
-              const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
-              classLabel = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown") : (item.class_id || "Unknown");
+              const csObj = (classSectionsList || []).find(cs => cs && (cs._id === item.class_id || cs.id === item.class_id || cs._id === item.class_section_id || cs.id === item.class_section_id));
+              if (csObj) {
+                classLabel = `${csObj.class_name || csObj.class || csObj.grade || "Class"} - ${csObj.__section || csObj.section || ""}`;
+              } else {
+                const gradesList = Array.isArray(dfGrades) ? dfGrades : [];
+                const gradeObj = gradesList.find(g => g && (g._id === item.class_id || g.id === item.class_id || g.grade === item.class_id));
+                classLabel = gradeObj ? (gradeObj.grade || gradeObj.name || "Unknown Class") : "Unknown Class";
+              }
             }
             
             const subObj = (Array.isArray(subjectsList) ? subjectsList : []).find(
               sub => sub && (sub._id === item.subject_id || sub.id === item.subject_id)
             );
-            const subjectLabel = subObj ? (subObj.name || subObj.subject) : item.subject_id;
+            const subjectLabel = subObj ? (subObj.name || subObj.subject) : (item.subject_name || item.subject || "Subject");
             
             return {
               classLabel,
