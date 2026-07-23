@@ -37,38 +37,135 @@ export default function AdminLeavesView({
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Helper: Format teacher name
-  const getTeacherName = (teacherId: string) => {
-    if (!teacherId) return "Unknown Teacher";
-    const t = userDirectory.find((u: any) => u && (u._id === teacherId || u.id === teacherId));
-    if (!t) return "Unknown Instructor";
-    const first = t.first_name || "";
-    const last = t.last_name || "";
-    return `${first} ${last}`.trim() || t.username || "Instructor";
+  // Helper: Find teacher record in userDirectory by any ID/code/username/email variant or name
+  const findTeacher = (teacherId: any, teacherName?: string) => {
+    if (!userDirectory || userDirectory.length === 0) return null;
+
+    let targetIdStr = "";
+    if (typeof teacherId === "object" && teacherId !== null) {
+      targetIdStr = String(teacherId._id || teacherId.id || "").trim().toLowerCase();
+    } else {
+      targetIdStr = String(teacherId || "").trim().toLowerCase();
+    }
+
+    const targetNameStr = String(teacherName || "").trim().toLowerCase();
+
+    return userDirectory.find((u: any) => {
+      if (!u) return false;
+      const uId = String(u._id || u.id || "").trim().toLowerCase();
+      const uUserId = String(u.user_id || "").trim().toLowerCase();
+      const uTeacherId = String(u.teacher_id || "").trim().toLowerCase();
+      const uUsername = String(u.username || "").trim().toLowerCase();
+      const uEmail = String(u.email || "").trim().toLowerCase();
+      const uNic = String(u.nic || u.employee_id || u.regNo || u.reg_no || "").trim().toLowerCase();
+
+      // Check ID & credential matches
+      if (targetIdStr) {
+        if (
+          uId === targetIdStr ||
+          uUserId === targetIdStr ||
+          uTeacherId === targetIdStr ||
+          uUsername === targetIdStr ||
+          uEmail === targetIdStr ||
+          uNic === targetIdStr
+        ) {
+          return true;
+        }
+      }
+
+      // Check name match
+      if (targetNameStr) {
+        const fullName = `${u.first_name || ""} ${u.last_name || ""}`.trim().toLowerCase();
+        const displayName = String(u.name || "").trim().toLowerCase();
+        if (fullName === targetNameStr || displayName === targetNameStr || uUsername === targetNameStr) {
+          return true;
+        }
+      }
+
+      return false;
+    });
   };
 
-  // Helper: Get Teacher Email / Username
-  const getTeacherContact = (teacherId: string) => {
-    const t = userDirectory.find((u: any) => u && (u._id === teacherId || u.id === teacherId));
-    return t ? t.email || t.username : "";
+  // Helper: Format teacher name
+  const getTeacherName = (leave: LeaveRequest) => {
+    if (leave.teacher_name && leave.teacher_name.trim()) {
+      return leave.teacher_name.trim();
+    }
+    const t = findTeacher(leave.teacher_id, leave.teacher_name);
+    if (t) {
+      const first = t.first_name || "";
+      const last = t.last_name || "";
+      const full = `${first} ${last}`.trim();
+      if (full) return full;
+      if (t.name) return t.name;
+      if (t.username) return t.username;
+    }
+    if (leave.teacher_id) {
+      return `Instructor (${leave.teacher_id})`;
+    }
+    return "Unknown Instructor";
+  };
+
+  // Helper: Get Teacher Email / Contact Info
+  const getTeacherContact = (leave: LeaveRequest) => {
+    const t = findTeacher(leave.teacher_id, leave.teacher_name);
+    if (t) {
+      return t.email || t.username || t.phone || "";
+    }
+    return leave.teacher_id || "";
+  };
+
+  // Helper: Normalize Organization ID
+  const normalizeOrgId = (id: any): string => {
+    if (!id) return "";
+    if (typeof id === "object") {
+      id = id._id || id.id || id;
+    }
+    return String(id).trim().toLowerCase();
+  };
+
+  // Helper: Normalize Status Case
+  const normalizeStatus = (status: any): "Pending" | "Approved" | "Rejected" => {
+    if (!status) return "Pending";
+    const str = String(status).trim().toLowerCase();
+    if (str === "approved") return "Approved";
+    if (str === "rejected" || str === "declined") return "Rejected";
+    return "Pending";
   };
 
   // Fetch Leaves
   const fetchLeaves = async () => {
     setIsLoading(true);
     try {
+      const currentOrgId = adminOrganizationId;
       const res = await fetch("/rel/teacherLeave/retrieve", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({})
+        body: JSON.stringify(currentOrgId ? { organization_id: currentOrgId } : {})
       });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setLeaves(data.filter(Boolean));
+          // Merge API results with local cache to be safe against offline network drops
+          const local = localStorage.getItem("abms_rel_teacher_leaves");
+          const localList: LeaveRequest[] = local ? JSON.parse(local) : [];
+          
+          const map = new Map<string, LeaveRequest>();
+          data.filter(Boolean).forEach((item: any) => {
+            const key = String(item._id || item.id || Math.random());
+            map.set(key, item);
+          });
+          localList.filter(Boolean).forEach((item: any) => {
+            const key = String(item._id || item.id || "");
+            if (key && !map.has(key)) {
+              map.set(key, item);
+            }
+          });
+
+          setLeaves(Array.from(map.values()));
           setIsLoading(false);
           return;
         }
@@ -89,7 +186,7 @@ export default function AdminLeavesView({
 
   useEffect(() => {
     fetchLeaves();
-  }, [token]);
+  }, [token, adminOrganizationId]);
 
   // Handle Approve / Reject Leave Decision
   const handleUpdateStatus = async (leafId: string, newStatus: "Approved" | "Rejected") => {
@@ -102,7 +199,7 @@ export default function AdminLeavesView({
 
     try {
       const res = await fetch(`/rel/teacherLeave/update/${leafId}`, {
-        method: "POST", // or PUT depending on design, POST is safe for generic endpoint update
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
@@ -110,7 +207,25 @@ export default function AdminLeavesView({
         body: JSON.stringify({ status: newStatus })
       });
       if (res.ok) {
-        setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} and saved in MongoDB Atlas!`);
+        setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} and saved in database!`);
+        // Update local state directly for responsive UI
+        setLeaves(prev => prev.map(item => {
+          if ((item._id && item._id === leafId) || (item.id && item.id === leafId)) {
+            return { ...item, status: newStatus };
+          }
+          return item;
+        }));
+        const local = localStorage.getItem("abms_rel_teacher_leaves");
+        if (local) {
+          const currentList: LeaveRequest[] = JSON.parse(local);
+          const updated = currentList.map((item: LeaveRequest) => {
+            if (item._id === leafId || item.id === leafId) {
+              return { ...item, status: newStatus };
+            }
+            return item;
+          });
+          localStorage.setItem("abms_rel_teacher_leaves", JSON.stringify(updated));
+        }
         await fetchLeaves();
         setIsProcessingId(null);
         return;
@@ -123,15 +238,13 @@ export default function AdminLeavesView({
       apiErrorMsg = err.message || "Network connection failure";
     }
 
-    // If API returned a failure (e.g. status 400 or 500) rather than a network disconnect,
-    // let's show the actual error instead of silently using local storage fallback.
     if (apiErrorMsg && apiErrorMsg !== "Failed to fetch" && !apiErrorMsg.includes("Network")) {
       setErrorMsg(`API Status Update Failed: ${apiErrorMsg}`);
       setIsProcessingId(null);
       return;
     }
 
-    // Local Storage Fallback Update (only on offline network failures)
+    // Local Storage Fallback Update
     const local = localStorage.getItem("abms_rel_teacher_leaves");
     if (local) {
       const currentList: LeaveRequest[] = JSON.parse(local);
@@ -143,9 +256,8 @@ export default function AdminLeavesView({
       });
       localStorage.setItem("abms_rel_teacher_leaves", JSON.stringify(updated));
       setLeaves(updated);
-      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} (Offline fallback mode: Saved locally in browser cache)!`);
+      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} (Saved locally in browser cache)!`);
     } else {
-      // If none existed but they updated some UI array
       const updated = leaves.map((item: LeaveRequest) => {
         if (item._id === leafId || item.id === leafId) {
           return { ...item, status: newStatus };
@@ -154,70 +266,60 @@ export default function AdminLeavesView({
       });
       setLeaves(updated);
       localStorage.setItem("abms_rel_teacher_leaves", JSON.stringify(updated));
-      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} (Offline fallback mode: Saved locally in browser cache)!`);
+      setSuccessMsg(`Leave request successfully ${newStatus.toLowerCase()} (Saved locally in browser cache)!`);
     }
     setIsProcessingId(null);
   };
 
-  // Filter leaves with robust normalization and tenant safety
-  const normalizeOrgId = (id: any): string => {
-    if (!id) return "";
-    const idStr = String(id).trim().toLowerCase();
-    if (idStr === "6a489ad4de9f134ee6c3b5ef") {
-      return "6a48a06fde9f134ee6c3d763";
-    }
-    return idStr;
-  };
-
+  // Filter leaves with robust tenant matching and fallback safety
   const filteredLeaves = leaves.filter((l) => {
     if (!l) return false;
 
-    // Filter by organization
+    // Filter by organization if specified for admin
     if (adminOrganizationId) {
       const targetOrg = normalizeOrgId(adminOrganizationId);
       const leafOrg = l.organization_id ? normalizeOrgId(l.organization_id) : "";
-      
-      if (leafOrg && leafOrg !== targetOrg) {
-        return false;
-      }
-      if (!leafOrg) {
-        const teacher = userDirectory.find((u: any) => u && (u._id === l.teacher_id || u.id === l.teacher_id));
-        if (!teacher) {
-          return false; // Safe fallback: filter out if teacher cannot be found
-        }
-        const teacherOrg = teacher.organization_id ? normalizeOrgId(teacher.organization_id) : "";
-        if (teacherOrg && teacherOrg !== targetOrg) {
+
+      if (leafOrg) {
+        if (leafOrg !== targetOrg) {
           return false;
         }
+      } else {
+        const teacher = findTeacher(l.teacher_id, l.teacher_name);
+        if (teacher && teacher.organization_id) {
+          const teacherOrg = normalizeOrgId(teacher.organization_id);
+          if (teacherOrg !== targetOrg) {
+            return false;
+          }
+        }
+        // If teacher is not found or teacher has no organization_id, keep the leave request
+        // so requests posted via Postman/API for this org are shown!
       }
     }
 
+    const normStatus = normalizeStatus(l.status);
     if (statusFilter === "All") return true;
-    return l.status === statusFilter;
+    return normStatus === statusFilter;
   });
 
   // Count items
-  const countByStatus = (status: string) => {
+  const countByStatus = (status: "Pending" | "Approved" | "Rejected") => {
     return leaves.filter((l) => {
       if (!l) return false;
-      if (l.status !== status) return false;
+      const normStatus = normalizeStatus(l.status);
+      if (normStatus !== status) return false;
 
-      // Filter by organization
       if (adminOrganizationId) {
         const targetOrg = normalizeOrgId(adminOrganizationId);
         const leafOrg = l.organization_id ? normalizeOrgId(l.organization_id) : "";
-        
-        if (leafOrg && leafOrg !== targetOrg) {
-          return false;
-        }
-        if (!leafOrg) {
-          const teacher = userDirectory.find((u: any) => u && (u._id === l.teacher_id || u.id === l.teacher_id));
-          if (!teacher) {
-            return false; // Safe fallback
-          }
-          const teacherOrg = teacher.organization_id ? normalizeOrgId(teacher.organization_id) : "";
-          if (teacherOrg && teacherOrg !== targetOrg) {
-            return false;
+
+        if (leafOrg) {
+          if (leafOrg !== targetOrg) return false;
+        } else {
+          const teacher = findTeacher(l.teacher_id, l.teacher_name);
+          if (teacher && teacher.organization_id) {
+            const teacherOrg = normalizeOrgId(teacher.organization_id);
+            if (teacherOrg !== targetOrg) return false;
           }
         }
       }
@@ -330,9 +432,8 @@ export default function AdminLeavesView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <AnimatePresence initial={false}>
                 {filteredLeaves.map((l, idx) => {
-                  const teacherId = l.teacher_id;
-                  const name = getTeacherName(teacherId);
-                  const contact = getTeacherContact(teacherId);
+                  const name = getTeacherName(l);
+                  const contact = getTeacherContact(l);
 
                   return (
                     <motion.div

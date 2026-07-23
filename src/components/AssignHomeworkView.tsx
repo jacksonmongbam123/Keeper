@@ -16,12 +16,14 @@ import {
 interface AssignHomeworkViewProps {
   token: string;
   classSectionsList: any[];
+  mClassesList?: any[];
   subjectsList: any[];
 }
 
 export default function AssignHomeworkView({
   token,
   classSectionsList = [],
+  mClassesList = [],
   subjectsList = [],
 }: AssignHomeworkViewProps) {
   // Form State
@@ -268,14 +270,26 @@ export default function AssignHomeworkView({
                 setErrorMsg("");
                 setSuccessMsg("");
               }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 text-slate-700 font-medium"
             >
               <option value="">-- Choose Class Section --</option>
-              {classSectionsList.map((cs: any) => (
-                <option key={cs._id || cs.id} value={cs._id || cs.id}>
-                  {cs.class || cs.grade} - {cs.__section || cs.section || "N/A"}
-                </option>
-              ))}
+              {mClassesList && mClassesList.length > 0 ? (
+                mClassesList.map((c: any) => {
+                  const matchedCs = (classSectionsList || []).find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                  const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                  return (
+                    <option key={c._id || c.id} value={c._id || c.id}>
+                      {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                    </option>
+                  );
+                })
+              ) : (
+                classSectionsList.map((cs: any) => (
+                  <option key={cs._id || cs.id} value={cs._id || cs.id}>
+                    {cs.class_name || cs.class || cs.grade || "Class"} - {cs.__section || cs.section || "N/A"}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -401,8 +415,14 @@ export default function AssignHomeworkView({
           {selectedClassId && (
             <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200 uppercase">
               Class: {(() => {
+                const mc = (mClassesList || []).find(item => (item._id || item.id) === selectedClassId);
+                if (mc) {
+                  const matchedCs = (classSectionsList || []).find(cs => cs._id === mc.class_section_id || cs.id === mc.class_section_id);
+                  const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                  return `${mc.class_name}${sectionName ? ` - ${sectionName}` : ""}`;
+                }
                 const c = classSectionsList.find(item => (item._id || item.id) === selectedClassId);
-                return c ? (c.class || c.grade || "N/A") : "N/A";
+                return c ? (c.class_name || c.class || c.grade || "N/A") : "N/A";
               })()}
             </span>
           )}

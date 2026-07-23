@@ -409,6 +409,9 @@ export default function App() {
   const [marksFilterSubject, setMarksFilterSubject] = useState<string>("");
   const [marksFilterStudent, setMarksFilterStudent] = useState<string>("");
 
+  // Teacher Overview Class Filter State
+  const [teacherSelectedClassId, setTeacherSelectedClassId] = useState<string>("");
+
   // df_marks_grade Local Storage Persistence & Fallback
   const [dfMarksGrades, setDfMarksGrades] = useState<any[]>(() => {
     const saved = localStorage.getItem("abms_df_marks_grades");
@@ -3236,7 +3239,116 @@ export default function App() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState("");
 
-  const fetchAttendanceHistory = async (dateStr: string) => {
+  // Helper to compute class-filtered students for teacher/instructor role
+  const getTeacherClassStudents = (customDirectory?: any[]) => {
+    const directory = customDirectory || userDirectoryState || [];
+    const allStudents = directory.filter((u: any) => u && String(u.role).toLowerCase() === "student");
+    if (selectedRole !== "instructor") {
+      return allStudents;
+    }
+
+    const teacherUser = loginResult?.data?.user;
+    const teacherIds = new Set<string>();
+    if (teacherUser) {
+      if (teacherUser._id) teacherIds.add(String(teacherUser._id).trim().toLowerCase());
+      if (teacherUser.id) teacherIds.add(String(teacherUser.id).trim().toLowerCase());
+      if (teacherUser.user_id) teacherIds.add(String(teacherUser.user_id).trim().toLowerCase());
+      if (teacherUser.teacher_id) teacherIds.add(String(teacherUser.teacher_id).trim().toLowerCase());
+      if (teacherUser.username) teacherIds.add(String(teacherUser.username).trim().toLowerCase());
+      if (teacherUser.email) {
+        const em = String(teacherUser.email).trim().toLowerCase();
+        teacherIds.add(em);
+        if (em.includes("@")) teacherIds.add(em.split("@")[0]);
+      }
+    }
+    try {
+      const savedSession = JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.user;
+      if (savedSession) {
+        if (savedSession._id) teacherIds.add(String(savedSession._id).trim().toLowerCase());
+        if (savedSession.id) teacherIds.add(String(savedSession.id).trim().toLowerCase());
+        if (savedSession.user_id) teacherIds.add(String(savedSession.user_id).trim().toLowerCase());
+        if (savedSession.teacher_id) teacherIds.add(String(savedSession.teacher_id).trim().toLowerCase());
+        if (savedSession.username) teacherIds.add(String(savedSession.username).trim().toLowerCase());
+        if (savedSession.email) {
+          const em = String(savedSession.email).trim().toLowerCase();
+          teacherIds.add(em);
+          if (em.includes("@")) teacherIds.add(em.split("@")[0]);
+        }
+      }
+    } catch (e) {}
+
+    const teacherAssignedClassIds = new Set<string>();
+    if (Array.isArray(teacherSubjectClasses)) {
+      teacherSubjectClasses.forEach((tsc: any) => {
+        if (!tsc) return;
+        const tId = String(tsc.teacher_id || "").trim().toLowerCase();
+        if (teacherIds.has(tId) || (tId.includes("@") && teacherIds.has(tId.split("@")[0]))) {
+          if (tsc.class_id) teacherAssignedClassIds.add(String(tsc.class_id).trim().toLowerCase());
+          if (tsc.class_section_id) teacherAssignedClassIds.add(String(tsc.class_section_id).trim().toLowerCase());
+          if (tsc.m_class_id) teacherAssignedClassIds.add(String(tsc.m_class_id).trim().toLowerCase());
+        }
+      });
+    }
+
+    let targetClassIdsForTeacher = new Set<string>();
+    if (teacherSelectedClassId && teacherSelectedClassId !== "all") {
+      targetClassIdsForTeacher.add(teacherSelectedClassId.toLowerCase());
+      const matchedMClass = (mClassesList || []).find((c: any) => String(c._id || c.id).toLowerCase() === teacherSelectedClassId.toLowerCase());
+      if (matchedMClass && matchedMClass.class_section_id) {
+        targetClassIdsForTeacher.add(String(matchedMClass.class_section_id).toLowerCase());
+      }
+    } else if (teacherAssignedClassIds.size > 0) {
+      targetClassIdsForTeacher = new Set(teacherAssignedClassIds);
+    }
+
+    return allStudents.filter((u: any) => {
+      if (!u) return false;
+      if (targetClassIdsForTeacher.size === 0) return true;
+
+      const sIds = new Set<string>();
+      if (u._id) sIds.add(String(u._id).trim().toLowerCase());
+      if (u.id) sIds.add(String(u.id).trim().toLowerCase());
+      if (u.user_id) sIds.add(String(u.user_id).trim().toLowerCase());
+      if (u.student_id) sIds.add(String(u.student_id).trim().toLowerCase());
+      if (u.username) sIds.add(String(u.username).trim().toLowerCase());
+      if (u.email) {
+        const em = String(u.email).trim().toLowerCase();
+        sIds.add(em);
+        if (em.includes("@")) sIds.add(em.split("@")[0]);
+      }
+      if (u.regNo || u.reg_no) sIds.add(String(u.regNo || u.reg_no).trim().toLowerCase());
+
+      const studentClassIds = new Set<string>();
+      if (Array.isArray(studentClassRelations)) {
+        studentClassRelations.forEach((rel: any) => {
+          if (!rel) return;
+          const relStudentId = rel.student_id && typeof rel.student_id === "object"
+            ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
+            : String(rel.student_id || "").trim().toLowerCase();
+
+          if (sIds.has(relStudentId) || (relStudentId.includes("@") && sIds.has(relStudentId.split("@")[0]))) {
+            if (rel.class_id) studentClassIds.add(String(rel.class_id).trim().toLowerCase());
+            if (rel.class_section_id) studentClassIds.add(String(rel.class_section_id).trim().toLowerCase());
+            if (rel.m_class_id) studentClassIds.add(String(rel.m_class_id).trim().toLowerCase());
+          }
+        });
+      }
+
+      if (u.class_id) studentClassIds.add(String(u.class_id).trim().toLowerCase());
+      if (u.class_section_id) studentClassIds.add(String(u.class_section_id).trim().toLowerCase());
+
+      for (const scId of studentClassIds) {
+        if (targetClassIdsForTeacher.has(scId)) return true;
+        const matchedMClass = (mClassesList || []).find((c: any) => String(c._id || c.id).toLowerCase() === scId);
+        if (matchedMClass && matchedMClass.class_section_id && targetClassIdsForTeacher.has(String(matchedMClass.class_section_id).toLowerCase())) {
+          return true;
+        }
+      }
+      return false;
+    });
+  };
+
+  const fetchAttendanceHistory = async (dateStr: string, customStudentsList?: any[]) => {
     if (!dateStr) return;
     setHistoryLoading(true);
     setHistoryError("");
@@ -3244,7 +3356,7 @@ export default function App() {
       const token = loginResult?.data?.token || JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.token || "";
       if (!token) return;
 
-      const students = (userDirectoryState || []).filter((u: any) => u && u.role === "student");
+      const students = customStudentsList || getTeacherClassStudents();
       
       const promises = students.map(async (student: any) => {
         try {
@@ -3338,9 +3450,9 @@ export default function App() {
 
   useEffect(() => {
     if (selectedRole === "instructor" && activeTab === "attendance-history" && userDirectoryState && userDirectoryState.length > 0) {
-      fetchAttendanceHistory(historyDate);
+      fetchAttendanceHistory(historyDate, getTeacherClassStudents());
     }
-  }, [historyDate, activeTab, userDirectoryState, selectedRole]);
+  }, [historyDate, activeTab, userDirectoryState, selectedRole, teacherSelectedClassId, teacherSubjectClasses, studentClassRelations]);
 
   const handleInlineAttendanceMark = async (studentID: string, attended: boolean) => {
     try {
@@ -5433,11 +5545,163 @@ export default function App() {
 
       // Instructor views
       if (selectedRole === "instructor") {
+        // Compute teacher class-filtered students
+        const teacherUser = loginResult?.data?.user;
+        const teacherIds = new Set<string>();
+        if (teacherUser) {
+          if (teacherUser._id) teacherIds.add(String(teacherUser._id).trim().toLowerCase());
+          if (teacherUser.id) teacherIds.add(String(teacherUser.id).trim().toLowerCase());
+          if (teacherUser.user_id) teacherIds.add(String(teacherUser.user_id).trim().toLowerCase());
+          if (teacherUser.teacher_id) teacherIds.add(String(teacherUser.teacher_id).trim().toLowerCase());
+          if (teacherUser.username) teacherIds.add(String(teacherUser.username).trim().toLowerCase());
+          if (teacherUser.email) {
+            const em = String(teacherUser.email).trim().toLowerCase();
+            teacherIds.add(em);
+            if (em.includes("@")) teacherIds.add(em.split("@")[0]);
+          }
+        }
+        try {
+          const savedSession = JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.user;
+          if (savedSession) {
+            if (savedSession._id) teacherIds.add(String(savedSession._id).trim().toLowerCase());
+            if (savedSession.id) teacherIds.add(String(savedSession.id).trim().toLowerCase());
+            if (savedSession.user_id) teacherIds.add(String(savedSession.user_id).trim().toLowerCase());
+            if (savedSession.teacher_id) teacherIds.add(String(savedSession.teacher_id).trim().toLowerCase());
+            if (savedSession.username) teacherIds.add(String(savedSession.username).trim().toLowerCase());
+            if (savedSession.email) {
+              const em = String(savedSession.email).trim().toLowerCase();
+              teacherIds.add(em);
+              if (em.includes("@")) teacherIds.add(em.split("@")[0]);
+            }
+          }
+        } catch (e) {}
+
+        // Assigned class IDs for logged-in teacher from teacherSubjectClasses
+        const teacherAssignedClassIds = new Set<string>();
+        if (Array.isArray(teacherSubjectClasses)) {
+          teacherSubjectClasses.forEach((tsc: any) => {
+            if (!tsc) return;
+            const tId = String(tsc.teacher_id || "").trim().toLowerCase();
+            if (teacherIds.has(tId) || (tId.includes("@") && teacherIds.has(tId.split("@")[0]))) {
+              if (tsc.class_id) teacherAssignedClassIds.add(String(tsc.class_id).trim().toLowerCase());
+              if (tsc.class_section_id) teacherAssignedClassIds.add(String(tsc.class_section_id).trim().toLowerCase());
+              if (tsc.m_class_id) teacherAssignedClassIds.add(String(tsc.m_class_id).trim().toLowerCase());
+            }
+          });
+        }
+
+        // Build teacher mClasses list for dropdown
+        const teacherMClasses = (mClassesList || []).filter((c: any) => {
+          if (!c) return false;
+          const cId = String(c._id || c.id || "").toLowerCase();
+          const csId = String(c.class_section_id || "").toLowerCase();
+          if (teacherAssignedClassIds.size > 0) {
+            return teacherAssignedClassIds.has(cId) || teacherAssignedClassIds.has(csId);
+          }
+          return true;
+        });
+
+        // Determine target class IDs for filtering students
+        let targetClassIdsForTeacher = new Set<string>();
+        if (teacherSelectedClassId && teacherSelectedClassId !== "all") {
+          targetClassIdsForTeacher.add(teacherSelectedClassId.toLowerCase());
+          const matchedMClass = (mClassesList || []).find((c: any) => String(c._id || c.id).toLowerCase() === teacherSelectedClassId.toLowerCase());
+          if (matchedMClass && matchedMClass.class_section_id) {
+            targetClassIdsForTeacher.add(String(matchedMClass.class_section_id).toLowerCase());
+          }
+        } else if (teacherAssignedClassIds.size > 0) {
+          targetClassIdsForTeacher = new Set(teacherAssignedClassIds);
+        }
+
+        // Filter students belonging to teacher's class(es)
+        const teacherClassStudents = getTeacherClassStudents(userDirectory);
+
+        // Compute student ID set for teacher's class(es)
+        const teacherClassStudentIdSet = new Set<string>();
+        teacherClassStudents.forEach(s => {
+          if (!s) return;
+          if (s._id) teacherClassStudentIdSet.add(String(s._id).trim().toLowerCase());
+          if (s.id) teacherClassStudentIdSet.add(String(s.id).trim().toLowerCase());
+          if (s.user_id) teacherClassStudentIdSet.add(String(s.user_id).trim().toLowerCase());
+          if (s.student_id) teacherClassStudentIdSet.add(String(s.student_id).trim().toLowerCase());
+          if (s.username) teacherClassStudentIdSet.add(String(s.username).trim().toLowerCase());
+          if (s.email) {
+            const em = String(s.email).trim().toLowerCase();
+            teacherClassStudentIdSet.add(em);
+            if (em.includes("@")) teacherClassStudentIdSet.add(em.split("@")[0]);
+          }
+          if (s.regNo || s.reg_no) teacherClassStudentIdSet.add(String(s.regNo || s.reg_no).trim().toLowerCase());
+        });
+
+        // Collect linked parent IDs from parentStudentRelations and student records
+        const linkedParentIds = new Set<string>();
+        if (Array.isArray(parentStudentRelations)) {
+          parentStudentRelations.forEach((rel: any) => {
+            if (!rel) return;
+            const relStudentId = rel.student_id && typeof rel.student_id === "object"
+              ? String(rel.student_id._id || rel.student_id.id || "").trim().toLowerCase()
+              : String(rel.student_id || "").trim().toLowerCase();
+
+            if (teacherClassStudentIdSet.has(relStudentId) || (relStudentId.includes("@") && teacherClassStudentIdSet.has(relStudentId.split("@")[0]))) {
+              if (rel.parent_id) {
+                const pId = typeof rel.parent_id === "object"
+                  ? String(rel.parent_id._id || rel.parent_id.id || "").trim().toLowerCase()
+                  : String(rel.parent_id || "").trim().toLowerCase();
+                if (pId) linkedParentIds.add(pId);
+              }
+            }
+          });
+        }
+
+        teacherClassStudents.forEach((s: any) => {
+          if (!s) return;
+          ['parent_id', 'father_id', 'mother_id', 'guardian_id', 'parentUser_id'].forEach(key => {
+            if (s[key]) {
+              const pVal = typeof s[key] === 'object'
+                ? String(s[key]._id || s[key].id || '').trim().toLowerCase()
+                : String(s[key]).trim().toLowerCase();
+              if (pVal) linkedParentIds.add(pVal);
+            }
+          });
+        });
+
+        // Filter registered parents belonging to teacher's class(es)
+        const teacherClassParents = userDirectory.filter(u => {
+          if (!u || u.role !== "parents") return false;
+          if (targetClassIdsForTeacher.size === 0) return true;
+
+          const pIds = new Set<string>();
+          if (u._id) pIds.add(String(u._id).trim().toLowerCase());
+          if (u.id) pIds.add(String(u.id).trim().toLowerCase());
+          if (u.user_id) pIds.add(String(u.user_id).trim().toLowerCase());
+          if (u.parent_id) pIds.add(String(u.parent_id).trim().toLowerCase());
+          if (u.username) pIds.add(String(u.username).trim().toLowerCase());
+          if (u.email) {
+            const em = String(u.email).trim().toLowerCase();
+            pIds.add(em);
+            if (em.includes("@")) pIds.add(em.split("@")[0]);
+          }
+
+          for (const pId of pIds) {
+            if (linkedParentIds.has(pId)) return true;
+          }
+
+          if (u.student_id && teacherClassStudentIdSet.has(String(u.student_id).trim().toLowerCase())) return true;
+          if (Array.isArray(u.children)) {
+            for (const ch of u.children) {
+              const chId = typeof ch === 'object' ? String(ch._id || ch.id || '').trim().toLowerCase() : String(ch).trim().toLowerCase();
+              if (chId && teacherClassStudentIdSet.has(chId)) return true;
+            }
+          }
+
+          return false;
+        });
+
         if (activeTab === "overview") {
-          const studentCount = userDirectory.filter(u => u.role === "student").length;
-          const teacherCount = userDirectory.filter(u => u.role === "instructor").length;
-          const parentCount = userDirectory.filter(u => u.role === "parents").length;
-          const activeClassesCount = getFilteredClassSections().length;
+          const studentCount = teacherClassStudents.length;
+          const teacherCount = userDirectory.filter(u => u && u.role === "instructor").length;
+          const parentCount = teacherClassParents.length;
+          const activeClassesCount = teacherMClasses.length > 0 ? teacherMClasses.length : getFilteredClassSections().length;
           const currentUserId = loginResult?.data?.user?.user_id || loginResult?.data?.user?._id || loginResult?.data?.user?.id || "";
           
           // Count leaves for the logged-in teacher
@@ -5473,6 +5737,32 @@ export default function App() {
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Class Cohort Selector Header Bar */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Class Cohort Filter:</span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <select
+                    value={teacherSelectedClassId}
+                    onChange={(e) => setTeacherSelectedClassId(e.target.value)}
+                    className="w-full sm:w-64 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                  >
+                    <option value="all">All Assigned Classes ({teacherClassStudents.length} Students)</option>
+                    {teacherMClasses.map((c: any) => {
+                      const matchedCs = (classSectionsList || []).find(cs => cs._id === c.class_section_id || cs.id === c.class_section_id);
+                      const sectionName = matchedCs ? (matchedCs.__section || matchedCs.section || "") : "";
+                      return (
+                        <option key={c._id || c.id} value={c._id || c.id}>
+                          {c.class_name}{sectionName ? ` - ${sectionName}` : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
 
@@ -5516,9 +5806,9 @@ export default function App() {
               {/* Stats Bento Grid */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                 {[
-                  { label: "Overall Students", val: studentCount, desc: "Total enrolled students", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50 border-cyan-100/70", tab: "roster" },
+                  { label: "Overall Students", val: studentCount, desc: "Students in selected class", icon: GraduationCap, color: "text-cyan-600 bg-cyan-50 border-cyan-100/70", tab: "roster" },
                   { label: "Faculty Instructors", val: teacherCount, desc: "Assigned course teachers", icon: Users, color: "text-emerald-600 bg-emerald-50 border-emerald-100/70", tab: "roster" },
-                  { label: "Registered Parents", val: parentCount, desc: "Active linked parents", icon: Users, color: "text-violet-600 bg-violet-50 border-violet-100/70", tab: "roster" },
+                  { label: "Registered Parents", val: parentCount, desc: "Parents of selected class", icon: Users, color: "text-violet-600 bg-violet-50 border-violet-100/70", tab: "roster" },
                   { label: "Class Cohorts", val: activeClassesCount, desc: "Configured study batches", icon: ClipboardList, color: "text-amber-600 bg-amber-50 border-amber-100/70", tab: "view-timetable" },
                   { label: "My Leaves Filed", val: myLeavesCount, desc: `${pendingLeavesCount} awaiting approval`, icon: FileText, color: "text-pink-600 bg-pink-50 border-pink-100/70", tab: "request-leave" }
                 ].map((item, idx) => {
@@ -5613,7 +5903,7 @@ export default function App() {
         }
 
         if (activeTab === "roster") {
-          const filtered = userDirectory.filter(u => u.role === "student" && (u.name.toLowerCase().includes(lowerQuery) || u.username.toLowerCase().includes(lowerQuery)));
+          const filtered = teacherClassStudents.filter(u => u && u.name && (u.name.toLowerCase().includes(lowerQuery) || (u.username && u.username.toLowerCase().includes(lowerQuery))));
           return (
             <div className="space-y-4">
               <div className="flex items-center gap-2 max-w-md bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-sm">
@@ -5668,7 +5958,7 @@ export default function App() {
         }
 
         if (activeTab === "attendance") {
-          const students = userDirectory.filter(u => u.role === "student");
+          const students = getTeacherClassStudents(userDirectory);
           const filteredStudents = students.filter(s => 
             s.name.toLowerCase().includes(attSearchQuery.toLowerCase()) || 
             s.username.toLowerCase().includes(attSearchQuery.toLowerCase())
@@ -6125,6 +6415,7 @@ export default function App() {
               <AssignHomeworkView 
                 token={token}
                 classSectionsList={getFilteredClassSections()}
+                mClassesList={getFilteredMClasses()}
                 subjectsList={getFilteredSubjects()}
               />
             </div>
@@ -6179,6 +6470,8 @@ export default function App() {
                 currentUserId={currentUserId}
                 teacherName={teacherName}
                 organizationId={adminOrganizationId || loginResult?.data?.user?.organization_id}
+                currentUser={loginResult?.data?.user}
+                userDirectory={userDirectoryState}
               />
             </div>
           );

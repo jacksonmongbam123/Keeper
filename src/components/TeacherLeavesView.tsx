@@ -18,6 +18,8 @@ interface TeacherLeavesViewProps {
   currentUserId: string;
   teacherName?: string;
   organizationId?: string;
+  currentUser?: any;
+  userDirectory?: any[];
 }
 
 export interface LeaveRequest {
@@ -38,7 +40,9 @@ export default function TeacherLeavesView({
   token,
   currentUserId,
   teacherName,
-  organizationId
+  organizationId,
+  currentUser,
+  userDirectory
 }: TeacherLeavesViewProps) {
   const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -54,9 +58,116 @@ export default function TeacherLeavesView({
   const [leaveType, setLeaveType] = useState("Casual Leave");
   const [reason, setReason] = useState("");
 
+  // Helper: Match if a leave request belongs to the current teacher across all identifier variants
+  const isTeacherMatch = (l: LeaveRequest) => {
+    if (!l) return false;
+
+    const leaveTeacherId = String(l.teacher_id || "").trim().toLowerCase();
+    const leaveTeacherName = String(l.teacher_name || "").trim().toLowerCase();
+
+    // Collect all possible teacher identifiers & names in lowercase
+    const idsToCheck = new Set<string>();
+    const namesToCheck = new Set<string>();
+
+    const addIdentities = (u: any) => {
+      if (!u) return;
+      if (u._id) idsToCheck.add(String(u._id).trim().toLowerCase());
+      if (u.id) idsToCheck.add(String(u.id).trim().toLowerCase());
+      if (u.user_id) idsToCheck.add(String(u.user_id).trim().toLowerCase());
+      if (u.teacher_id) idsToCheck.add(String(u.teacher_id).trim().toLowerCase());
+      if (u.username) idsToCheck.add(String(u.username).trim().toLowerCase());
+      if (u.email) {
+        const em = String(u.email).trim().toLowerCase();
+        idsToCheck.add(em);
+        if (em.includes("@")) {
+          idsToCheck.add(em.split("@")[0]);
+        }
+      }
+      if (u.nic) idsToCheck.add(String(u.nic).trim().toLowerCase());
+      if (u.employee_id) idsToCheck.add(String(u.employee_id).trim().toLowerCase());
+      if (u.regNo || u.reg_no) idsToCheck.add(String(u.regNo || u.reg_no).trim().toLowerCase());
+
+      const first = u.first_name || "";
+      const last = u.last_name || "";
+      const full = `${first} ${last}`.trim().toLowerCase();
+      if (full) namesToCheck.add(full);
+      if (u.name) namesToCheck.add(String(u.name).trim().toLowerCase());
+      if (u.username) namesToCheck.add(String(u.username).trim().toLowerCase());
+    };
+
+    if (currentUserId) {
+      const cid = String(currentUserId).trim().toLowerCase();
+      idsToCheck.add(cid);
+      if (cid.includes("@")) idsToCheck.add(cid.split("@")[0]);
+    }
+    if (teacherName) {
+      namesToCheck.add(String(teacherName).trim().toLowerCase());
+    }
+
+    addIdentities(currentUser);
+
+    try {
+      const savedSession = JSON.parse(localStorage.getItem("abms_session") || "{}")?.data?.user;
+      addIdentities(savedSession);
+    } catch (e) {
+      // ignore
+    }
+
+    if (userDirectory && Array.isArray(userDirectory)) {
+      const foundTeacher = userDirectory.find((u: any) => {
+        if (!u) return false;
+        const uId = String(u._id || u.id || u.user_id || u.teacher_id || "").trim().toLowerCase();
+        const uEmail = String(u.email || "").trim().toLowerCase();
+        const uUsername = String(u.username || "").trim().toLowerCase();
+        if (idsToCheck.has(uId) || idsToCheck.has(uEmail) || idsToCheck.has(uUsername)) return true;
+        const fullName = `${u.first_name || ""} ${u.last_name || ""}`.trim().toLowerCase();
+        if (fullName && namesToCheck.has(fullName)) return true;
+        return false;
+      });
+      if (foundTeacher) {
+        addIdentities(foundTeacher);
+      }
+    }
+
+    // 1. Check ID / username / email match
+    if (leaveTeacherId) {
+      if (idsToCheck.has(leaveTeacherId)) return true;
+      if (leaveTeacherId.includes("@") && idsToCheck.has(leaveTeacherId.split("@")[0])) return true;
+    }
+
+    // 2. Check Name match
+    if (leaveTeacherName) {
+      for (const n of namesToCheck) {
+        if (!n) continue;
+        if (leaveTeacherName === n || leaveTeacherName.includes(n) || n.includes(leaveTeacherName)) {
+          return true;
+        }
+      }
+    }
+
+    // 3. Check Organization match if teacher name tokens partially match
+    if (organizationId && l.organization_id) {
+      const targetOrg = String(organizationId).trim().toLowerCase();
+      const leafOrg = String(l.organization_id).trim().toLowerCase();
+      if (leafOrg === targetOrg && leaveTeacherName && namesToCheck.size > 0) {
+        const leaveWords = leaveTeacherName.split(/\s+/).filter(Boolean);
+        for (const n of namesToCheck) {
+          const userWords = n.split(/\s+/).filter(Boolean);
+          if (leaveWords.some(lw => userWords.some(uw => lw === uw && lw.length > 2))) {
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  };
+
   // 1. Fetch Teacher Leaves
   const fetchLeaves = async () => {
     setIsLoading(true);
+    let fetchedData: LeaveRequest[] = [];
+
     try {
       const res = await fetch("/rel/teacherLeave/retrieve", {
         method: "POST",
@@ -64,31 +175,38 @@ export default function TeacherLeavesView({
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ teacher_id: currentUserId })
+        body: JSON.stringify({})
       });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          // Filter to only current teacher's leaves
-          const filtered = data.filter((item: any) => item && item.teacher_id === currentUserId);
-          setLeaves(filtered);
-          setIsLoading(false);
-          return;
+          fetchedData = data.filter(Boolean);
         }
       }
     } catch (err) {
       console.warn("API leaf retrieval error, loading from local cache:", err);
     }
 
-    // Fallback scheme
+    // Merge with local storage
     const local = localStorage.getItem("abms_rel_teacher_leaves");
-    if (local) {
-      const allLeaves: LeaveRequest[] = JSON.parse(local);
-      const filtered = allLeaves.filter(l => l && l.teacher_id === currentUserId);
-      setLeaves(filtered);
-    } else {
-      setLeaves([]);
-    }
+    const localList: LeaveRequest[] = local ? JSON.parse(local) : [];
+
+    const map = new Map<string, LeaveRequest>();
+    fetchedData.forEach((item) => {
+      const key = String(item._id || item.id || Math.random());
+      map.set(key, item);
+    });
+    localList.forEach((item) => {
+      const key = String(item._id || item.id || "");
+      if (key && !map.has(key)) {
+        map.set(key, item);
+      }
+    });
+
+    const combined = Array.from(map.values());
+    const filtered = combined.filter(isTeacherMatch);
+
+    setLeaves(filtered);
     setIsLoading(false);
   };
 
@@ -188,7 +306,7 @@ export default function TeacherLeavesView({
     setEndDate("");
     
     // Refresh state
-    setLeaves(updated.filter(l => l.teacher_id === currentUserId));
+    setLeaves(updated.filter(isTeacherMatch));
     setIsSubmitting(false);
   };
 

@@ -25,9 +25,11 @@ const schema = new mongoose.Schema({
         type: String,
         required: true
     },
+    organization_id: {
+        type: String
+    },
     status: {
         type: String,
-        enum: ["Pending", "Approved", "Rejected"],
         default: "Pending"
     },
     created_at: {
